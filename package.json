@@ -1,0 +1,23 @@
+{
+  "name": "archen",
+  "version": "0.1.0",
+  "description": "Archen - Add GraphQL API to your existing database",
+  "main": "index.js",
+  "directories": {
+    "example": "example",
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Weidong Fang",
+  "license": "MIT",
+  "dependencies": {
+    "dataloader": "^1.4.0",
+    "graphql": "^0.13.1"
+  },
+ "repository": {
+    "type": "git",
+    "url": "http://github.com/fangwd/archen.git"
+  }
+}
