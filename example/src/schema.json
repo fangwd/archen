@@ -1,0 +1,232 @@
+{
+    "name": "archen",
+    "tables": [
+        {
+            "name": "order",
+            "charset": "latin1",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "int",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "code",
+                    "type": "varchar",
+                    "size": 40,
+                    "nullable": true
+                },
+                {
+                    "name": "user_id",
+                    "type": "int",
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "datetime",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "code",
+                    "unique": true,
+                    "columns": [
+                        "code"
+                    ]
+                },
+                {
+                    "name": "user_id",
+                    "columns": [
+                        "user_id"
+                    ]
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "columns": [
+                        "user_id"
+                    ],
+                    "referencedTable": "user",
+                    "referencedColumns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "order_item",
+            "charset": "latin1",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "int",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "order_id",
+                    "type": "int",
+                    "nullable": false
+                },
+                {
+                    "name": "product_id",
+                    "type": "int",
+                    "nullable": false
+                },
+                {
+                    "name": "quantity",
+                    "type": "double",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "order_id",
+                    "unique": true,
+                    "columns": [
+                        "order_id",
+                        "product_id"
+                    ]
+                },
+                {
+                    "name": "product_id",
+                    "columns": [
+                        "product_id"
+                    ]
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "columns": [
+                        "order_id"
+                    ],
+                    "referencedTable": "order",
+                    "referencedColumns": [
+                        "id"
+                    ]
+                },
+                {
+                    "columns": [
+                        "product_id"
+                    ],
+                    "referencedTable": "product",
+                    "referencedColumns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "product",
+            "charset": "latin1",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "int",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "sku",
+                    "type": "varchar",
+                    "size": 40,
+                    "nullable": false
+                },
+                {
+                    "name": "name",
+                    "type": "varchar",
+                    "size": 160,
+                    "nullable": false
+                },
+                {
+                    "name": "description",
+                    "type": "varchar",
+                    "size": 4096,
+                    "nullable": true
+                },
+                {
+                    "name": "quantity",
+                    "type": "double",
+                    "nullable": true,
+                    "default": "0",
+                    "default_quotable": true
+                },
+                {
+                    "name": "price",
+                    "type": "float",
+                    "nullable": true,
+                    "default": "0",
+                    "default_quotable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "sku",
+                    "unique": true,
+                    "columns": [
+                        "sku"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "user",
+            "charset": "latin1",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "int",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "email",
+                    "type": "varchar",
+                    "size": 80,
+                    "nullable": true
+                },
+                {
+                    "name": "password",
+                    "type": "varchar",
+                    "size": 60,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "email",
+                    "unique": true,
+                    "columns": [
+                        "email"
+                    ]
+                }
+            ]
+        }
+    ]
+}
