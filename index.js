@@ -2,20 +2,12 @@ const express = require('express');
 const graphqlHTTP = require('express-graphql');
 
 const { Database } = require('./lib/database');
+const { Document } = require('./lib/document');
 const { Loader } = require('./lib/loader');
 const { Builder } = require('./lib/builder');
 
 class Archen {
   constructor(schema, knex, options = { plurals: {}, endpoint: '/graphql' }) {
-    if (!(schema instanceof Database)) {
-      if (typeof schema === 'string') {
-        schema = JSON.parse(schema);
-      } else if (Buffer.isBuffer(schema)) {
-        schema = JSON.parse(schema.toString());
-      }
-      schema = new Database(schema);
-    }
-
     this.app = express();
 
     this.app.use(function(req, res, next) {
@@ -39,4 +31,4 @@ class Archen {
   }
 }
 
-module.exports = Archen;
+module.exports = { Archen, Database, Document };
