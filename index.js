@@ -1,15 +1,42 @@
+const express = require('express');
+const graphqlHTTP = require('express-graphql');
+
 const { Database } = require('./lib/database');
 const { Loader } = require('./lib/loader');
 const { Builder } = require('./lib/builder');
 
-function createSchema(data, options) {
-  const builder = new Builder(new Database(data), options);
-  const schema = builder.build();
-  return schema;
+class Archen {
+  constructor(schema, knex, options = { plurals: {}, endpoint: '/graphql' }) {
+    if (!(schema instanceof Database)) {
+      if (typeof schema === 'string') {
+        schema = JSON.parse(schema);
+      } else if (Buffer.isBuffer(schema)) {
+        schema = JSON.parse(schema.toString());
+      }
+      schema = new Database(schema);
+    }
+
+    this.app = express();
+
+    this.app.use(function(req, res, next) {
+      req.loader = new Loader(knex, schema);
+      next();
+    });
+
+    const builder = new Builder(schema, options);
+
+    this.app.use(
+      options.endpoint,
+      graphqlHTTP({
+        schema: builder.build(),
+        graphiql: true,
+      })
+    );
+  }
+
+  start(port, callback) {
+    this.app.listen(port, callback);
+  }
 }
 
-function createLoader(conn, data, options) {
-  return new Loader(conn, data);
-}
-
-module.exports = { createSchema, createLoader };
+module.exports = Archen;
