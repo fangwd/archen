@@ -6,8 +6,10 @@ const { Document } = require('./lib/document');
 const { Loader } = require('./lib/loader');
 const { Builder } = require('./lib/builder');
 
+const DEFAULT_OPTIONS = { plurals: {}, endpoint: '/graphql' };
+
 class Archen {
-  constructor(schema, knex, options = { plurals: {}, endpoint: '/graphql' }) {
+  constructor(schema, knex, options = {}) {
     this.app = express();
 
     this.app.use(function(req, res, next) {
@@ -15,15 +17,28 @@ class Archen {
       next();
     });
 
-    const builder = new Builder(schema, options);
+    options = Object.assign({}, DEFAULT_OPTIONS, options);
 
-    this.app.use(
-      options.endpoint,
-      graphqlHTTP({
-        schema: builder.build(),
-        graphiql: true,
-      })
-    );
+    const httpOptions = {
+      schema: new Builder(schema, options).build(),
+      pretty: false,
+    };
+
+    if (options.debug) {
+      httpOptions.graphiql = true;
+      httpOptions.formatError = error => {
+        console.error(error);
+        const params = {
+          message: error.message,
+          state: error.originalError && error.originalError.state,
+          locations: error.locations,
+          path: error.path,
+        };
+        return params;
+      };
+    }
+
+    this.app.use(options.endpoint, graphqlHTTP(httpOptions));
   }
 
   start(port, callback) {
