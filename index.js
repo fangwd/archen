@@ -1,49 +1,34 @@
-const express = require('express');
-const graphqlHTTP = require('express-graphql');
-
-const { Database } = require('./lib/database');
-const { Document } = require('./lib/document');
+const { Database } = require('./lib/model');
 const { Loader } = require('./lib/loader');
-const { Builder } = require('./lib/builder');
+const { createSchema } = require('./lib/schema');
 
-const DEFAULT_OPTIONS = { plurals: {}, endpoint: '/graphql' };
+const fs = require('fs');
 
 class Archen {
-  constructor(schema, knex, options = {}) {
-    this.app = express();
-
-    this.app.use(function(req, res, next) {
-      req.loader = new Loader(knex, schema);
-      next();
-    });
-
-    options = Object.assign({}, DEFAULT_OPTIONS, options);
-
-    const httpOptions = {
-      schema: new Builder(schema, options).build(),
-      pretty: false,
-    };
-
-    if (options.debug) {
-      httpOptions.graphiql = true;
-      httpOptions.formatError = error => {
-        console.error(error);
-        const params = {
-          message: error.message,
-          state: error.originalError && error.originalError.state,
-          locations: error.locations,
-          path: error.path,
-        };
-        return params;
-      };
+  constructor(schema, options = {}) {
+    if (typeof schema === 'string') {
+      try {
+        schema = JSON.parse(schema);
+      } catch (error) {
+        schema = JSON.parse(fs.readFileSync(schema).toString());
+      }
     }
 
-    this.app.use(options.endpoint, graphqlHTTP(httpOptions));
+    this._model = new Database(schema);
+    this._schema = createSchema(this._model);
   }
 
-  start(port, callback) {
-    this.app.listen(port, callback);
+  getSchema() {
+    return this._schema;
+  }
+
+  getContext(db) {
+    return {
+      loader: new Loader(this._model, db)
+    };
   }
 }
 
-module.exports = { Archen, Database, Document };
+module.exports = function(schema, options) {
+  return new Archen(schema, options);
+};
