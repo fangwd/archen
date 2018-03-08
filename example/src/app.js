@@ -1,4 +1,5 @@
-const { Archen, Database, Document } = require('../../index');
+const express = require('express');
+const graphqlHTTP = require('express-graphql');
 
 const knex = require('knex')({
   client: 'mysql',
@@ -6,22 +7,31 @@ const knex = require('knex')({
     host: '127.0.0.1',
     user: 'root',
     password: 'secret',
-    database: 'archen_test',
+    database: 'example'
   },
-  pool: { min: 0, max: 7 },
+  pool: { min: 0, max: 7 }
 });
 
-const generateSchemaFromDatabase = () => {
-  const fileName = require('path').join(__dirname, 'schema.json');
-  return new Database(JSON.parse(require('fs').readFileSync(fileName)));
-}
+const archen = require('archen')('data/schema.json');
 
-const generateFromGraphql = () => {
-  const fileName = require('path').join(__dirname, 'schema.graphql');
-  return new Document(require('fs').readFileSync(fileName));
-}
+const app = express();
 
-const schema = generateSchemaFromDatabase();
+app.get('/', (req, res) => res.send('Hello World!'));
 
-const server = new Archen(schema, knex);
-server.start(3000, () => console.log('Example server running on port 3000'));
+app.use(
+  '/graphql',
+  graphqlHTTP(async (request, response, params) => ({
+    schema: archen.getSchema(),
+    context: archen.getContext(knex),
+    pretty: false,
+    graphiql: true,
+    formatError: error => ({
+      message: error.message,
+      locations: error.locations,
+      stack: error.stack ? error.stack.split('\n') : [],
+      path: error.path
+    })
+  }))
+);
+
+app.listen(3000);

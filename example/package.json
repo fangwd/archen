@@ -14,6 +14,8 @@
     "start": "node ./dist/app.js"
   },
   "dependencies": {
+    "express": "^4.15.2",
+    "express-graphql": "^0.6.11",
     "archen": "^0.1.0",
     "mysql": "^2.15.0"
   },
