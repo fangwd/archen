@@ -1,5 +1,6 @@
 const express = require('express');
 const graphqlHTTP = require('express-graphql');
+const fs = require('fs');
 
 const knex = require('knex')({
   client: 'mysql',
@@ -12,7 +13,7 @@ const knex = require('knex')({
   pool: { min: 0, max: 7 }
 });
 
-const archen = require('archen')('data/schema.json');
+const archen = require('archen')(fs.readFileSync('schema/schema.json'));
 
 const app = express();
 
