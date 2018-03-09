@@ -1,16 +1,19 @@
 const { Database } = require('./lib/model');
+const { Document } = require('./lib/document');
 const { Loader } = require('./lib/loader');
 const { createSchema } = require('./lib/schema');
 
-const fs = require('fs');
-
 class Archen {
   constructor(schema, options = {}) {
+    if (schema instanceof Buffer) {
+      schema = schema.toString();
+    }
+
     if (typeof schema === 'string') {
       try {
         schema = JSON.parse(schema);
       } catch (error) {
-        schema = JSON.parse(fs.readFileSync(schema).toString());
+        schema = new Document(schema).json();
       }
     }
 
