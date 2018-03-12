@@ -55,20 +55,6 @@ test('creating object', done => {
   });
 });
 
-/*
-db
-  .table('shop')
-  .insert({ name: 'foo' })
-  .then(() => {
-    db
-      .select('*')
-      .from('shop')
-      .then((rows, fields) => {
-        console.log('*shit');
-        console.log(rows, fields);
-      });
-  });
-*/
 function createDatabase() {
   return new Promise(resolve => {
     function _create() {
