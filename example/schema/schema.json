@@ -1,31 +1,24 @@
 {
-    "name": "archen",
+    "name": "",
     "tables": [
         {
-            "name": "order",
-            "charset": "latin1",
+            "name": "user",
             "columns": [
                 {
                     "name": "id",
-                    "type": "int",
-                    "nullable": false,
-                    "autoIncrement": true
+                    "type": "integer",
+                    "nullable": true
                 },
                 {
-                    "name": "code",
+                    "name": "email",
                     "type": "varchar",
-                    "size": 40,
+                    "size": 200,
                     "nullable": true
                 },
                 {
-                    "name": "user_id",
+                    "name": "status",
                     "type": "int",
                     "nullable": true
-                },
-                {
-                    "name": "created_at",
-                    "type": "datetime",
-                    "nullable": false
                 }
             ],
             "indexes": [
@@ -36,16 +29,263 @@
                     ]
                 },
                 {
-                    "name": "code",
                     "unique": true,
                     "columns": [
-                        "code"
+                        "email"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "shop",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "name",
+                    "type": "varchar",
+                    "size": 200,
+                    "nullable": true
+                },
+                {
+                    "name": "status",
+                    "type": "int",
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
                     ]
                 },
                 {
+                    "unique": true,
+                    "columns": [
+                        "name"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "role",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "name",
+                    "type": "varchar",
+                    "size": 60,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "name"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "shop_user",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
                     "name": "user_id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "shop_id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "role_id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "status",
+                    "type": "int",
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "shop_id",
+                        "user_id"
+                    ]
+                }
+            ],
+            "foreignKeys": [
+                {
                     "columns": [
                         "user_id"
+                    ],
+                    "referencedTable": "user",
+                    "referencedColumns": [
+                        "id"
+                    ]
+                },
+                {
+                    "columns": [
+                        "shop_id"
+                    ],
+                    "referencedTable": "shop",
+                    "referencedColumns": [
+                        "id"
+                    ]
+                },
+                {
+                    "columns": [
+                        "role_id"
+                    ],
+                    "referencedTable": "role",
+                    "referencedColumns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "product",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "sku",
+                    "type": "char",
+                    "size": 40,
+                    "nullable": true
+                },
+                {
+                    "name": "name",
+                    "type": "char",
+                    "size": 200,
+                    "nullable": true
+                },
+                {
+                    "name": "shop_id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "price",
+                    "type": "float",
+                    "nullable": true
+                },
+                {
+                    "name": "status",
+                    "type": "int",
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "sku"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "name"
+                    ]
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "columns": [
+                        "shop_id"
+                    ],
+                    "referencedTable": "shop",
+                    "referencedColumns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "order",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "code",
+                    "type": "char",
+                    "size": 40,
+                    "nullable": true
+                },
+                {
+                    "name": "date",
+                    "type": "datetime",
+                    "nullable": true,
+                    "default": "current_timestamp",
+                    "default_quotable": false
+                },
+                {
+                    "name": "user_id",
+                    "type": "int",
+                    "nullable": true
+                },
+                {
+                    "name": "status",
+                    "type": "int",
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "code"
                     ]
                 }
             ],
@@ -63,28 +303,26 @@
         },
         {
             "name": "order_item",
-            "charset": "latin1",
             "columns": [
                 {
                     "name": "id",
-                    "type": "int",
-                    "nullable": false,
-                    "autoIncrement": true
+                    "type": "integer",
+                    "nullable": true
                 },
                 {
                     "name": "order_id",
-                    "type": "int",
-                    "nullable": false
+                    "type": "integer",
+                    "nullable": true
                 },
                 {
                     "name": "product_id",
                     "type": "int",
-                    "nullable": false
+                    "nullable": true
                 },
                 {
                     "name": "quantity",
-                    "type": "double",
-                    "nullable": false
+                    "type": "float",
+                    "nullable": true
                 }
             ],
             "indexes": [
@@ -95,16 +333,9 @@
                     ]
                 },
                 {
-                    "name": "order_id",
                     "unique": true,
                     "columns": [
                         "order_id",
-                        "product_id"
-                    ]
-                },
-                {
-                    "name": "product_id",
-                    "columns": [
                         "product_id"
                     ]
                 }
@@ -126,104 +357,6 @@
                     "referencedTable": "product",
                     "referencedColumns": [
                         "id"
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "product",
-            "charset": "latin1",
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "int",
-                    "nullable": false,
-                    "autoIncrement": true
-                },
-                {
-                    "name": "sku",
-                    "type": "varchar",
-                    "size": 40,
-                    "nullable": false
-                },
-                {
-                    "name": "name",
-                    "type": "varchar",
-                    "size": 160,
-                    "nullable": false
-                },
-                {
-                    "name": "description",
-                    "type": "varchar",
-                    "size": 4096,
-                    "nullable": true
-                },
-                {
-                    "name": "quantity",
-                    "type": "double",
-                    "nullable": true,
-                    "default": "0",
-                    "default_quotable": true
-                },
-                {
-                    "name": "price",
-                    "type": "float",
-                    "nullable": true,
-                    "default": "0",
-                    "default_quotable": true
-                }
-            ],
-            "indexes": [
-                {
-                    "primaryKey": true,
-                    "columns": [
-                        "id"
-                    ]
-                },
-                {
-                    "name": "sku",
-                    "unique": true,
-                    "columns": [
-                        "sku"
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "user",
-            "charset": "latin1",
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "int",
-                    "nullable": false,
-                    "autoIncrement": true
-                },
-                {
-                    "name": "email",
-                    "type": "varchar",
-                    "size": 80,
-                    "nullable": true
-                },
-                {
-                    "name": "password",
-                    "type": "varchar",
-                    "size": 60,
-                    "nullable": true
-                }
-            ],
-            "indexes": [
-                {
-                    "primaryKey": true,
-                    "columns": [
-                        "id"
-                    ]
-                },
-                {
-                    "name": "email",
-                    "unique": true,
-                    "columns": [
-                        "email"
                     ]
                 }
             ]
