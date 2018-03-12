@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Archen - Add GraphQL API to your existing database",
   "main": "index.js",
   "directories": {
@@ -8,7 +8,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "author": "Weidong Fang",
   "license": "MIT",
@@ -20,5 +20,9 @@
   "repository": {
     "type": "git",
     "url": "http://github.com/fangwd/archen.git"
+  },
+  "devDependencies": {
+    "jest": "^22.4.2",
+    "sqlite3": "^3.1.13"
   }
 }
