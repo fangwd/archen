@@ -1,23 +1,23 @@
 create table user (
-  id integer primary key,
+  id integer primary key auto_increment,
   name varchar(60),
   email varchar(200) unique,
   status int
 );
 
 create table shop (
-  id integer primary key,
+  id integer primary key auto_increment,
   name varchar(200) unique,
   status int
 );
 
 create table role (
-  id integer primary key,
+  id integer primary key auto_increment,
   name varchar(60) unique
 );
 
 create table shop_user(
-  id integer primary key,
+  id integer primary key auto_increment,
   user_id integer,
   shop_id integer,
   role_id integer,
@@ -31,7 +31,7 @@ create table shop_user(
 );
 
 create table product (
-  id integer primary key,
+  id integer primary key auto_increment,
   sku char(40) unique,
   name char(200),
   shop_id integer,
@@ -41,7 +41,7 @@ create table product (
 );
 
 create table `order` (
-  id integer primary key,
+  id integer primary key auto_increment,
   code char(40) unique,
   `date` datetime default current_timestamp,
   user_id integer default null,
@@ -50,7 +50,7 @@ create table `order` (
 );
 
 create table order_item (
-  id integer primary key,
+  id integer primary key auto_increment,
   order_id integer,
   product_id integer,
   quantity float,
