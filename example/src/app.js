@@ -13,7 +13,13 @@ const knex = require('knex')({
   pool: { min: 0, max: 7 }
 });
 
-const archen = require('archen')(fs.readFileSync('schema/schema.json'));
+let archen;
+
+if (process.env.NODE_ENV === 'development') {
+  archen = require('../..')(fs.readFileSync('example/data/schema.json'));
+} else {
+  archen = require('archen')(fs.readFileSync('data/schema.json'));
+}
 
 const app = express();
 
