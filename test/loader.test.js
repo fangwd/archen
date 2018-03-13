@@ -3,7 +3,8 @@ const sqlite3 = require('sqlite3');
 const { graphql } = require('graphql');
 
 const DATABASE = 'myshop.db';
-const SCHEMA = fs.readFileSync('example/schema/schema.sql').toString();
+const SCHEMA = fs.readFileSync('example/data/schema.sql').toString();
+const DATA = fs.readFileSync('example/data/data.sql').toString();
 
 let db;
 
@@ -20,7 +21,7 @@ beforeAll(() => {
   });
 });
 
-const archen = require('..')(fs.readFileSync('example/schema/schema.json'));
+const archen = require('..')(fs.readFileSync('example/data/schema.json'));
 
 test('creating object', done => {
   expect.assertions(6);
@@ -60,7 +61,8 @@ function createDatabase() {
     function _create() {
       const db = new sqlite3.Database(DATABASE);
       db.serialize(function() {
-        SCHEMA.split(';').forEach(stmt => {
+        (SCHEMA + DATA).split(';').forEach(line => {
+          const stmt = line.replace(/--.*?(\n|$)/g, '\n');
           if (stmt.trim()) {
             db.run(stmt);
           }
@@ -68,7 +70,6 @@ function createDatabase() {
       });
       db.close(err => {
         if (err) throw err;
-        console.log('Created');
         resolve();
       });
     }
