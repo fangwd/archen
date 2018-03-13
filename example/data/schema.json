@@ -10,6 +10,12 @@
                     "nullable": true
                 },
                 {
+                    "name": "name",
+                    "type": "varchar",
+                    "size": 60,
+                    "nullable": true
+                },
+                {
                     "name": "email",
                     "type": "varchar",
                     "size": 200,
@@ -125,6 +131,16 @@
                     "nullable": true
                 },
                 {
+                    "name": "start_from",
+                    "type": "datetime",
+                    "nullable": true
+                },
+                {
+                    "name": "end_by",
+                    "type": "datetime",
+                    "nullable": true
+                },
+                {
                     "name": "status",
                     "type": "int",
                     "nullable": true
@@ -223,12 +239,6 @@
                     "columns": [
                         "sku"
                     ]
-                },
-                {
-                    "unique": true,
-                    "columns": [
-                        "name"
-                    ]
                 }
             ],
             "foreignKeys": [
@@ -266,7 +276,7 @@
                 },
                 {
                     "name": "user_id",
-                    "type": "int",
+                    "type": "integer",
                     "nullable": true
                 },
                 {
@@ -316,7 +326,7 @@
                 },
                 {
                     "name": "product_id",
-                    "type": "int",
+                    "type": "integer",
                     "nullable": true
                 },
                 {
@@ -333,6 +343,7 @@
                     ]
                 },
                 {
+                    "name": "order_product",
                     "unique": true,
                     "columns": [
                         "order_id",
