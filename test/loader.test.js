@@ -62,8 +62,9 @@ function createDatabase() {
       const db = new sqlite3.Database(DATABASE);
       db.serialize(function() {
         (SCHEMA + DATA).split(';').forEach(line => {
-          const stmt = line.replace(/--.*?(\n|$)/g, '\n');
+          const stmt = line.replace(/auto_increment|--.*?(\n|$)/ig, '\n');
           if (stmt.trim()) {
+            console.log(stmt)
             db.run(stmt);
           }
         });
