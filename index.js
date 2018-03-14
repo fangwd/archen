@@ -17,7 +17,7 @@ class Archen {
       }
     }
 
-    this._model = new Database(schema);
+    this._model = new Database(schema, options);
     this._schema = createSchema(this._model);
   }
 
