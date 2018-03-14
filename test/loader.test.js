@@ -1,23 +1,12 @@
 const fs = require('fs');
-const sqlite3 = require('sqlite3');
 const { graphql } = require('graphql');
-
-const DATABASE = 'myshop.db';
-const SCHEMA = fs.readFileSync('example/data/schema.sql').toString();
-const DATA = fs.readFileSync('example/data/data.sql').toString();
+const { createDatabase } = require('./helper');
 
 let db;
 
 beforeAll(() => {
-  return createDatabase().then(() => {
-    db = require('knex')({
-      client: 'sqlite3',
-      connection: {
-        filename: DATABASE
-      },
-      useNullAsDefault: true
-    });
-    return Promise.resolve();
+  return createDatabase().then(knex => {
+    db = knex;
   });
 });
 
@@ -30,7 +19,7 @@ test('creating object', done => {
   const STATUS = 200;
 
   const QUERY = `mutation {
-  create_user(data: {email: "${EMAIL}", status: ${STATUS}}) {
+  createUser(data: {email: "${EMAIL}", status: ${STATUS}}) {
     id
     email
     status
@@ -38,7 +27,7 @@ test('creating object', done => {
 }
 `;
   graphql(archen.getSchema(), QUERY, null, archen.getContext(db)).then(row => {
-    const user = row.data.create_user;
+    const user = row.data.createUser;
     expect(user.email).toBe(EMAIL);
     expect(user.status).toBe(STATUS);
     db
@@ -56,33 +45,23 @@ test('creating object', done => {
   });
 });
 
-function createDatabase() {
-  return new Promise(resolve => {
-    function _create() {
-      const db = new sqlite3.Database(DATABASE);
-      db.serialize(function() {
-        (SCHEMA + DATA).split(';').forEach(line => {
-          const stmt = line.replace(/auto_increment|--.*?(\n|$)/ig, '\n');
-          if (stmt.trim()) {
-            console.log(stmt)
-            db.run(stmt);
-          }
-        });
-      });
-      db.close(err => {
-        if (err) throw err;
-        resolve();
-      });
+test('simple query', done => {
+  expect.assertions(3);
+
+  const QUERY = `
+  {
+    categories(where: {parent: {name: "Fruit"}}, orderBy: "name") {
+      name
     }
-    fs.exists(DATABASE, exists => {
-      if (exists) {
-        fs.unlink(DATABASE, err => {
-          if (err) throw err;
-          _create();
-        });
-      } else {
-        _create();
-      }
-    });
-  });
-}
+  }
+`;
+  graphql(archen.getSchema(), QUERY, null, archen.getContext(db)).then(
+    result => {
+      const rows = result.data.categories;
+      expect(rows.length).toBe(2);
+      expect(rows[0].name).toBe('Apple');
+      expect(rows[1].name).toBe('Banana');
+      done();
+    }
+  );
+});
