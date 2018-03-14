@@ -42,6 +42,8 @@ See `example/src/app.js` for an example using MySQL.
 
 # Development
 
+## Using the example
+
 To start the example graphql server for development using mysql:
 
 ```
@@ -49,4 +51,29 @@ $ echo 'drop database if exists example; create database example' | mysql -uroot
 $ cat example/data/schema.sql example/data/data.sql | mysql -uroot -psecret example
 $ npm install express express-graphql mysql
 $ NODE_ENV=development nodemon example/src/app.js
+```
+
+## Logging MySQL queries to file
+
+To enable logging:
+
+```
+SET global log_output = 'FILE';
+SET global general_log_file='/tmp/mysqld.log';
+SET global general_log = 1;
+```
+
+To disable:
+
+```
+SET global general_log = 0;
+```
+
+## Creating a sqlite3 database
+
+The following command can help remove the `auto_increment` keywords in `example/data/schema.sql`
+so that it works for sqlite3:
+
+```
+$ sed 's/\sauto_increment//ig' example/data/schema.sql
 ```
