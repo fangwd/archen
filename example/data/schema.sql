@@ -5,45 +5,48 @@ create table user (
   status int
 );
 
-create table shop (
+create table `group` (
   id integer primary key auto_increment,
-  name varchar(200) unique,
-  status int
+  name varchar(200) unique
 );
 
-create table role (
-  id integer primary key auto_increment,
-  name varchar(60) unique
-);
-
-create table shop_user(
+create table user_group (
   id integer primary key auto_increment,
   user_id integer,
-  shop_id integer,
-  role_id integer,
-  start_from datetime,
-  end_by datetime,
-  status int,
-  unique (shop_id, user_id),
+  group_id integer,
+  date_added datetime default current_timestamp,
+  unique (user_id, group_id),
   foreign key (user_id) references user(id),
-  foreign key (shop_id) references shop(id),
-  foreign key (role_id) references role(id)
+  foreign key (group_id) references `group`(id)
+);
+
+create table category (
+  id integer primary key auto_increment,
+  name varchar(200),
+  parent_id integer default null,
+  foreign key (parent_id) references category(id),
+  unique (parent_id, name)
 );
 
 create table product (
   id integer primary key auto_increment,
   sku char(40) unique,
   name char(200),
-  shop_id integer,
   price float,
-  status int,
-  foreign key (shop_id) references shop(id)
+  status int
+);
+
+create table product_category (
+  id integer primary key auto_increment,
+  product_id integer,
+  category_id integer,
+  unique (product_id, category_id)
 );
 
 create table `order` (
   id integer primary key auto_increment,
   code char(40) unique,
-  `date` datetime default current_timestamp,
+  date_created datetime default current_timestamp,
   user_id integer default null,
   status int,
   foreign key (user_id) references user(id)
