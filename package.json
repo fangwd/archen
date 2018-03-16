@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "0.4.8",
+  "version": "0.4.10",
   "description": "Archen - Add GraphQL API to your existing database",
   "main": "index.js",
   "directories": {
@@ -15,7 +15,6 @@
   "dependencies": {
     "dataloader": "^1.4.0",
     "graphql": "^0.13.1",
-    "graphql-iso-date": "^3.5.0",
     "knex": "0.14.2"
   },
   "repository": {
