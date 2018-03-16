@@ -1,7 +1,7 @@
-insert into user (id, name, email, status) values
-  (1, 'alice', 'alice@example.com', 1),
-  (2, 'bob', 'bob@example.com', 0),
-  (3, 'grace', 'grace@example.com', 1);
+insert into user (id, email, first_name, last_name, status) values
+  (1, 'alice@example.com', 'Alice', 'Green', 1),
+  (2, 'bob@example.com', 'Bob', 'Brown', 0),
+  (3, 'grace@example.com', 'Grace', 'White', 1);
 insert into `group`(id, name) values
   (1, 'ADMIN'),
   (2, 'STAFF');
@@ -35,13 +35,15 @@ insert into product_category(product_id, category_id) values
   (6, 6),
   (7, 5),
   (8, 6);
-insert into `order` (id, code, date_created, user_id, status) values
-  (1, 'order-1', '2018-3-20', 3, 1),
-  (2, 'order-2', '2018-3-21', 3, 1);
+insert into delivery_address (id, street_address, city, state, country, postal_code) values
+  (1, '1 King William Street', 'Adelaide', 'South Australia', 'Australia', '5000'),
+  (2, '2 King William Street', 'Adelaide', 'South Australia', 'Australia', '5000');
+insert into `order` (id, code, date_created, user_id, delivery_address_id, status) values
+  (1, 'order-1', '2018-3-20', 3, 1, 1),
+  (2, 'order-2', '2018-3-21', 3, 2, 1);
 insert into order_item (order_id, product_id, quantity) values
   (1, 1, 2), -- 2 kg of australian apple
   (1, 3, 1), -- 1 kg of american apple
   (2, 2, 2), -- 2 kg of australian banana
   (2, 1, 1), -- 1 kg of australian apple
   (2, 7, 2); -- 2 kg of american beef
-

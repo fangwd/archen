@@ -11,15 +11,21 @@
                     "autoIncrement": true
                 },
                 {
-                    "name": "name",
-                    "type": "varchar",
-                    "size": 60,
-                    "nullable": true
-                },
-                {
                     "name": "email",
                     "type": "varchar",
                     "size": 200,
+                    "nullable": true
+                },
+                {
+                    "name": "first_name",
+                    "type": "varchar",
+                    "size": 30,
+                    "nullable": true
+                },
+                {
+                    "name": "last_name",
+                    "type": "varchar",
+                    "size": 100,
                     "nullable": true
                 },
                 {
@@ -212,6 +218,11 @@
                     "nullable": true
                 },
                 {
+                    "name": "stock_quantity",
+                    "type": "float",
+                    "nullable": true
+                },
+                {
                     "name": "status",
                     "type": "int",
                     "nullable": true
@@ -269,6 +280,64 @@
             ]
         },
         {
+            "name": "delivery_address",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "street_address",
+                    "type": "varchar",
+                    "size": 100,
+                    "nullable": false
+                },
+                {
+                    "name": "city",
+                    "type": "varchar",
+                    "size": 30,
+                    "nullable": false
+                },
+                {
+                    "name": "state",
+                    "type": "varchar",
+                    "size": 30,
+                    "nullable": false
+                },
+                {
+                    "name": "country",
+                    "type": "varchar",
+                    "size": 30,
+                    "nullable": false
+                },
+                {
+                    "name": "postal_code",
+                    "type": "varchar",
+                    "size": 8,
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "street_address",
+                        "city",
+                        "state",
+                        "country"
+                    ]
+                }
+            ]
+        },
+        {
             "name": "order",
             "columns": [
                 {
@@ -296,6 +365,11 @@
                     "nullable": true
                 },
                 {
+                    "name": "delivery_address_id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
                     "name": "status",
                     "type": "int",
                     "nullable": true
@@ -316,6 +390,15 @@
                 }
             ],
             "foreignKeys": [
+                {
+                    "columns": [
+                        "delivery_address_id"
+                    ],
+                    "referencedTable": "delivery_address",
+                    "referencedColumns": [
+                        "id"
+                    ]
+                },
                 {
                     "columns": [
                         "user_id"

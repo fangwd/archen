@@ -1,7 +1,8 @@
 create table user (
   id integer primary key auto_increment,
-  name varchar(60),
   email varchar(200) unique,
+  first_name varchar(30),
+  last_name varchar(100),
   status int
 );
 
@@ -33,6 +34,7 @@ create table product (
   sku char(40) unique,
   name char(200),
   price float,
+  stock_quantity float,
   status int
 );
 
@@ -43,12 +45,24 @@ create table product_category (
   unique (product_id, category_id)
 );
 
+create table delivery_address (
+  id integer primary key auto_increment,
+  street_address varchar(100) NOT NULL,
+  city varchar(30) NOT NULL,
+  state varchar(30) NOT NULL,
+  country varchar(30) NOT NULL,
+  postal_code varchar(8) NOT NULL,
+  unique (street_address, city, state, country)
+);
+
 create table `order` (
   id integer primary key auto_increment,
   code char(40) unique,
   date_created datetime default current_timestamp,
   user_id integer default null,
+  delivery_address_id integer default null,
   status int,
+  foreign key (delivery_address_id) references delivery_address(id),
   foreign key (user_id) references user(id)
 );
 
