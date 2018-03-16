@@ -1,16 +1,27 @@
 const fs = require('fs');
 const sqlite3 = require('sqlite3');
+const knex = require('knex');
 
-const DATABASE = 'example.db';
+const TEST_DB = process.env.ARCHEN_TEST || 'archen_test';
 const SCHEMA = fs.readFileSync('example/data/schema.sql').toString();
 const DATA = fs.readFileSync('example/data/data.sql').toString();
 
 const archen = require('..')(fs.readFileSync('example/data/schema.json'));
 
-function createDatabase(overwrite) {
+function createSQLite3Connection() {
+  return knex({
+    client: 'sqlite3',
+    connection: {
+      filename: TEST_DB
+    },
+    useNullAsDefault: true
+  });
+}
+
+function createSQLite3Database() {
   return new Promise(resolve => {
     function _create() {
-      const db = new sqlite3.Database(DATABASE);
+      const db = new sqlite3.Database(TEST_DB);
       db.serialize(function() {
         (SCHEMA + DATA).split(';').forEach(line => {
           const stmt = line.replace(/auto_increment|--.*?(\n|$)/gi, '\n');
@@ -26,19 +37,12 @@ function createDatabase(overwrite) {
     }
 
     function _resolve() {
-      const db = require('knex')({
-        client: 'sqlite3',
-        connection: {
-          filename: DATABASE
-        },
-        useNullAsDefault: true
-      });
-      resolve(db);
+      resolve();
     }
 
-    fs.exists(DATABASE, exists => {
+    fs.exists(TEST_DB, exists => {
       if (exists) {
-        fs.unlink(DATABASE, err => {
+        fs.unlink(TEST_DB, err => {
           if (err) throw err;
           _create();
         });
@@ -49,4 +53,50 @@ function createDatabase(overwrite) {
   });
 }
 
-module.exports = { createDatabase };
+function createMySQLConnection(exists = true) {
+  return knex({
+    client: 'mysql',
+    connection: {
+      host: '127.0.0.1',
+      user: 'root',
+      password: 'secret',
+      database: exists ? TEST_DB : undefined,
+      timezone: 'Z'
+    },
+    pool: { min: 0, max: 7 }
+  });
+}
+
+function createMySQLDatabase() {
+  return new Promise(resolve => {
+    const db = createConnection(false);
+    const lines = [
+      `drop database if exists ${TEST_DB}`,
+      `create database ${TEST_DB}`,
+      `use ${TEST_DB}`
+    ].concat((SCHEMA + DATA).split(';').filter(line => line.trim()));
+    let next = 0;
+    function _resolve() {
+      if (next >= lines.length) {
+        resolve();
+      } else {
+        const line = lines[next++];
+        db.raw(line).then(() => {
+          _resolve();
+        });
+      }
+    }
+    _resolve();
+  });
+}
+
+const createConnection = process.env.ARCHEN_TEST
+  ? createMySQLConnection
+  : createSQLite3Connection;
+
+module.exports = {
+  createSQLite3Database,
+  createMySQLDatabase,
+  createConnection,
+  graphql: require('graphql').graphql
+};
