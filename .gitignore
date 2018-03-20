@@ -1,4 +1,7 @@
 node_modules/
 archen_test
+*~
+*.swp
+*.swo
 *.log
 

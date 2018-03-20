@@ -16,7 +16,7 @@ const knex = require('knex')({
 
 let archen;
 
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === 'development' || process.env.ARCHEN_TEST) {
   archen = require('../..')(fs.readFileSync('example/data/schema.json'));
 } else {
   archen = require('archen')(fs.readFileSync('data/schema.json'));

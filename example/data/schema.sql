@@ -42,6 +42,8 @@ create table product_category (
   id integer primary key auto_increment,
   product_id integer,
   category_id integer,
+  foreign key (product_id) references product(id),
+  foreign key (category_id) references category(id),
   unique (product_id, category_id)
 );
 
