@@ -27,7 +27,7 @@ interface Index {
   references?: Index;
 }
 
-interface SchemaConfig {
+interface DomainConfig {
   models: ModelConfig[];
 }
 
@@ -45,13 +45,13 @@ interface FieldConfig {
   throughField?: string;
 }
 
-const SCHEMA_CONFIG: SchemaConfig = { models: [] };
+const SCHEMA_CONFIG: DomainConfig = { models: [] };
 const MODEL_CONFIG: ModelConfig = { fields: [] };
 const FIELD_CONFIG: FieldConfig = {};
 
-export class Schema {
+export class Domain {
   database: Database;
-  config: SchemaConfig;
+  config: DomainConfig;
   models: Model[] = [];
 
   private modelMap: { [key: string]: Model } = {};
@@ -103,7 +103,7 @@ export class Schema {
 }
 
 export class Model {
-  schema: Schema;
+  domain: Domain;
   name: string;
   fields: Field[] = [];
   table: Table;
@@ -117,8 +117,8 @@ export class Model {
     return this.config.fields.find(field => field.column === column.name);
   }
 
-  constructor(schema: Schema, table: Table, config: ModelConfig) {
-    this.schema = schema;
+  constructor(domain: Domain, table: Table, config: ModelConfig) {
+    this.domain = domain;
     this.table = table;
     this.config = Object.assign({}, MODEL_CONFIG, config);
     this.name = this.config.name || toPascal(table.name);
@@ -152,12 +152,15 @@ export class Model {
       if (index.primaryKey || index.unique) {
         const fields = index.columns.map(name => this.field(name));
         this.uniqueKeys.push(new UniqueKey(fields, index.primaryKey));
+        if (fields.length === 1) {
+          fields[0].unique = true;
+        }
       }
 
       if (index.references) {
         const field = this.field(index.columns[0]);
         if (field instanceof ForeignKeyField) {
-          const referencedTable = this.schema.model(index.references.table);
+          const referencedTable = this.domain.model(index.references.table);
           const columnName = index.references.columns[0];
           const referencedField = referencedTable.field(columnName);
           if (referencedField instanceof SimpleField) {
@@ -207,6 +210,8 @@ export class Field {
   name: string;
   model: Model;
   config: FieldConfig;
+
+  unique?: boolean;
 
   constructor(name: string, model: Model, config: FieldConfig) {
     this.name = name;

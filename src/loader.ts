@@ -1,8 +1,13 @@
-const DataLoader = require('dataloader');
-const { Column } = require('./model');
+import * as DataLoader from 'dataloader';
+import * as knex from 'knex';
+
+import { Schema } from './model';
 
 class Loader {
-  constructor(schema, db) {
+  db: knex;
+  queryLoader: DataLoader<string, any>;
+
+  constructor(schema, db: knex) {
     this.db = db;
     this.queryLoader = createQueryLoader(db);
     this.loaders = {};
