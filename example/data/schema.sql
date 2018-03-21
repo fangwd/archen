@@ -78,3 +78,9 @@ create table order_item (
   foreign key (product_id) references product(id)
 );
 
+create table `order_shipping` (
+  order_id integer primary key,
+  status int,
+  foreign key (order_id) references `order`(id)
+);
+

@@ -499,6 +499,29 @@
                     }
                 }
             ]
+        },
+        {
+            "name": "order_shipping",
+            "columns": [
+                {
+                    "name": "order_id",
+                    "type": "integer",
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "int",
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "order_id"
+                    ]
+                }
+            ]
         }
     ]
 }
