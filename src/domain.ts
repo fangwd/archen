@@ -264,9 +264,14 @@ export class RelatedField extends Field {
     }
 
     if (!this.name) {
-      this.name = this.throughField
-        ? this.throughField.referencedField.model.pluralName
-        : field.model.pluralName;
+      if (this.throughField) {
+        this.name = this.throughField.referencedField.model.pluralName;
+      } else if (field.unique) {
+        const name = field.model.name;
+        this.name = name.charAt(0).toLowerCase() + name.slice(1);
+      } else {
+        this.name = field.model.pluralName;
+      }
     }
   }
 }

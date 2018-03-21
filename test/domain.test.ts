@@ -165,6 +165,13 @@ test('unique keys', () => {
   expect(uniqueKey.fields[1].name).toBe('name');
 });
 
+test('one to one relation', () => {
+  const domain = new Domain(data);
+  const orderModel = domain.model('Order');
+  const shipping = orderModel.field('orderShipping') as RelatedField;
+  expect(shipping.referencingField.unique).toBe(true);
+});
+
 function getExampleData() {
   const fileName = require('path').join(
     __dirname,
