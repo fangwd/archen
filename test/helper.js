@@ -6,7 +6,7 @@ const TEST_DB = process.env.ARCHEN_TEST || 'archen_test';
 const SCHEMA = fs.readFileSync('example/data/schema.sql').toString();
 const DATA = fs.readFileSync('example/data/data.sql').toString();
 
-const archen = require('..')(fs.readFileSync('example/data/schema.json'));
+//const archen = require('..')(fs.readFileSync('example/data/schema.json'));
 
 function createSQLite3Connection() {
   return knex({
@@ -90,6 +90,17 @@ function createMySQLDatabase() {
   });
 }
 
+function getExampleData() {
+  const fileName = require('path').join(
+    __dirname,
+    '..',
+    'example',
+    'data',
+    'schema.json'
+  );
+  return JSON.parse(fs.readFileSync(fileName).toString());
+}
+
 const createConnection = process.env.ARCHEN_TEST
   ? createMySQLConnection
   : createSQLite3Connection;
@@ -98,5 +109,6 @@ module.exports = {
   createSQLite3Database,
   createMySQLDatabase,
   createConnection,
+  getExampleData,
   graphql: require('graphql').graphql
 };

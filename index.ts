@@ -1,3 +1,4 @@
+/*
 const { Database } = require('./lib/model');
 const { Document } = require('./lib/document');
 const { Loader } = require('./lib/loader');
@@ -35,3 +36,4 @@ class Archen {
 module.exports = function(schema, options) {
   return new Archen(schema, options);
 };
+*/

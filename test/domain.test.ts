@@ -5,7 +5,9 @@ import {
   RelatedField
 } from '../src/domain';
 
-const data = getExampleData();
+import * as helper from './helper';
+
+const data = helper.getExampleData();
 
 test('domain properties', () => {
   const domain = new Domain(data);
@@ -169,20 +171,5 @@ test('one to one relation', () => {
   const domain = new Domain(data);
   const orderModel = domain.model('Order');
   const shipping = orderModel.field('orderShipping') as RelatedField;
-  expect(shipping.referencingField.unique).toBe(true);
+  expect(shipping.referencingField.isUnique()).toBe(true);
 });
-
-function getExampleData() {
-  const fileName = require('path').join(
-    __dirname,
-    '..',
-    'example',
-    'data',
-    'schema.json'
-  );
-  return JSON.parse(
-    require('fs')
-      .readFileSync(fileName)
-      .toString()
-  );
-}

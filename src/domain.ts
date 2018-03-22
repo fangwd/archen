@@ -27,7 +27,7 @@ interface Index {
   references?: Index;
 }
 
-interface DomainConfig {
+export interface DomainConfig {
   models: ModelConfig[];
 }
 
@@ -151,10 +151,11 @@ export class Model {
     for (const index of this.table.indexes) {
       if (index.primaryKey || index.unique) {
         const fields = index.columns.map(name => this.field(name));
-        this.uniqueKeys.push(new UniqueKey(fields, index.primaryKey));
-        if (fields.length === 1) {
-          fields[0].unique = true;
+        const uniqueKey = new UniqueKey(fields, index.primaryKey);
+        for (const field of fields) {
+          field.uniqueKey = uniqueKey;
         }
+        this.uniqueKeys.push(uniqueKey);
       }
 
       if (index.references) {
@@ -211,12 +212,20 @@ export class Field {
   model: Model;
   config: FieldConfig;
 
-  unique?: boolean;
+  uniqueKey?: UniqueKey;
 
   constructor(name: string, model: Model, config: FieldConfig) {
     this.name = name;
     this.model = model;
     this.config = config;
+  }
+
+  isUnique(): boolean {
+    return this.uniqueKey && this.uniqueKey.fields.length == 1;
+  }
+
+  displayName(): string {
+    return `${this.model.name}::${this.name}`;
   }
 }
 
@@ -266,7 +275,7 @@ export class RelatedField extends Field {
     if (!this.name) {
       if (this.throughField) {
         this.name = this.throughField.referencedField.model.pluralName;
-      } else if (field.unique) {
+      } else if (field.isUnique()) {
         const name = field.model.name;
         this.name = name.charAt(0).toLowerCase() + name.slice(1);
       } else {

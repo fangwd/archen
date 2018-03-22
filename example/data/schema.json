@@ -519,7 +519,13 @@
                     "primaryKey": true,
                     "columns": [
                         "order_id"
-                    ]
+                    ],
+                    "references": {
+                        "table": "order",
+                        "columns": [
+                            "id"
+                        ]
+                    }
                 }
             ]
         }

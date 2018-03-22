@@ -4,16 +4,44 @@ import {
   GraphQLInt,
   GraphQLFloat,
   GraphQLString,
+  GraphQLInputType,
   GraphQLNonNull,
   GraphQLObjectType,
   GraphQLList,
   GraphQLInputObjectType,
+  GraphQLInputFieldConfigMap,
   GraphQLSchema,
   GraphQLFieldConfigMap,
   printSchema
 } from 'graphql';
 
-import { Schema, SimpleField, ForeignKeyField, RelatedField } from './model';
+import {
+  Domain,
+  SimpleField,
+  ForeignKeyField,
+  RelatedField,
+  Field
+} from './domain';
+
+interface ObjectTypeMap {
+  [key: string]: GraphQLObjectType;
+}
+
+interface ObjectFieldsMap {
+  [key: string]: GraphQLFieldConfigMap<any, QueryContext>;
+}
+
+interface InputTypeMap {
+  [key: string]: GraphQLInputObjectType;
+}
+
+interface InputFieldsMap {
+  [key: string]: GraphQLInputFieldConfigMap;
+}
+
+interface QueryContext {
+  loader: any;
+}
 
 const QueryOptions = {
   limit: { type: GraphQLInt },
@@ -21,196 +49,202 @@ const QueryOptions = {
   orderBy: { type: GraphQLString }
 };
 
-interface Context {
-  loader: any;
-}
+class SchemaBuilder {
+  private domain: Domain;
+  private schema: GraphQLSchema;
 
-class Builder {
-  schema: Schema;
+  private modelTypeMap: ObjectTypeMap = {};
+  private whereTypeMap: InputTypeMap = {};
+  private uniqueTypeMap: InputTypeMap = {};
+  private uniqueFieldsMap: InputFieldsMap;
 
-  modelTypes: { [key: string]: GraphQLObjectType };
-  modelFields: {
-    [key: string]: GraphQLFieldConfigMap<any, Context>;
-  };
+  constructor(domain: Domain) {
+    this.domain = domain;
 
-  constructor(schema: Schema | any, options: any) {
-    if (!(schema instanceof Schema)) {
-      schema = new Schema(schema, options);
-    }
+    this.createWhereTypes();
+    this.createModelTypes();
 
-    this.schema = schema;
+    const queryFields = this.createQueryFields();
+    const mutationFields = this.createMutationFields();
 
-    const modelTypes: { [key: string]: GraphQLObjectType } = {};
-    const modelFields: {
-      [key: string]: GraphQLFieldConfigMap<any, Context>;
-    } = {};
-
-    this.modelTypes = modelTypes;
-    this.modelFields = modelFields;
-
-    for (const model of this.schema.models) {
-      const modelType = new GraphQLObjectType({
-        name: model.name,
-        fields(): GraphQLFieldConfigMap<any, Context> {
-          return modelFields[model.name];
-        }
-      });
-      modelTypes[model.name] = modelType;
-    }
+    this.schema = new GraphQLSchema({
+      query: new GraphQLObjectType({
+        name: 'Query',
+        fields: queryFields
+      }),
+      mutation: new GraphQLObjectType({
+        name: 'Mutation',
+        fields: mutationFields
+      })
+    });
   }
 
-  build() {
-    const whereTypes = {};
-    const whereFields = {};
+  createWhereTypes() {
+    const whereFieldsMap: InputFieldsMap = {};
+    const uniqueFieldsMap: InputFieldsMap = {};
 
-    for (const model of this.schema.models) {
-      const fields = {};
-      for (const column of model.fields) {
-        const fieldType = getType(column.type);
-        fields[column.name] = { type: fieldType };
-        for (const op of ['lt', 'le', 'ge', 'gt', 'ne']) {
-          const name = column.name + '_' + op;
-          fields[name] = { type: fieldType };
-        }
-        for (const op of ['exists']) {
-          const name = column.name + '_' + op;
-          fields[name] = { type: GraphQLBoolean };
-        }
-        for (const op of ['in']) {
-          const name = column.name + '_' + op;
-          fields[name] = { type: new GraphQLList(fieldType) };
-        }
-        if (fieldType === GraphQLString) {
-          const name = column.name + '_like';
-          fields[name] = { type: fieldType };
+    for (const model of this.domain.models) {
+      const whereFields: GraphQLInputFieldConfigMap = {};
+      const uniqueFields: GraphQLInputFieldConfigMap = {};
+
+      for (const field of model.fields) {
+        if (field instanceof SimpleField) {
+          if (!(field instanceof ForeignKeyField)) {
+            const type = getType(field.column.type);
+            whereFields[field.name] = { type: type };
+            for (const op of ['lt', 'le', 'ge', 'gt', 'ne']) {
+              const name = field.name + '_' + op;
+              whereFields[name] = { type };
+            }
+            for (const op of ['exists']) {
+              const name = field.name + '_' + op;
+              whereFields[name] = { type: GraphQLBoolean };
+            }
+            for (const op of ['in']) {
+              const name = field.name + '_' + op;
+              whereFields[name] = { type: new GraphQLList(type) };
+            }
+            if (type === GraphQLString) {
+              const name = field.name + '_like';
+              whereFields[name] = { type };
+            }
+            if (field.uniqueKey) {
+              uniqueFields[field.name] = { type: type };
+            }
+          }
         }
       }
+
       const whereType = new GraphQLInputObjectType({
-        name: model._names.pascal + 'WhereType',
+        name: model.name + 'WhereType',
         fields() {
-          return fields;
+          return whereFields;
         }
       });
-      fields['AND'] = { type: new GraphQLList(whereType) };
-      fields['OR'] = { type: new GraphQLList(whereType) };
-      fields['NOT'] = { type: new GraphQLList(whereType) };
-      whereTypes[model.name] = whereType;
-      whereFields[model.name] = fields;
-    }
 
-    const uniqueWhereTypes: { [key: string]: GraphQLInputObjectType } = {};
+      whereFields['AND'] = { type: new GraphQLList(whereType) };
+      whereFields['OR'] = { type: new GraphQLList(whereType) };
+      whereFields['NOT'] = { type: new GraphQLList(whereType) };
 
-    for (const table of this.schema.tables) {
-      const fields = {};
-      for (const index of table.indexes) {
-        for (const name of index.columns) {
-          const column = table._column(name);
-          fields[column.name] = { type: getType(column.type) };
-        }
-      }
-      const uniqueWhereType = new GraphQLInputObjectType({
-        name: table._names.pascal + 'UniqueWhereType',
+      const uniqueType = new GraphQLInputObjectType({
+        name: model.name + 'UniqueWhereType',
         fields() {
-          return fields;
+          return uniqueFields;
         }
       });
-      uniqueWhereTypes[table.name] = uniqueWhereType;
+
+      this.whereTypeMap[model.name] = whereType;
+      whereFieldsMap[model.name] = whereFields;
+
+      this.uniqueTypeMap[model.name] = uniqueType;
+      uniqueFieldsMap[model.name] = uniqueFields;
     }
 
-    const modelTypes = this.modelTypes;
-    const modelFields = this.modelFields;
-
-    for (const model of this.schema.models) {
-      modelFields[model.name] = {};
+    for (const model of this.domain.models) {
       for (const field of model.fields) {
         if (field instanceof ForeignKeyField) {
-          modelFields[model.name][field.name] = {
-            type: modelTypes[field.referencedField.model.name],
+          whereFieldsMap[model.name][field.name] = {
+            type: this.whereTypeMap[field.referencedField.model.name]
+          };
+          if (field.uniqueKey) {
+            uniqueFieldsMap[model.name][field.name] = {
+              type: this.uniqueTypeMap[field.referencedField.model.name]
+            };
+          }
+        } else if (field instanceof RelatedField) {
+          for (const op of ['some', 'none']) {
+            const name = field.name + '_' + op;
+            whereFieldsMap[model.name][name] = {
+              type: this.whereTypeMap[field.model.name]
+            };
+          }
+        }
+      }
+    }
+
+    this.uniqueFieldsMap = uniqueFieldsMap;
+  }
+
+  createModelTypes() {
+    const modelFieldsMap: ObjectFieldsMap = {};
+
+    for (const model of this.domain.models) {
+      this.modelTypeMap[model.name] = new GraphQLObjectType({
+        name: model.name,
+        fields(): GraphQLFieldConfigMap<any, QueryContext> {
+          return modelFieldsMap[model.name];
+        }
+      });
+      modelFieldsMap[model.name] = {};
+    }
+
+    const modelTypeMap = this.modelTypeMap;
+    const whereTypeMap = this.whereTypeMap;
+
+    for (const model of this.domain.models) {
+      const modelFields = modelFieldsMap[model.name];
+      for (const field of model.fields) {
+        if (field instanceof ForeignKeyField) {
+          modelFields[field.name] = {
+            type: modelTypeMap[field.referencedField.model.name],
             resolve(obj, args, req) {
               return req.loader.load(field.referencedField, obj[field.name]);
             }
           };
-          whereFields[model.name][field.name] = {
-            type: whereTypes[field.referencedField.model.name]
-          };
         } else if (field instanceof SimpleField) {
-          modelFields[model.name][field.name] = {
+          modelFields[field.name] = {
             type: getType(field.column.type)
           };
         } else {
-          const relatedField = field as RelatedField;
-
-          let fieldName = relatedField.name;
-          let type = modelTypes[relatedField.referencingField.model.name];
-
-          if (field.unique) {
-            fieldName = snakeToCamel(col.table.name);
-            type = new GraphQLList(type);
-            type = modelTypes[relatedField.referencingField.model.name];
-          } else {
-            fieldName = col.relatedName;
-            type = new GraphQLList();
-          }
-        }
-
-        field.referencedBy.forEach(col => {
-          let fieldName, type;
-          if (col.unique) {
-            fieldName = snakeToCamel(col.table.name);
-            type = modelTypes[col.table.name];
-          } else {
-            fieldName = col.relatedName;
-            type = new GraphQLList(modelTypes[col.table.name]);
-          }
-
-          if (modelFields[model.name][fieldName]) {
-            throw new Error(`Bad related name: '${fieldName}'`);
-          }
-
-          modelFields[model.name][fieldName] = {
+          const related = (field as RelatedField).referencingField;
+          const modelType = modelTypeMap[related.model.name];
+          const type = related.isUnique()
+            ? modelType
+            : new GraphQLList(modelType);
+          modelFields[field.name] = {
             type,
             args: {
-              where: { type: whereTypes[col.table.name] },
+              where: { type: whereTypeMap[related.model.name] },
               ...QueryOptions
             },
             resolve(object, args, context) {
               if (args.where) {
-                args.where[col.name] = object[field.name];
-                return context.loader.query(col.table, args);
+                args.where[related.column.name] = object[field.name];
+                return context.loader.query(related.model.table.name, args);
               } else {
-                return context.loader.load(col, object[field.name]);
+                return context.loader.load(related, object[field.name]);
               }
             }
           };
-          for (const op of ['some', 'none']) {
-            const fieldName = col.relatedName + '_' + op;
-            whereFields[model.name][fieldName] = {
-              type: whereTypes[col.table.name]
-            };
-          }
-        });
+        }
       }
     }
+  }
 
+  createQueryFields() {
     const queryFields = {};
 
-    for (const table of this.schema.tables) {
-      const name = table._names.plural;
-      queryFields[name] = {
-        type: new GraphQLList(modelTypes[table.name]),
-        args: { where: { type: whereTypes[table.name] }, ...QueryOptions },
+    for (const model of this.domain.models) {
+      queryFields[model.pluralName] = {
+        type: new GraphQLList(this.modelTypeMap[model.name]),
+        args: {
+          where: { type: this.whereTypeMap[model.name] },
+          ...QueryOptions
+        },
         resolve(_, args, context) {
-          return context.loader.query(table, args);
+          return context.loader.query(model, args);
         }
       };
-      queryFields[table.name] = {
-        type: modelTypes[table.name],
-        args: { where: { type: this.uniqueWhereTypes[table.name] } },
+      const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
+      queryFields[name] = {
+        type: this.modelTypeMap[model.name],
+        args: this.uniqueFieldsMap[model.name],
         resolve(_, args, context) {
           return new Promise(resolve => {
-            context.loader.query(table, args).then(rows => {
+            // TODO: Check if args meets at least one unique constraint
+            context.loader.query(model, args).then(rows => {
               if (rows.length > 1) {
-                resolve(Error('Internal error: unique constraint not met'));
+                resolve(Error('Internal error: not unique'));
               } else {
                 resolve(rows[0]);
               }
@@ -220,255 +254,243 @@ class Builder {
       };
     }
 
-    const schema = new GraphQLSchema({
-      query: new GraphQLObjectType({
-        name: 'Query',
-        fields: queryFields
-      }),
-      mutation: new GraphQLObjectType({
-        name: 'Mutation',
-        fields: this.buildMutationFields()
-      })
-    });
-
-    // require('fs').writeFileSync('schema.graphql', printSchema(schema));
-
-    return schema;
+    return queryFields;
   }
 
-  buildMutationFields() {
-    const inputTypesCreate = {};
-    const inputTypesUpdate = {};
+  createMutationFields(): GraphQLFieldConfigMap<any, QueryContext> {
+    const uniqueWhereTypes = this.uniqueTypeMap;
 
-    const inputFieldsCreate = {};
-    const inputFieldsUpdate = {};
+    const inputTypesCreate: InputTypeMap = {};
+    const inputTypesUpdate: InputTypeMap = {};
 
-    for (const table of this.schema.tables) {
+    const inputFieldsCreate: InputFieldsMap = {};
+    const inputFieldsUpdate: InputFieldsMap = {};
+
+    for (const model of this.domain.models) {
       // Create a new object
       const inputType = new GraphQLInputObjectType({
-        name: table._names.pascal + 'InputType',
+        name: model.name + 'InputType',
         fields() {
-          return inputFieldsCreate[table.name];
+          return inputFieldsCreate[model.name];
         }
       });
 
-      inputTypesCreate[table.name] = inputType;
+      inputTypesCreate[model.name] = inputType;
 
       // Update an existing object
       const inputTypeUpdate = new GraphQLInputObjectType({
-        name: table._names.pascal + 'UpdateInputType',
+        name: model.name + 'UpdateInputType',
         fields() {
-          return inputFieldsUpdate[table.name];
+          return inputFieldsUpdate[model.name];
         }
       });
 
-      inputTypesUpdate[table.name] = inputTypeUpdate;
+      inputTypesUpdate[model.name] = inputTypeUpdate;
     }
 
     const connectCreateInputTypes = {};
-    const uniqueWhereTypes = this.uniqueWhereTypes;
 
-    for (const table of this.schema.tables) {
+    for (const model of this.domain.models) {
       // Connect to an existing/Create a new object
       const inputType = new GraphQLInputObjectType({
-        name: table._names.pascal + 'ConnectCreateInputType',
+        name: model.name + 'ConnectCreateInputType',
         fields() {
           return {
-            connect: { type: uniqueWhereTypes[table.name] },
-            create: { type: inputTypesCreate[table.name] }
+            connect: { type: uniqueWhereTypes[model.name] },
+            create: { type: inputTypesCreate[model.name] }
           };
         }
       });
-      connectCreateInputTypes[table.name] = inputType;
+      connectCreateInputTypes[model.name] = inputType;
     }
 
     const connectCreateUpdateInputTypesParent = {};
 
-    for (const table of this.schema.tables) {
-      const typeName =
-        table._names.pascal + 'ConnectCreateUpdateInputTypeParent';
+    for (const model of this.domain.models) {
+      const typeName = model.name + 'ConnectCreateUpdateInputTypeParent';
       const inputType = new GraphQLInputObjectType({
         name: typeName,
         fields() {
           return {
-            connect: { type: uniqueWhereTypes[table.name] },
-            create: { type: inputTypesCreate[table.name] },
-            update: { type: inputTypesUpdate[table.name] }
+            connect: { type: uniqueWhereTypes[model.name] },
+            create: { type: inputTypesCreate[model.name] },
+            update: { type: inputTypesUpdate[model.name] }
           };
         }
       });
-      connectCreateUpdateInputTypesParent[table.name] = inputType;
+      connectCreateUpdateInputTypesParent[model.name] = inputType;
     }
 
     const updateOneTypes = {};
 
-    for (const table of this.schema.tables) {
-      const typeName = table._names.pascal + 'UpdateOneInputType';
+    for (const model of this.domain.models) {
+      const typeName = model.name + 'UpdateOneInputType';
       const inputType = new GraphQLInputObjectType({
         name: typeName,
         fields() {
           return {
-            where: { type: uniqueWhereTypes[table.name] },
-            data: { type: inputTypesUpdate[table.name] }
+            where: { type: uniqueWhereTypes[model.name] },
+            data: { type: inputTypesUpdate[model.name] }
           };
         }
       });
-      updateOneTypes[table.name] = inputType;
+      updateOneTypes[model.name] = inputType;
     }
 
     const upsertTypes = {};
 
-    for (const table of this.schema.tables) {
-      const typeName = table._names.pascal + 'UpsertInputType';
+    for (const model of this.domain.models) {
+      const typeName = model.name + 'UpsertInputType';
       const inputType = new GraphQLInputObjectType({
         name: typeName,
         fields() {
           return {
-            create: { type: inputTypesCreate[table.name] },
-            update: { type: inputTypesUpdate[table.name] }
+            create: { type: inputTypesCreate[model.name] },
+            update: { type: inputTypesUpdate[model.name] }
           };
         }
       });
-      upsertTypes[table.name] = inputType;
+      upsertTypes[model.name] = inputType;
     }
 
     const setTypes = {};
 
-    for (const table of this.schema.tables) {
-      const typeName = table._names.pascal + 'SetChildInputType';
+    for (const model of this.domain.models) {
+      const typeName = model.name + 'SetChildInputType';
       const inputType = new GraphQLInputObjectType({
         name: typeName,
         fields() {
           return {
             connect: {
-              type: new GraphQLList(uniqueWhereTypes[table.name])
+              type: new GraphQLList(uniqueWhereTypes[model.name])
             },
             create: {
-              type: new GraphQLList(inputTypesCreate[table.name])
+              type: new GraphQLList(inputTypesCreate[model.name])
             },
             upsert: {
-              type: new GraphQLList(upsertTypes[table.name])
+              type: new GraphQLList(upsertTypes[model.name])
             }
           };
         }
       });
-      setTypes[table.name] = inputType;
+      setTypes[model.name] = inputType;
     }
 
     const connectCreateUpdateInputTypesChild = {};
 
-    for (const table of this.schema.tables) {
-      const typeName =
-        table._names.pascal + 'ConnectCreateUpdateInputTypeChild';
+    for (const model of this.domain.models) {
+      const typeName = model.name + 'ConnectCreateUpdateInputTypeChild';
       const inputType = new GraphQLInputObjectType({
         name: typeName,
         fields() {
           return {
             connect: {
-              type: new GraphQLList(uniqueWhereTypes[table.name])
+              type: new GraphQLList(uniqueWhereTypes[model.name])
             },
             create: {
-              type: new GraphQLList(inputTypesCreate[table.name])
+              type: new GraphQLList(inputTypesCreate[model.name])
             },
             update: {
-              type: new GraphQLList(updateOneTypes[table.name])
+              type: new GraphQLList(updateOneTypes[model.name])
             },
             upsert: {
-              type: new GraphQLList(upsertTypes[table.name])
+              type: new GraphQLList(upsertTypes[model.name])
             },
             delete: {
-              type: new GraphQLList(uniqueWhereTypes[table.name])
+              type: new GraphQLList(uniqueWhereTypes[model.name])
             },
             set: {
-              type: setTypes[table.name]
+              type: setTypes[model.name]
             }
           };
         }
       });
-      connectCreateUpdateInputTypesChild[table.name] = inputType;
+      connectCreateUpdateInputTypesChild[model.name] = inputType;
     }
 
-    for (const table of this.schema.tables) {
-      inputFieldsCreate[table.name] = {};
-      inputFieldsUpdate[table.name] = {};
-      for (const column of table.columns) {
-        inputFieldsUpdate[table.name][column.name] = {
-          type: getType(column.type)
-        };
-        if (column.references) {
-          inputFieldsCreate[table.name][column.name] = {
-            type: getType(column.type)
+    for (const model of this.domain.models) {
+      inputFieldsCreate[model.name] = {};
+      inputFieldsUpdate[model.name] = {};
+      for (const field of model.fields) {
+        if (field instanceof ForeignKeyField) {
+          inputFieldsCreate[model.name][field.name] = {
+            type: connectCreateInputTypes[field.referencedField.model.name]
           };
-          inputFieldsCreate[table.name][column.foreignName] = {
-            type: connectCreateInputTypes[column.references.table.name]
-          };
-          inputFieldsUpdate[table.name][column.foreignName] = {
+          inputFieldsUpdate[model.name][field.name] = {
             type:
-              connectCreateUpdateInputTypesParent[column.references.table.name]
+              connectCreateUpdateInputTypesParent[
+                field.referencedField.model.name
+              ]
+          };
+        } else if (field instanceof SimpleField) {
+          inputFieldsCreate[model.name][field.name] = {
+            type: getInputType(field)
+          };
+          inputFieldsUpdate[model.name][field.name] = {
+            type: getType(field.column.type)
           };
         } else {
-          inputFieldsCreate[table.name][column.name] = {
-            type: getType(column)
-          };
+          const related = (field as RelatedField).referencingField;
+          const type = connectCreateUpdateInputTypesChild[related.model.name];
+          inputFieldsUpdate[model.name][field.name] = { type };
+          inputFieldsCreate[model.name][field.name] = { type };
         }
-        column.referencedBy.forEach(col => {
-          const fieldName = col.relatedName;
-          const type = connectCreateUpdateInputTypesChild[col.table.name];
-          inputFieldsUpdate[table.name][fieldName] = { type };
-          inputFieldsCreate[table.name][fieldName] = { type };
-        });
       }
     }
 
-    const mutationFields = {};
+    const mutationFields: GraphQLFieldConfigMap<any, QueryContext> = {};
 
-    for (const table of this.schema.tables) {
-      const name = 'create' + table._names.pascal;
+    for (const model of this.domain.models) {
+      const name = 'create' + model.name;
       mutationFields[name] = {
-        type: this.modelTypes[table.name],
-        args: { data: { type: inputTypesCreate[table.name] } },
+        type: this.modelTypeMap[model.name],
+        args: { data: { type: inputTypesCreate[model.name] } },
         resolve(_, args, context) {
-          return context.loader.create(table, args);
+          return context.loader.create(model, args);
         }
       };
     }
 
-    for (const table of this.schema.tables) {
-      const name = 'update' + table._names.pascal;
+    for (const model of this.domain.models) {
+      const name = 'update' + model.name;
       mutationFields[name] = {
-        type: this.modelTypes[table.name],
-        args: updateOneTypes[table.name].getFields(),
+        type: this.modelTypeMap[model.name],
+        args: updateOneTypes[model.name].getFields(),
         resolve(_, args, context) {
-          return context.loader.update(table, args);
+          return context.loader.update(model, args);
         }
       };
     }
 
-    for (const table of this.schema.tables) {
-      const name = 'upsert' + table._names.pascal;
+    for (const model of this.domain.models) {
+      const name = 'upsert' + model.name;
       mutationFields[name] = {
-        type: this.modelTypes[table.name],
-        args: upsertTypes[table.name].getFields(),
+        type: this.modelTypeMap[model.name],
+        args: upsertTypes[model.name].getFields(),
         resolve(_, args, context) {
-          return context.loader.upsert(table, args);
+          return context.loader.upsert(model, args);
         }
       };
     }
 
-    for (const table of this.schema.tables) {
-      const name = 'delete' + table._names.pascal;
+    for (const model of this.domain.models) {
+      const name = 'delete' + model.name;
       mutationFields[name] = {
-        type: this.modelTypes[table.name],
+        type: this.modelTypeMap[model.name],
         args: {
-          where: { type: uniqueWhereTypes[table.name] }
+          where: { type: uniqueWhereTypes[model.name] }
         },
         resolve(_, args, context) {
-          return context.loader.delete(table, args);
+          return context.loader.delete(model, args);
         }
       };
     }
 
     return mutationFields;
+  }
+
+  getSchema(): GraphQLSchema {
+    return this.schema;
   }
 }
 
@@ -485,16 +507,14 @@ function getType(type: string): GraphQLScalarType {
   return GraphQLString;
 }
 
-function getInputType(column) {
-  const type = getType(column.type);
-  return column.nullable || column.autoIncrement
+function getInputType(field: SimpleField): GraphQLInputType {
+  const type = getType(field.column.type);
+  return field.column.nullable || field.column.autoIncrement
     ? type
     : new GraphQLNonNull(type);
 }
 
-function createSchema(data, options) {
-  const builder = new Builder(data, options);
-  return builder.build();
+export function createSchema(data, config = undefined): GraphQLSchema {
+  const builder = new SchemaBuilder(new Domain(data, config));
+  return builder.getSchema();
 }
-
-module.exports = { createSchema };
