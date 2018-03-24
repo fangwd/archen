@@ -1,4 +1,4 @@
-import { pluralise, toPascal, toCamel } from './forms';
+import { pluralise, toPascalCase, toCamelCase } from './forms';
 
 interface Database {
   name?: string;
@@ -108,6 +108,7 @@ export class Model {
   fields: Field[] = [];
   table: Table;
   config: ModelConfig;
+  primaryKey: UniqueKey;
   uniqueKeys: UniqueKey[] = [];
   pluralName: string;
 
@@ -121,8 +122,9 @@ export class Model {
     this.domain = domain;
     this.table = table;
     this.config = Object.assign({}, MODEL_CONFIG, config);
-    this.name = this.config.name || toPascal(table.name);
-    this.pluralName = this.config.pluralName || toCamel(pluralise(table.name));
+    this.name = this.config.name || toPascalCase(table.name);
+    this.pluralName =
+      this.config.pluralName || toCamelCase(pluralise(table.name));
 
     const references: { [key: string]: Index } = {};
     for (const index of table.indexes) {
@@ -147,6 +149,63 @@ export class Model {
     return this.fieldMap[name];
   }
 
+  keyField(): SimpleField {
+    return this.primaryKey.fields.length === 1
+      ? this.primaryKey.fields[0]
+      : null;
+  }
+
+  checkUniqueKey(row): boolean {
+    if (!row || typeof row !== 'object') {
+      return false;
+    }
+    for (const uniqueKey of this.uniqueKeys) {
+      let missing;
+      for (const field of uniqueKey.fields) {
+        if (row[field.name] === undefined) {
+          missing = field;
+          break;
+        }
+      }
+      if (!missing) return true;
+    }
+    return false;
+  }
+
+  getUniqueFields<Row>(row: Row): any {
+    let uniqueKey = this.primaryKey;
+    for (const field of uniqueKey.fields) {
+      if (row[field.name] === undefined) {
+        uniqueKey = null;
+        break;
+      }
+    }
+    if (!uniqueKey) {
+      for (const key of this.uniqueKeys) {
+        if (!key.primary) {
+          let missing;
+          for (const field of key.fields) {
+            if (row[field.name] === undefined) {
+              missing = field;
+              break;
+            }
+          }
+          if (!missing) {
+            uniqueKey = key;
+            break;
+          }
+        }
+      }
+    }
+    if (uniqueKey) {
+      const fields = {};
+      for (const field of uniqueKey.fields) {
+        fields[field.name] = row[field.name];
+      }
+      return fields;
+    }
+  }
+
   resolveForeignKeyFields() {
     for (const index of this.table.indexes) {
       if (index.primaryKey || index.unique) {
@@ -156,6 +215,9 @@ export class Model {
           field.uniqueKey = uniqueKey;
         }
         this.uniqueKeys.push(uniqueKey);
+        if (index.primaryKey) {
+          this.primaryKey = uniqueKey;
+        }
       }
 
       if (index.references) {
@@ -234,7 +296,7 @@ export class SimpleField extends Field {
 
   constructor(model: Model, column: Column, config) {
     config = Object.assign({}, FIELD_CONFIG, config);
-    super(config.name || toCamel(column.name), model, config);
+    super(config.name || toCamelCase(column.name), model, config);
     this.column = column;
   }
 }
@@ -247,7 +309,7 @@ export class ForeignKeyField extends SimpleField {
     if (!this.config.name) {
       const match = /(.+?)(?:_id|Id)/.exec(column.name);
       if (match) {
-        this.name = toCamel(match[1]);
+        this.name = toCamelCase(match[1]);
       }
     }
   }
@@ -286,11 +348,11 @@ export class RelatedField extends Field {
 }
 
 class UniqueKey {
-  fields: Field[];
+  fields: SimpleField[];
   primary: boolean;
 
   constructor(fields: Field[], primary: boolean = false) {
-    this.fields = fields;
+    this.fields = fields as SimpleField[];
     this.primary = primary;
   }
 }

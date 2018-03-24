@@ -56,7 +56,6 @@ class SchemaBuilder {
   private modelTypeMap: ObjectTypeMap = {};
   private whereTypeMap: InputTypeMap = {};
   private uniqueTypeMap: InputTypeMap = {};
-  private uniqueFieldsMap: InputFieldsMap;
 
   constructor(domain: Domain) {
     this.domain = domain;
@@ -161,8 +160,6 @@ class SchemaBuilder {
         }
       }
     }
-
-    this.uniqueFieldsMap = uniqueFieldsMap;
   }
 
   createModelTypes() {
@@ -238,7 +235,7 @@ class SchemaBuilder {
       const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
       queryFields[name] = {
         type: this.modelTypeMap[model.name],
-        args: this.uniqueFieldsMap[model.name],
+        args: { where: { type: this.uniqueTypeMap[model.name] } },
         resolve(_, args, context) {
           return new Promise(resolve => {
             // TODO: Check if args meets at least one unique constraint
@@ -258,7 +255,7 @@ class SchemaBuilder {
   }
 
   createMutationFields(): GraphQLFieldConfigMap<any, QueryContext> {
-    const uniqueWhereTypes = this.uniqueTypeMap;
+    const uniqueTypeMap = this.uniqueTypeMap;
 
     const inputTypesCreate: InputTypeMap = {};
     const inputTypesUpdate: InputTypeMap = {};
@@ -296,7 +293,7 @@ class SchemaBuilder {
         name: model.name + 'ConnectCreateInputType',
         fields() {
           return {
-            connect: { type: uniqueWhereTypes[model.name] },
+            connect: { type: uniqueTypeMap[model.name] },
             create: { type: inputTypesCreate[model.name] }
           };
         }
@@ -312,7 +309,7 @@ class SchemaBuilder {
         name: typeName,
         fields() {
           return {
-            connect: { type: uniqueWhereTypes[model.name] },
+            connect: { type: uniqueTypeMap[model.name] },
             create: { type: inputTypesCreate[model.name] },
             update: { type: inputTypesUpdate[model.name] }
           };
@@ -329,7 +326,7 @@ class SchemaBuilder {
         name: typeName,
         fields() {
           return {
-            where: { type: uniqueWhereTypes[model.name] },
+            where: { type: uniqueTypeMap[model.name] },
             data: { type: inputTypesUpdate[model.name] }
           };
         }
@@ -356,13 +353,13 @@ class SchemaBuilder {
     const setTypes = {};
 
     for (const model of this.domain.models) {
-      const typeName = model.name + 'SetChildInputType';
+      const typeName = model.name + 'InputTypeChild';
       const inputType = new GraphQLInputObjectType({
         name: typeName,
         fields() {
           return {
             connect: {
-              type: new GraphQLList(uniqueWhereTypes[model.name])
+              type: new GraphQLList(uniqueTypeMap[model.name])
             },
             create: {
               type: new GraphQLList(inputTypesCreate[model.name])
@@ -385,7 +382,7 @@ class SchemaBuilder {
         fields() {
           return {
             connect: {
-              type: new GraphQLList(uniqueWhereTypes[model.name])
+              type: new GraphQLList(uniqueTypeMap[model.name])
             },
             create: {
               type: new GraphQLList(inputTypesCreate[model.name])
@@ -397,8 +394,9 @@ class SchemaBuilder {
               type: new GraphQLList(upsertTypes[model.name])
             },
             delete: {
-              type: new GraphQLList(uniqueWhereTypes[model.name])
+              type: new GraphQLList(uniqueTypeMap[model.name])
             },
+            // TODO: Add disconnect
             set: {
               type: setTypes[model.name]
             }
@@ -478,7 +476,7 @@ class SchemaBuilder {
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: {
-          where: { type: uniqueWhereTypes[model.name] }
+          where: { type: uniqueTypeMap[model.name] }
         },
         resolve(_, args, context) {
           return context.loader.delete(model, args);

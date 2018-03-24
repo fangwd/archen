@@ -13,11 +13,11 @@ export function pluralise(name: string): string {
   return words.join('_');
 }
 
-export function toCamel(s: string): string {
+export function toCamelCase(s: string): string {
   return s.replace(/_\w/g, m => m[1].toUpperCase());
 }
 
-export function toPascal(s: string): string {
-  s = toCamel(s);
+export function toPascalCase(s: string): string {
+  s = toCamelCase(s);
   return s[0].toUpperCase() + s.substr(1);
 }
