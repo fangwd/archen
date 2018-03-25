@@ -155,24 +155,7 @@ export class Model {
       : null;
   }
 
-  checkUniqueKey(row): boolean {
-    if (!row || typeof row !== 'object') {
-      return false;
-    }
-    for (const uniqueKey of this.uniqueKeys) {
-      let missing;
-      for (const field of uniqueKey.fields) {
-        if (row[field.name] === undefined) {
-          missing = field;
-          break;
-        }
-      }
-      if (!missing) return true;
-    }
-    return false;
-  }
-
-  getUniqueFields<Row>(row: Row): any {
+  checkUniqueKey(row): UniqueKey {
     let uniqueKey = this.primaryKey;
     for (const field of uniqueKey.fields) {
       if (row[field.name] === undefined) {
@@ -197,6 +180,11 @@ export class Model {
         }
       }
     }
+    return uniqueKey;
+  }
+
+  getUniqueFields(row) {
+    const uniqueKey = this.checkUniqueKey(row);
     if (uniqueKey) {
       const fields = {};
       for (const field of uniqueKey.fields) {

@@ -35,9 +35,9 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "(/test/.*|(\\.|/)(test|spec))\\.(jsx|tsx?)$",
+    "testRegex": "/test/mutation.test.ts",
     "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
-    "collectCoverage": true,
+    "collectCoverage": false,
     "collectCoverageFrom": ["src/**/*.ts"],
     "verbose": true
   }

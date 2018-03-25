@@ -41,13 +41,17 @@ export function createOne(db: knex, model: Model, data: Input): Promise<Row> {
   return new Promise((resolve, reject) => {
     resolveParentFields(db, model, data)
       .then(row => {
-        db(model.name)
+        db(model.table.name)
           .insert(rowToSnake(row, model))
           .then(id => {
             if (Array.isArray(id)) id = id[0];
-            return updateChildFields(db, model, data, id).then(() =>
-              select(db, model, { [model.keyField.name]: id }, '*')
-            );
+            return updateChildFields(db, model, data, id)
+              .then(() =>
+                select(db, model, { [model.keyField().name]: id }, '*').then(
+                  rows => resolve(rows.length === 1 ? rows[0] : null)
+                )
+              )
+              .catch(reject);
           })
           .catch(reason => reject({ reason, row }));
       })
@@ -61,7 +65,7 @@ function connect(
   where: QueryArgs
 ): Promise<Row> {
   const model = field.referencedField.model;
-  const name = model.keyField.name;
+  const name = model.keyField().name;
 
   const keys = Object.keys(where);
   if (keys.length === 1 && keys[0] === name) {
@@ -87,6 +91,7 @@ function resolveParentFields(
   const promises = [];
 
   function _createPromise(field: ForeignKeyField, input: Input): void {
+    console.log(input);
     const method = Object.keys(input)[0];
     let promise =
       method === 'connect'
@@ -94,7 +99,7 @@ function resolveParentFields(
         : createOne(db, field.referencedField.model, input[method] as Input);
     promise = promise.then(row => {
       result[field.name] = row
-        ? row[field.referencedField.model.keyField.name]
+        ? row[field.referencedField.model.keyField().name]
         : null;
       return row;
     });
@@ -145,15 +150,27 @@ function select(
 }
 
 export function upsertOne(db: knex, model: Model, input: Input): Promise<Row> {
-  return createOne(db, model, input.create as Input).catch(
-    ({ reason, row }) => {
-      return new Promise((resolve, reject) => {
-        // 1. get unique fields
-        // 2. run update
-        // 3. select with unique fields
-      });
-    }
-  );
+  if (!model.checkUniqueKey(input.create)) {
+    return Promise.reject('Invalid filter');
+  }
+
+  return resolveParentFields(db, model, input.create as QueryArgs).then(row => {
+    const uniqueFields = model.getUniqueFields(row);
+    return select(db, model, uniqueFields, '*').then(rows => {
+      if (rows.length === 0) {
+        return createOne(db, model, input.create as QueryArgs);
+      } else {
+        if (input.update && Object.keys(input.update).length > 0) {
+          return updateOne(db, model, {
+            data: input.update,
+            where: uniqueFields
+          });
+        } else {
+          return rows[0];
+        }
+      }
+    });
+  });
 }
 
 export function updateOne(
@@ -161,16 +178,17 @@ export function updateOne(
   model: Model,
   args: QueryArgs
 ): Promise<Row> {
-  if (model.checkUniqueKey(args.where)) {
+  if (!model.checkUniqueKey(args.where)) {
     return Promise.reject('Invalid filter');
   }
   const builder = new QueryBuilder(db, model, 'UPDATE');
   const where = builder.buildWhere(args.where as QueryArgs);
   return new Promise((resolve, reject) => {
     const data = args.data as QueryArgs;
-    return resolveParentFields(db, model, data).then(row => {
-      db(model.name)
+    resolveParentFields(db, model, data).then(row => {
+      db(model.table.name)
         .update(rowToSnake(row, model))
+        .where(where)
         .then(() => {
           const where = Object.assign({}, args.where);
           for (const key in where) {
@@ -178,9 +196,9 @@ export function updateOne(
               where[key] = row[key];
             }
           }
-          return select(db, model, where as QueryArgs, '*').then(rows => {
-            const id = rows[0][model.keyField.name];
-            return updateChildFields(db, model, data, id).then(() => rows[0]);
+          select(db, model, where as QueryArgs, '*').then(rows => {
+            const id = rows[0][model.keyField().name];
+            updateChildFields(db, model, data, id).then(() => resolve(rows[0]));
           });
         });
     });
@@ -237,6 +255,7 @@ function updateChildField(
       }));
       promises.push(updateMany(db, model, rows));
     } else if (method === 'delete') {
+      // FIXME
       const wheres = args.map(arg => ({
         ...(arg.where as QueryArgs),
         [field.name]: id
@@ -304,20 +323,24 @@ function deleteMany(db: knex, model: Model, args: QueryArgs[]): Promise<Row[]> {
   });
 }
 
-export function deleteOne(db: knex, table: Model, args: QueryArgs) {
-  if (table.checkUniqueKey(args.where)) {
-    const me = this;
-    return new Promise(resolve => {
-      me.query(table, args).then(rows => {
-        const query = this.db(table.name);
-        const builder = new QueryBuilder(me.db, table, 'UPDATE');
-        query.where(builder.buildWhere(args.where as QueryArgs));
-        query
+export function deleteOne(
+  db: knex,
+  model: Model,
+  args: QueryArgs
+): Promise<Row> {
+  if (model.checkUniqueKey(args.where)) {
+    return select(db, model, args.where as QueryArgs, '*').then(rows => {
+      if (rows.length === 0) {
+        return null;
+      } else {
+        const builder = new QueryBuilder(db, model, 'DELETE');
+        return db
           .del()
-          .then(() => resolve(rows[0]))
-          .catch(e => resolve(Error(e.code)));
-      });
+          .from(model.table.name)
+          .where(builder.buildWhere(args.where as QueryArgs))
+          .then(() => rows[0]);
+      }
     });
   }
-  return Error('Invalid filter');
+  return Promise.reject(Error('Invalid filter'));
 }

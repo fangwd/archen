@@ -44,7 +44,7 @@ export function rowToSnake(row: Row, model: Model): Row {
   for (const key in row) {
     const field = model.field(key);
     if (field instanceof SimpleField) {
-      result[field.name] = _toSnake(row[key], field);
+      result[field.column.name] = _toSnake(row[key], field);
     } else {
       result[key] = row[key];
     }
