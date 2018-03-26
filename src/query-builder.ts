@@ -1,5 +1,5 @@
 import knex = require('knex');
-
+// console.log(knex.raw('?? > ?', ['where', 'danger\'']).toString())
 import {
   Model,
   Field,

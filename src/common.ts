@@ -1,4 +1,4 @@
-import { Model, SimpleField } from './domain';
+import { Model, SimpleField, ForeignKeyField } from './domain';
 
 export type Value = string | number | boolean | Date | null;
 
@@ -17,7 +17,7 @@ function _toCamel(value: Value, field: SimpleField): Value {
   return value;
 }
 
-function _toSnake(value: Value, field: SimpleField): Value {
+export function _toSnake(value: Value, field: SimpleField): Value {
   if (/date|time/i.test(field.column.type)) {
     return new Date(value as any)
       .toISOString()
@@ -30,9 +30,14 @@ function _toSnake(value: Value, field: SimpleField): Value {
 export function rowToCamel(row: Row, model: Model): Row {
   const result = {};
   for (const field of model.fields) {
-    if (field instanceof SimpleField) {
-      if (row[field.column.name] !== undefined) {
-        result[field.name] = _toCamel(row[field.column.name], field);
+    if (field instanceof SimpleField && row[field.column.name] !== undefined) {
+      const value = _toCamel(row[field.column.name], field);
+      if (field instanceof ForeignKeyField) {
+        result[field.name] = {
+          [field.referencedField.model.keyField().name]: value
+        };
+      } else {
+        result[field.name] = value;
       }
     }
   }

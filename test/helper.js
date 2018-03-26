@@ -54,7 +54,7 @@ function createSQLite3Database() {
 }
 
 function createMySQLConnection(exists = true) {
-  return knex({
+  const db = knex({
     client: 'mysql',
     connection: {
       host: '127.0.0.1',
@@ -65,6 +65,7 @@ function createMySQLConnection(exists = true) {
     },
     pool: { min: 0, max: 7 }
   });
+  return db;
 }
 
 function createMySQLDatabase() {

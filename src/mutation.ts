@@ -38,25 +38,18 @@ interface UpsertInput {
 }
 
 export function createOne(db: knex, model: Model, data: Input): Promise<Row> {
-  return new Promise((resolve, reject) => {
-    resolveParentFields(db, model, data)
-      .then(row => {
-        db(model.table.name)
-          .insert(rowToSnake(row, model))
-          .then(id => {
-            if (Array.isArray(id)) id = id[0];
-            return updateChildFields(db, model, data, id)
-              .then(() =>
-                select(db, model, { [model.keyField().name]: id }, '*').then(
-                  rows => resolve(rows.length === 1 ? rows[0] : null)
-                )
-              )
-              .catch(reject);
-          })
-          .catch(reason => reject({ reason, row }));
+  return resolveParentFields(db, model, data).then(row =>
+    db(model.table.name)
+      .insert(rowToSnake(row, model))
+      .then(id => {
+        if (Array.isArray(id)) id = id[0];
+        return updateChildFields(db, model, data, id).then(() =>
+          select(db, model, { [model.keyField().name]: id }, '*').then(rows =>
+            Promise.resolve(rows.length === 1 ? rows[0] : null)
+          )
+        );
       })
-      .catch(reject);
-  });
+  );
 }
 
 function connect(
@@ -91,7 +84,6 @@ function resolveParentFields(
   const promises = [];
 
   function _createPromise(field: ForeignKeyField, input: Input): void {
-    console.log(input);
     const method = Object.keys(input)[0];
     let promise =
       method === 'connect'
@@ -108,7 +100,11 @@ function resolveParentFields(
 
   for (const key in input) {
     let field = model.field(key);
-    if (field instanceof ForeignKeyField) {
+    if (
+      field instanceof ForeignKeyField &&
+      input[key] &&
+      typeof input[key] === 'object'
+    ) {
       _createPromise(field, input[key] as Input);
     } else if (field instanceof SimpleField) {
       result[key] = input[key] as Value;
@@ -151,7 +147,7 @@ function select(
 
 export function upsertOne(db: knex, model: Model, input: Input): Promise<Row> {
   if (!model.checkUniqueKey(input.create)) {
-    return Promise.reject('Invalid filter');
+    return Promise.reject('Bad filter');
   }
 
   return resolveParentFields(db, model, input.create as QueryArgs).then(row => {
@@ -179,7 +175,7 @@ export function updateOne(
   args: QueryArgs
 ): Promise<Row> {
   if (!model.checkUniqueKey(args.where)) {
-    return Promise.reject('Invalid filter');
+    return Promise.reject('Bad filter');
   }
   const builder = new QueryBuilder(db, model, 'UPDATE');
   const where = builder.buildWhere(args.where as QueryArgs);
@@ -224,6 +220,15 @@ function updateChildFields(
     }
   }
   return Promise.all(promises).then(() => Promise.resolve());
+}
+
+function assignArgs(args: Input, field: SimpleField, value: Value): Input {
+  return field instanceof ForeignKeyField
+    ? {
+        [field.name]: { [field.referencedField.model.keyField.name]: value },
+        ...args
+      }
+    : { [field.name]: value, ...args };
 }
 
 function updateChildField(
@@ -277,7 +282,10 @@ function update(
   data: Input,
   where: QueryArgs | QueryArgs[]
 ) {
-  const query = db(model.table.name).update(data);
+  return db(model.table.name)
+    .update(rowToSnake(data as Row, model))
+    .where('id', '>', '1000');
+  /*
   if (Array.isArray(where)) {
     for (const arg of where) {
       const builder = new QueryBuilder(db, model, 'UPDATE');
@@ -286,9 +294,7 @@ function update(
   } else {
     query.where(where);
   }
-  return new Promise((resolve, reject) => {
-    query.then(resolve).catch(reject);
-  });
+  */
 }
 
 function createMany(db: knex, model: Model, rows: Input[]): Promise<Row[]> {
@@ -313,13 +319,13 @@ function deleteMany(db: knex, model: Model, args: QueryArgs[]): Promise<Row[]> {
     builder
       .select()
       .where(where)
-      .then(rows => {
+      .then(rows =>
         db(model.table.name)
           .where(where)
           .del()
           .then(() => resolve(rows))
-          .catch(reject);
-      });
+          .catch(reject)
+      );
   });
 }
 
@@ -342,5 +348,5 @@ export function deleteOne(
       }
     });
   }
-  return Promise.reject(Error('Invalid filter'));
+  return Promise.reject(Error('Bad filter'));
 }
