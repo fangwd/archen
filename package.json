@@ -5,7 +5,8 @@
   "main": "./dist/index.js",
   "directories": {
     "example": "example",
-    "lib": "lib"
+    "lib": "lib",
+    "dist": "dist"
   },
   "scripts": {
     "test": "jest",
