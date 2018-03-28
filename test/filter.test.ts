@@ -4,7 +4,7 @@ import { encodeFilter } from '../src/filter';
 
 import helper = require('./helper');
 
-const NAME = 'query';
+const NAME = 'filter';
 
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
