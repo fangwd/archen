@@ -1,0 +1,131 @@
+import { Document, splitArg } from '../src/query';
+import { Domain } from '../src/model';
+import { encodeFilter } from '../src/filter';
+
+import helper = require('./helper');
+
+const NAME = 'query';
+
+beforeAll(() => helper.createDatabase(NAME));
+afterAll(() => helper.dropDatabase(NAME));
+
+const data = helper.getExampleData();
+const domain = new Domain(data);
+
+test('split name and operator', () => {
+  let [name, op] = splitArg('orders_some');
+  expect(name).toBe('orders');
+  expect(op).toBe('some');
+  [name, op] = splitArg('orders');
+  expect(name).toBe('orders');
+  expect(op).toBe(undefined);
+});
+
+/*
+-- To get user -> order -> item -> products:
+select u.email, o.date_created, p.name, p.stock_quantity
+from product p
+  join order_item oi on p.id=oi.product_id
+  join `order` o on o.id=oi.order_id
+  join user u on u.id=o.user_id;
+*/
+test('example query', done => {
+  expect.assertions(2);
+
+  const db = helper.createTestConnection(NAME);
+  const model = domain.model('user');
+  const args = {
+    email: 'grace@example.com',
+    orders_some: {
+      dateCreated: '2018-3-21',
+      orderItems_none: {
+        product: {
+          name_like: '%Lamb%',
+          stockQuantity: [null, 0]
+        }
+      }
+    }
+  };
+
+  db.select('*', model, { where: args }).then(rows => {
+    expect(rows.length).toBe(1);
+    expect(rows[0].email).toBe(args.email);
+    done();
+  });
+});
+
+test('foreign key column filter', () => {
+  const model = domain.model('OrderItem');
+
+  const args = {
+    order: {
+      user: {
+        id_gt: 2
+      },
+      dateCreated: '2018-3-21'
+    },
+    product: {
+      id: [1, 2, 3]
+    }
+  };
+  const condition = encodeFilter(args, model);
+  expect(condition.indexOf('`product_id` in (1, 2, 3)')).not.toBe(-1);
+  expect(condition.indexOf('`user_id` > 2')).not.toBe(-1);
+});
+
+/*
+-- To retrieve a 3-level category tree:
+SELECT t1.name AS L1, t2.name as L2, t3.name as L3
+FROM category AS t1
+LEFT JOIN category AS t2 ON t2.parent_id = t1.id
+LEFT JOIN category AS t3 ON t3.parent_id = t2.id
+WHERE t1.name = 'All';
+
+-- To get product categories:
+select c.name, p.name
+from product_category pc
+  join product p on pc.product_id=p.id
+  join category c on c.id=pc.category_id
+order by c.name;
+*/
+test('many to many', done => {
+  expect.assertions(2);
+
+  const options = {
+    models: [
+      {
+        table: 'product_category',
+        fields: [
+          {
+            column: 'category_id',
+            throughField: 'product_id'
+          },
+          {
+            column: 'product_id',
+            throughField: 'category_id',
+            relatedName: 'categorySet'
+          }
+        ]
+      }
+    ]
+  };
+
+  const domain = new Domain(data, options);
+  const model = domain.model('Category');
+
+  const args = {
+    categories: {
+      name_like: 'Apple%',
+      products: {
+        name_like: '%Apple%'
+      }
+    }
+  };
+
+  const db = helper.createTestConnection(NAME);
+  db.select('*', model, { where: args }).then(rows => {
+    expect(rows.length).toBe(1);
+    expect(rows[0].name).toBe('Fruit');
+    done();
+  });
+});
