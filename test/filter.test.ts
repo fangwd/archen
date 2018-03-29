@@ -31,7 +31,7 @@ from product p
 test('example query', done => {
   expect.assertions(2);
 
-  const db = helper.createTestConnection(NAME);
+  const db = helper.connectToDatabase(NAME);
   const model = domain.model('user');
   const args = {
     email: 'grace@example.com',
@@ -46,11 +46,14 @@ test('example query', done => {
     }
   };
 
-  db.select(model, '*', { where: args }).then(rows => {
-    expect(rows.length).toBe(1);
-    expect(rows[0].email).toBe(args.email);
-    done();
-  });
+  db
+    .table('user')
+    .select('*', { where: args })
+    .then(rows => {
+      expect(rows.length).toBe(1);
+      expect(rows[0].email).toBe(args.email);
+      done();
+    });
 });
 
 test('foreign key column filter', () => {
@@ -110,7 +113,6 @@ test('many to many', done => {
   };
 
   const domain = new Schema(data, options);
-  const model = domain.model('Category');
 
   const args = {
     categories: {
@@ -121,10 +123,13 @@ test('many to many', done => {
     }
   };
 
-  const db = helper.createTestConnection(NAME);
-  db.select(model, '*', { where: args }).then(rows => {
-    expect(rows.length).toBe(1);
-    expect(rows[0].name).toBe('Fruit');
-    done();
-  });
+  const db = helper.connectToDatabase(NAME, domain);
+  db
+    .table('category')
+    .select('*', { where: args })
+    .then(rows => {
+      expect(rows.length).toBe(1);
+      expect(rows[0].name).toBe('Fruit');
+      done();
+    });
 });
