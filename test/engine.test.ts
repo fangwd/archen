@@ -5,7 +5,7 @@ const NAME = 'engine';
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
-test('smoke', done => {
+test('select/update', done => {
   expect.assertions(1);
 
   const conn = helper.createTestConnection(NAME);
