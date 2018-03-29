@@ -172,8 +172,10 @@ export function createTestConnection(name: string): Connection {
     : createSQLite3Connection(name);
 }
 
-export function connectToDatabase(name: string): Database {
-  const schema = new Schema(getExampleData());
+export function connectToDatabase(name: string, schema?: Schema): Database {
+  if (!schema) {
+    schema = new Schema(getExampleData());
+  }
   const conn = createTestConnection(name);
   return new Database(schema, conn);
 }
