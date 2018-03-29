@@ -21,8 +21,9 @@
   "devDependencies": {
     "@types/graphql": "^0.12.5",
     "@types/jest": "^22.2.0",
-    "@types/knex": "^0.14.9",
+    "@types/mysql": "^2.15.4",
     "@types/node": "^9.4.7",
+    "dotenv": "5.0.1",
     "jest": "^22.4.1",
     "sqlite3": "^3.1.13",
     "ts-jest": "^22.4.1",
@@ -35,7 +36,7 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "/test/mutation.test.ts",
+    "testRegex": "/test/(database).test.ts",
     "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
     "collectCoverage": false,
     "collectCoverageFrom": ["src/**/*.ts"],

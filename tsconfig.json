@@ -2,7 +2,7 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "es6",
-    "types": ["node", "jest"],
+    "types": ["node", "graphql", "jest", "mysql"],
     "typeRoots": ["node_modules/@types"],
     "inlineSourceMap": true
   },

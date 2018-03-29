@@ -16,12 +16,12 @@ import {
 } from 'graphql';
 
 import {
-  Domain,
+  Schema,
   SimpleField,
   ForeignKeyField,
   RelatedField,
   Field
-} from './domain';
+} from './model';
 
 interface ObjectTypeMap {
   [key: string]: GraphQLObjectType;
@@ -50,14 +50,14 @@ const QueryOptions = {
 };
 
 class SchemaBuilder {
-  private domain: Domain;
+  private domain: Schema;
   private schema: GraphQLSchema;
 
   private modelTypeMap: ObjectTypeMap = {};
   private whereTypeMap: InputTypeMap = {};
   private uniqueTypeMap: InputTypeMap = {};
 
-  constructor(domain: Domain) {
+  constructor(domain: Schema) {
     this.domain = domain;
 
     this.createWhereTypes();
@@ -513,6 +513,6 @@ function getInputType(field: SimpleField): GraphQLInputType {
 }
 
 export function createSchema(data, config = undefined): GraphQLSchema {
-  const builder = new SchemaBuilder(new Domain(data, config));
+  const builder = new SchemaBuilder(new Schema(data, config));
   return builder.getSchema();
 }

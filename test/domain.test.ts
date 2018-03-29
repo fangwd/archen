@@ -1,5 +1,5 @@
 import {
-  Domain,
+  Schema,
   SimpleField,
   ForeignKeyField,
   RelatedField
@@ -10,14 +10,14 @@ import * as helper from './helper';
 const data = helper.getExampleData();
 
 test('domain properties', () => {
-  const domain = new Domain(data);
+  const domain = new Schema(data);
   expect(domain.database).toBe(data);
   expect(domain.models.length).toBe(data.tables.length);
   expect(domain.model('User').domain).toBe(domain);
 });
 
 test('default model names', () => {
-  const domain = new Domain(data);
+  const domain = new Schema(data);
   expect(domain.model('User')).toBe(domain.model('user'));
   expect(domain.model('product_category').name).toBe('ProductCategory');
   expect(domain.model('product_category').pluralName).toBe('productCategories');
@@ -33,7 +33,7 @@ test('custmise model names', () => {
       }
     ]
   };
-  const domain = new Domain(data, options);
+  const domain = new Schema(data, options);
   expect(domain.model('delivery_address')).toBe(domain.model('Address'));
   expect(domain.model('Address').pluralName).toBe('Addresses');
 });
@@ -43,7 +43,7 @@ function getTable(data: any, name: string): any {
 }
 
 test('simple fields', () => {
-  const domain = new Domain(data);
+  const domain = new Schema(data);
   const model = domain.model('user');
   expect(model.field('first_name').name).toBe('firstName');
   expect(model.field('first_name')).toBe(model.field('firstName'));
@@ -67,7 +67,7 @@ test('foreign key fields', () => {
       }
     ]
   };
-  const domain = new Domain(data, options);
+  const domain = new Schema(data, options);
   const model = domain.model('order');
   const address = model.field('delivery_address_id') as ForeignKeyField;
   expect(model.field('deliveryAddress')).toBe(address);
@@ -103,7 +103,7 @@ test('related fields', () => {
       }
     ]
   };
-  const domain = new Domain(data, options);
+  const domain = new Schema(data, options);
   const orderModel = domain.model('order');
   const userOrders = domain.model('user').field('orders') as RelatedField;
   expect(userOrders.referencingField.model).toBe(orderModel);
@@ -140,7 +140,7 @@ test('through fields', () => {
       }
     ]
   };
-  const domain = new Domain(data, options);
+  const domain = new Schema(data, options);
   const categoryModel = domain.model('Category');
   expect(categoryModel.fields.length).toBe(5);
   const products = categoryModel.field('products') as RelatedField;
@@ -154,7 +154,7 @@ test('through fields', () => {
 });
 
 test('unique keys', () => {
-  const domain = new Domain(data);
+  const domain = new Schema(data);
   const model = domain.model('Category');
   expect(model.uniqueKeys.length).toBe(2);
   const primaryKey = model.uniqueKeys.find(key => key.fields.length === 1);
@@ -168,7 +168,7 @@ test('unique keys', () => {
 });
 
 test('one to one relation', () => {
-  const domain = new Domain(data);
+  const domain = new Schema(data);
   const orderModel = domain.model('Order');
   const shipping = orderModel.field('orderShipping') as RelatedField;
   expect(shipping.referencingField.isUnique()).toBe(true);

@@ -1,6 +1,5 @@
-import { Document, splitArg } from '../src/query';
-import { Domain } from '../src/model';
-import { encodeFilter } from '../src/filter';
+import { Schema } from '../src/domain';
+import { encodeFilter, splitKey } from '../src/filter';
 
 import helper = require('./helper');
 
@@ -10,13 +9,13 @@ beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
 const data = helper.getExampleData();
-const domain = new Domain(data);
+const domain = new Schema(data);
 
 test('split name and operator', () => {
-  let [name, op] = splitArg('orders_some');
+  let [name, op] = splitKey('orders_some');
   expect(name).toBe('orders');
   expect(op).toBe('some');
-  [name, op] = splitArg('orders');
+  [name, op] = splitKey('orders');
   expect(name).toBe('orders');
   expect(op).toBe(undefined);
 });
@@ -47,7 +46,7 @@ test('example query', done => {
     }
   };
 
-  db.select('*', model, { where: args }).then(rows => {
+  db.select(model, '*', { where: args }).then(rows => {
     expect(rows.length).toBe(1);
     expect(rows[0].email).toBe(args.email);
     done();
@@ -110,7 +109,7 @@ test('many to many', done => {
     ]
   };
 
-  const domain = new Domain(data, options);
+  const domain = new Schema(data, options);
   const model = domain.model('Category');
 
   const args = {
@@ -123,7 +122,7 @@ test('many to many', done => {
   };
 
   const db = helper.createTestConnection(NAME);
-  db.select('*', model, { where: args }).then(rows => {
+  db.select(model, '*', { where: args }).then(rows => {
     expect(rows.length).toBe(1);
     expect(rows[0].name).toBe('Fruit');
     done();

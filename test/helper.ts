@@ -2,7 +2,9 @@ const fs = require('fs');
 
 require('dotenv').config();
 
-import { Connection } from '../src/connection';
+import { Connection, createConnection } from '../src/engine';
+import { Schema } from '../src/domain';
+import { Database } from '../src/database';
 
 const DB_NAME = process.env.DB_NAME || 'archen_test';
 const DB_TYPE = process.env.DB_TYPE || 'sqlite3';
@@ -63,9 +65,7 @@ function dropSQLite3Database(name): Promise<void> {
 
 function createSQLite3Connection(name: string): Connection {
   const filename = `${DB_NAME}_${name}.db`;
-  return new Connection('sqlite3', {
-    filename
-  });
+  return createConnection('sqlite3', { filename });
 }
 
 function createMySQLDatabase(name: string): Promise<any> {
@@ -112,10 +112,9 @@ function dropMySQLDatabase(name: string): Promise<void> {
   });
 }
 
-function createMySQLConnection(name: string) {
+function createMySQLConnection(name: string): Connection {
   const database = `${DB_NAME}_${name}`;
-
-  return new Connection('mysql', {
+  return createConnection('mysql', {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
@@ -167,8 +166,14 @@ export function dropDatabase(name: string): Promise<any> {
     : dropSQLite3Database(name);
 }
 
-export function createConnection(name: string): Connection {
+export function createTestConnection(name: string): Connection {
   return process.env.DB_TYPE === 'mysql'
     ? createMySQLConnection(name)
     : createSQLite3Connection(name);
+}
+
+export function connectToDatabase(name: string): Database {
+  const schema = new Schema(getExampleData());
+  const conn = createTestConnection(name);
+  return new Database(schema, conn);
 }

@@ -1,17 +1,17 @@
-import { pluralise, toPascalCase, toCamelCase } from './forms';
+import { pluralise, toPascalCase, toCamelCase } from './misc';
 
-interface Database {
+interface DatabaseInfo {
   name?: string;
-  tables: Table[];
+  tables: TableInfo[];
 }
 
-interface Table {
+interface TableInfo {
   name: string;
-  columns: Column[];
-  indexes?: Index[];
+  columns: ColumnInfo[];
+  indexes?: IndexInfo[];
 }
 
-interface Column {
+interface ColumnInfo {
   name: string;
   type: string;
   size?: number;
@@ -19,15 +19,15 @@ interface Column {
   autoIncrement?: boolean;
 }
 
-interface Index {
+interface IndexInfo {
   table?: string;
   columns: string[];
   primaryKey?: boolean;
   unique?: boolean;
-  references?: Index;
+  references?: IndexInfo;
 }
 
-export interface DomainConfig {
+export interface SchemaConfig {
   models: ModelConfig[];
 }
 
@@ -45,18 +45,18 @@ interface FieldConfig {
   throughField?: string;
 }
 
-const SCHEMA_CONFIG: DomainConfig = { models: [] };
+const SCHEMA_CONFIG: SchemaConfig = { models: [] };
 const MODEL_CONFIG: ModelConfig = { fields: [] };
 const FIELD_CONFIG: FieldConfig = {};
 
-export class Domain {
-  database: Database;
-  config: DomainConfig;
+export class Schema {
+  database: DatabaseInfo;
+  config: SchemaConfig;
   models: Model[] = [];
 
   private modelMap: { [key: string]: Model } = {};
 
-  private getModelConfig(table: Table) {
+  private getModelConfig(table: TableInfo) {
     return this.config.models.find(config => config.table === table.name);
   }
 
@@ -79,7 +79,7 @@ export class Domain {
     }
   }
 
-  constructor(database: Database, config = SCHEMA_CONFIG) {
+  constructor(database: DatabaseInfo, config = SCHEMA_CONFIG) {
     this.database = database;
     this.config = Object.assign({}, SCHEMA_CONFIG, config);
 
@@ -103,10 +103,10 @@ export class Domain {
 }
 
 export class Model {
-  domain: Domain;
+  domain: Schema;
   name: string;
   fields: Field[] = [];
-  table: Table;
+  table: TableInfo;
   config: ModelConfig;
   primaryKey: UniqueKey;
   uniqueKeys: UniqueKey[] = [];
@@ -114,11 +114,11 @@ export class Model {
 
   private fieldMap: { [key: string]: Field } = {};
 
-  private getFieldConfig(column: Column) {
+  private getFieldConfig(column: ColumnInfo) {
     return this.config.fields.find(field => field.column === column.name);
   }
 
-  constructor(domain: Domain, table: Table, config: ModelConfig) {
+  constructor(domain: Schema, table: TableInfo, config: ModelConfig) {
     this.domain = domain;
     this.table = table;
     this.config = Object.assign({}, MODEL_CONFIG, config);
@@ -126,7 +126,7 @@ export class Model {
     this.pluralName =
       this.config.pluralName || toCamelCase(pluralise(table.name));
 
-    const references: { [key: string]: Index } = {};
+    const references: { [key: string]: IndexInfo } = {};
     for (const index of table.indexes) {
       if (index.references) {
         if (index.columns.length > 1) {
@@ -240,7 +240,7 @@ export class Model {
       throw Error(`Duplicate field name: ${field.name}`);
     }
 
-    let column: Column;
+    let column: ColumnInfo;
     if (field instanceof SimpleField) {
       column = field.column;
       if (column.name in this.fieldMap) {
@@ -280,9 +280,9 @@ export class Field {
 }
 
 export class SimpleField extends Field {
-  column: Column;
+  column: ColumnInfo;
 
-  constructor(model: Model, column: Column, config) {
+  constructor(model: Model, column: ColumnInfo, config) {
     config = Object.assign({}, FIELD_CONFIG, config);
     super(config.name || toCamelCase(column.name), model, config);
     this.column = column;
@@ -292,7 +292,7 @@ export class SimpleField extends Field {
 export class ForeignKeyField extends SimpleField {
   referencedField: SimpleField;
 
-  constructor(model: Model, column: Column, config) {
+  constructor(model: Model, column: ColumnInfo, config) {
     super(model, column, config);
     if (!this.config.name) {
       const match = /(.+?)(?:_id|Id)/.exec(column.name);

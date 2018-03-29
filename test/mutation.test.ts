@@ -1,16 +1,14 @@
-import { Domain } from '../src/domain';
+import { Schema } from '../src/model';
 import { createOne, updateOne, upsertOne, deleteOne } from '../src/mutation';
-import { rowToCamel } from '../src/common';
+import { rowToCamel } from '../src/mapping';
 import helper = require('./helper');
 
-beforeAll(() => {
-  const createDatabase = process.env.ARCHEN_TEST
-    ? helper.createMySQLDatabase
-    : helper.createSQLite3Database;
-  return createDatabase();
-});
+const NAME = 'mutation';
 
-const domain = new Domain(helper.getExampleData());
+const domain = new Schema(helper.getExampleData());
+
+beforeAll(() => helper.createDatabase(NAME));
+afterAll(() => helper.dropDatabase(NAME));
 
 function createSimpleObject(done) {
   expect.assertions(8);
@@ -23,15 +21,13 @@ function createSimpleObject(done) {
     firstName: 'Dude'
   };
 
-  helper.createConnection().transaction(db =>
+  helper.createTestConnection(NAME).transaction(db =>
     createOne(db, model, data).then(user => {
       expect(user.email).toBe(data.email);
       expect(user.status).toBe(data.status);
       expect(user.firstName).toBe(data.firstName);
       return db
-        .select('*')
-        .from('user')
-        .where({ email: data.email })
+        .select(model, '*', { where: { email: data.email } })
         .then(rows => {
           expect(rows.length).toBe(1);
           const row = rowToCamel(rows[0], model);
@@ -56,7 +52,7 @@ function updateSimpleObject(done) {
     firstName: 'Dude'
   };
 
-  helper.createConnection().transaction(db =>
+  helper.createTestConnection(NAME).transaction(db =>
     createOne(db, model, data).then(user =>
       updateOne(db, model, {
         data: { email: 'user-2x@example.com', firstName: 'Dude-x' },
@@ -66,15 +62,11 @@ function updateSimpleObject(done) {
         expect(user.status).toBe(data.status);
         expect(user.firstName).toBe('Dude-x');
         return db
-          .select('*')
-          .from('user')
-          .where({ email: data.email })
+          .select(model, '*', { where: { email: data.email } })
           .then(rows => {
             expect(rows.length).toBe(0);
             return db
-              .select('*')
-              .from('user')
-              .where({ email: 'user-2x@example.com' })
+              .select(model, '*', { where: { email: 'user-2x@example.com' } })
               .then(rows => {
                 expect(rows.length).toBe(1);
                 const row = rowToCamel(rows[0], model);
@@ -100,7 +92,7 @@ function upsertSimpleObject(done) {
     firstName: 'Dude'
   };
 
-  helper.createConnection().transaction(db =>
+  helper.createTestConnection(NAME).transaction(db =>
     createOne(db, model, data).then(user => {
       const userId = user.id;
       return upsertOne(db, model, {
@@ -116,15 +108,13 @@ function upsertSimpleObject(done) {
             expect(user.email).toBe('user-3x@example.com');
             expect(user.firstName).toBe('Dude-x');
             return db
-              .select('*')
-              .from('user')
-              .where({ email: data.email })
+              .select(model, '*', { where: { email: data.email } })
               .then(rows => {
                 expect(rows.length).toBe(0);
                 return db
-                  .select('*')
-                  .from('user')
-                  .where({ email: 'user-3x@example.com' })
+                  .select(model, '*', {
+                    where: { email: 'user-3x@example.com' }
+                  })
                   .then(rows => {
                     expect(rows.length).toBe(1);
                     const row = rowToCamel(rows[0], model);
@@ -153,7 +143,7 @@ function deleteObject(done) {
     email: 'user-4@example.com'
   };
 
-  helper.createConnection().transaction(db =>
+  helper.createTestConnection(NAME).transaction(db =>
     createOne(db, model, data).then(user => {
       const userId = user.id;
       return updateOne(db, model, {
@@ -167,10 +157,9 @@ function deleteObject(done) {
               where: { email: 'user-4x@example.com' }
             }).then(user => {
               expect(user.email).toBe('user-4x@example.com');
+
               return db
-                .select('*')
-                .from('user')
-                .where({ email: 'user-4x@example.com' })
+                .select(model, '*', { where: { email: 'user-4x@example.com' } })
                 .then(rows => {
                   expect(rows.length).toBe(0);
                   done();
@@ -204,7 +193,7 @@ function createObject_1(done) {
     }
   };
 
-  helper.createConnection().transaction(db =>
+  helper.createTestConnection(NAME).transaction(db =>
     createOne(db, model, data).then(row => {
       expect(row.parent.id).toBe(data.parent.connect.id);
       expect(row.name).toBe(data.name);
@@ -251,19 +240,16 @@ function createObject_2(done) {
     }
   };
 
-  helper.createConnection().transaction(db =>
+  helper.createTestConnection(NAME).transaction(db =>
     createOne(db, model, data).then(row => {
       const parentId = row.id;
-      console.log(row);
       expect(row.parent.id).toBe(data.parent.connect.id);
       expect(row.name).toBe(data.name);
       return db
-        .select('*')
-        .from('category')
-        .where({ name: 'Vegitable' })
-        .orWhere({ parent_id: parentId })
+        .select(model, '*', {
+          where: [{ name: 'Vegitable' }, { parent_id: parentId }]
+        })
         .then(rows => {
-          console.log(rows);
           expect(rows.length).toBe(5);
           const cucumber = rows.find(row => row.name === 'Cucumber');
           expect(cucumber.parent_id).toBe(parentId);

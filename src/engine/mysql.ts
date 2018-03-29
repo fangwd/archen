@@ -1,5 +1,6 @@
-import mysql = require('mysql');
 import { Connection, TransactionCallback } from './connection';
+
+import mysql = require('mysql');
 
 class MySQL extends Connection {
   private connection: mysql.Connection;

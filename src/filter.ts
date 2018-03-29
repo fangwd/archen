@@ -1,5 +1,6 @@
-import { Document, Escape, Value, splitArg } from './query';
-import { Model, SimpleField, ForeignKeyField, RelatedField } from './model';
+import { Document, Filter, Value } from './database';
+import { Model, SimpleField, ForeignKeyField, RelatedField } from './domain';
+import { Escape } from './engine';
 
 class Context {
   private counter: number;
@@ -29,7 +30,7 @@ class Builder {
     }
   }
 
-  where(args: Document | Document[]): string {
+  where(args: Filter): string {
     if (Array.isArray(args)) {
       return args.length ? this.or(args) : '';
     } else {
@@ -45,14 +46,14 @@ class Builder {
   private and(args: Document): string {
     const exprs: string[] = [];
     for (const key in args) {
-      const [name, operator] = splitArg(key);
+      const [name, operator] = splitKey(key);
       const field = this.model.field(name);
       const value = args[key];
       if (field instanceof ForeignKeyField) {
         const query = value as Document;
         const keys = Object.keys(query);
         if (keys.length === 1) {
-          const [name, operator] = splitArg(keys[0] as string);
+          const [name, operator] = splitKey(keys[0] as string);
           if (name === field.referencedField.name) {
             exprs.push(this.expr(field, operator, query[keys[0]] as Value));
             continue;
@@ -184,14 +185,34 @@ class Builder {
 }
 
 export function encodeFilter(
-  args: Document | Document[],
+  args: Filter,
   model: Model,
-  dialect?: Escape
+  escape?: Escape
 ): string {
-  dialect = dialect || {
+  escape = escape || {
     escapeId: s => '`' + s + '`',
     escape: s => "'" + (s + '').replace(/'/g, "\\'") + "'"
   };
-  const builder = new Builder(model, dialect);
+  const builder = new Builder(model, escape);
   return builder.where(args);
+}
+
+const OPERATOR_MAP = {
+  lt: '<',
+  le: '<=',
+  ge: '>=',
+  gt: '>',
+  ne: '<>',
+  in: 'in',
+  like: 'like',
+  null: 'null'
+};
+
+export function splitKey(arg: string): string[] {
+  const match = /^(.+?)_([^_]+)$/.exec(arg);
+  if (match) {
+    const op = match[2] in OPERATOR_MAP ? OPERATOR_MAP[match[2]] : match[2];
+    return [match[1], op];
+  }
+  return [arg];
 }
