@@ -13,7 +13,7 @@ import {
   SimpleField,
   ForeignKeyField,
   RelatedField
-} from './domain';
+} from './model';
 
 import { Connection, Row } from './engine';
 import { encodeFilter } from './filter';

@@ -3,7 +3,7 @@ const fs = require('fs');
 require('dotenv').config();
 
 import { Connection, createConnection } from '../src/engine';
-import { Schema } from '../src/domain';
+import { Schema } from '../src/model';
 import { Database } from '../src/database';
 
 const DB_NAME = process.env.DB_NAME || 'archen_test';

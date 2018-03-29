@@ -1,5 +1,5 @@
 import { Document, Filter, Value } from './database';
-import { Model, SimpleField, ForeignKeyField, RelatedField } from './domain';
+import { Model, SimpleField, ForeignKeyField, RelatedField } from './model';
 import { Escape } from './engine';
 
 class Context {

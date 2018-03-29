@@ -36,7 +36,7 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "/test/(database).test.ts",
+    "testRegex": "/test/(model|connection|database|filter|misc).test.ts",
     "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
     "collectCoverage": false,
     "collectCoverageFrom": ["src/**/*.ts"],

@@ -1,4 +1,4 @@
-import { Schema } from '../src/domain';
+import { Schema } from '../src/model';
 import helper = require('./helper');
 
 const NAME = 'database';

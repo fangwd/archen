@@ -1,4 +1,4 @@
-import { Schema } from '../src/domain';
+import { Schema } from '../src/model';
 import { encodeFilter, splitKey } from '../src/filter';
 
 import helper = require('./helper');
