@@ -151,3 +151,76 @@ test('transaction rollback - error', done => {
         });
     });
 });
+
+test('transaction commit (by user)', done => {
+  expect.assertions(3);
+
+  const ID = 500;
+
+  const conn = helper.createTestConnection(NAME);
+  conn.transaction(conn => {
+    conn
+      .query(`insert into category (id, name) values (${ID}, 'Grocery')`)
+      .then(id => {
+        return conn
+          .query(`select * from category where id=${ID}`)
+          .then(rows => {
+            expect(rows[0].name).toBe('Grocery');
+            conn
+              .query(
+                `insert into category(id, name) values (${ID + 1}, 'Dairy')`
+              )
+              .then(() => {
+                conn.commit().then(() => {
+                  conn
+                    .query(
+                      `select * from category where id in (${ID}, ${ID +
+                        1}) order by id`
+                    )
+                    .then(rows => {
+                      expect(rows.length).toBe(2);
+                      expect(rows[1].name).toBe('Dairy');
+                      done();
+                    });
+                });
+              });
+          });
+      });
+  });
+});
+
+test('transaction rollback (by user)', done => {
+  expect.assertions(2);
+
+  const ID = 600;
+
+  const conn = helper.createTestConnection(NAME);
+  conn.transaction(conn => {
+    conn
+      .query(`insert into category (id, name) values (${ID}, 'Grocery')`)
+      .then(id => {
+        return conn
+          .query(`select * from category where id=${ID}`)
+          .then(rows => {
+            expect(rows[0].name).toBe('Grocery');
+            conn
+              .query(
+                `insert into category(id, name) values (${ID + 1}, 'Dairy')`
+              )
+              .then(() => {
+                conn.rollback().then(() => {
+                  conn
+                    .query(
+                      `select * from category where id in (${ID}, ${ID +
+                        1}) order by id`
+                    )
+                    .then(rows => {
+                      expect(rows.length).toBe(0);
+                      done();
+                    });
+                });
+              });
+          });
+      });
+  });
+});

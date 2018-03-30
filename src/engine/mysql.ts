@@ -25,37 +25,60 @@ class MySQL extends Connection {
     });
   }
 
+  transaction(callback: TransactionCallback): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.connection.beginTransaction(error => {
+        if (error) return reject(error);
+        const promise = callback(this);
+        if (promise instanceof Promise) {
+          promise
+            .then(() => {
+              this.connection.commit(function(error) {
+                if (error) {
+                  this.conn.rollback(function() {
+                    reject(error);
+                  });
+                } else {
+                  resolve();
+                }
+              });
+            })
+            .catch(reason => {
+              this.connection.rollback(function() {
+                reject(reason);
+              });
+            });
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  commit(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.connection.commit(error => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+
+  rollback(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.connection.rollback(error => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+
   escape(value: string): string {
     return mysql.escape(value);
   }
 
   escapeId(name: string) {
     return mysql.escapeId(name);
-  }
-
-  transaction(callback: TransactionCallback): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.connection.beginTransaction(error => {
-        if (error) return reject(error);
-        callback(this)
-          .then(() => {
-            this.connection.commit(function(error) {
-              if (error) {
-                this.conn.rollback(function() {
-                  reject(error);
-                });
-              } else {
-                resolve();
-              }
-            });
-          })
-          .catch(reason => {
-            this.connection.rollback(function() {
-              reject(reason);
-            });
-          });
-      });
-    });
   }
 }
 
