@@ -33,7 +33,12 @@ export class Database {
     }
   }
 
-  table(name: string): Table {
+  table(name: string | Field | Model): Table {
+    if (name instanceof Field) {
+      name = name.model.name;
+    } else if (name instanceof Model) {
+      name = name.name;
+    }
     return this.tables[name];
   }
 }
@@ -128,11 +133,11 @@ export class Table {
     return this.db.engine.query(sql);
   }
 
-  delete(model: Model, where?: Document | Document[]): Promise<any> {
+  delete(filter: Filter): Promise<any> {
     let sql = `delete from {this._name()}`;
 
-    if (where) {
-      sql += ` where ${this._where(where)}`;
+    if (filter) {
+      sql += ` where ${this._where(filter)}`;
     }
 
     return this.db.engine.query(sql);
@@ -159,6 +164,221 @@ export class Table {
       return 'null';
     }
     return this.db.engine.escape(value + '');
+  }
+
+  get(key: Value | Document): Promise<Document> {
+    if (key === null || typeof key !== 'object') {
+      key = {
+        [this.model.keyField().name]: key
+      };
+    } else if (!this.model.checkUniqueKey(key)) {
+      const msg = `Bad selector: ${JSON.stringify(key)}`;
+      return Promise.reject(Error(msg));
+    }
+
+    return this.select('*', { where: key } as SelectOptions).then(
+      rows => rows[0]
+    );
+  }
+
+  // GraphQL mutations
+  resolveParentFields(input: Document): Promise<Row> {
+    const result: Row = {};
+    const promises = [];
+    const self = this;
+
+    function _createPromise(field: ForeignKeyField, data: Document): void {
+      const table = self.db.table(field.referencedField.model);
+      const method = Object.keys(data)[0];
+      let promise = (method === 'connect'
+        ? table.get(data[method] as Document)
+        : table.create(data[method] as Document)
+      ).then(row => {
+        result[field.name] = row
+          ? row[field.referencedField.model.keyField().name]
+          : null;
+        return row;
+      });
+      promises.push(promise);
+    }
+
+    for (const key in input) {
+      let field = this.model.field(key);
+      if (
+        field instanceof ForeignKeyField &&
+        input[key] &&
+        typeof input[key] === 'object'
+      ) {
+        _createPromise(field, input[key] as Document);
+      } else if (field instanceof SimpleField) {
+        result[key] = input[key] as Value;
+      }
+    }
+
+    return Promise.all(promises).then(() => result);
+  }
+
+  create(data: Document): Promise<Document> {
+    return this.resolveParentFields(data).then(row =>
+      this.insert(row).then(id => {
+        return this.updateChildFields(data, id).then(() => this.get(id));
+      })
+    );
+  }
+
+  upsert(data: Document, update?: Document): Promise<Document> {
+    if (!this.model.checkUniqueKey(data)) {
+      return Promise.reject('Incomplete data');
+    }
+
+    const self = this;
+
+    return this.resolveParentFields(data).then(row => {
+      const uniqueFields = self.model.getUniqueFields(row);
+      return self.get(uniqueFields).then(row => {
+        if (!row) {
+          return self.create(data);
+        } else {
+          if (update && Object.keys(update).length > 0) {
+            return self.updateOne(update, uniqueFields);
+          } else {
+            return row;
+          }
+        }
+      });
+    });
+  }
+
+  updateOne(data: Document, filter: Filter): Promise<Document> {
+    if (!this.model.checkUniqueKey(data)) {
+      return Promise.reject(`Bad filter: ${JSON.stringify(filter)}`);
+    }
+
+    const self = this;
+
+    return this.resolveParentFields(data).then(row =>
+      self.update(row, filter).then(() => {
+        const where = Object.assign({}, filter);
+        for (const key in where) {
+          if (key in row) {
+            where[key] = row[key];
+          }
+        }
+        return self.get(where as Document).then(row => {
+          if (row) {
+            const id = row[this.model.keyField().name] as Value;
+            return this.updateChildFields(data, id).then(() => row);
+          } else {
+            return Promise.resolve(row);
+          }
+        });
+      })
+    );
+  }
+
+  updateChildFields(data: Document, id: Value): Promise<void> {
+    const promises = [];
+    for (const key in data) {
+      let field = this.model.field(key);
+      if (field instanceof RelatedField) {
+        const related = field.referencingField;
+        promises.push(
+          this.updateChildField(related, id, data[key] as Document)
+        );
+      }
+    }
+    return Promise.all(promises).then(() => Promise.resolve());
+  }
+
+  updateChildField(
+    field: ForeignKeyField,
+    id: Value,
+    data: Document
+  ): Promise<void> {
+    const promises = [];
+    const table = this.db.table(field.model);
+    for (const method in data) {
+      const args = data[method] as Document[];
+      if (method === 'connect') {
+        // connect: [{parent: {id: 2}, name: 'Apple'}, ...]
+        for (const arg of args) {
+          if (!table.model.checkUniqueKey(arg)) {
+            return Promise.reject('Bad filter');
+          }
+          promises.push(table.update({ [field.name]: id }, args));
+        }
+      } else if (method === 'create') {
+        // create: [{parent: {id: 2}, name: 'Apple'}, ...]
+        const docs = args.map(arg => ({ [field.name]: id, ...arg }));
+        for (const doc of docs) {
+          promises.push(table.create(doc));
+        }
+      } else if (method === 'upsert') {
+        const rows = args.map(arg => ({
+          create: { [field.name]: id, ...(arg.create as Document) },
+          update: { [field.name]: id, ...((arg.update || {}) as Document) }
+        }));
+        for (const arg of args) {
+          const create = arg.create as Document;
+          const update = arg.update as Document;
+          promises.push(table.upsert(create, update));
+        }
+      } else if (method === 'update') {
+        const rows = args.map(arg => ({
+          data: arg.data,
+          where: { ...(arg.where as Document), [field.name]: id }
+        }));
+        for (const arg of args) {
+          const data = arg.data as Document;
+          const filter = {
+            [field.name]: id,
+            ...((arg.where || {}) as Document)
+          };
+          promises.push(table.updateOne(data, filter));
+        }
+      } else if (method === 'delete') {
+        const filter = args.map(arg => ({
+          ...(arg.where as Document),
+          [field.name]: id
+        }));
+        promises.push(table.delete(filter as Filter));
+      } else if (method === 'disconnect') {
+        const where = args.map(arg => ({ [field.name]: id, ...arg }));
+        promises.push(table.update({ [field.name]: null }, where));
+      } else if (method === 'set') {
+        for (const key in args) {
+          if (!/^(connect|create|upsert)$/.test(key)) {
+            return Promise.reject(`Bad operator: ${key}`);
+          }
+        }
+        promises.push(
+          table
+            .delete({ [field.name]: id })
+            .then(() =>
+              table.updateChildField(field, id, data[method] as Document)
+            )
+        );
+      } else {
+        throw Error(`Unknown method: ${method}`);
+      }
+    }
+
+    return Promise.all(promises).then(() => Promise.resolve());
+  }
+
+  // Aggregate functions
+  count(filter?: Filter): Promise<number> {
+    let sql = `select count(1) as result from ${this._name()}`;
+
+    if (filter) {
+      sql += ` where ${this._where(filter)}`;
+    }
+
+    return new Promise<number>(resolve => {
+      this.db.engine.query(sql).then(rows => {
+        resolve(parseInt(rows[0].result));
+      });
+    });
   }
 }
 
@@ -194,25 +414,4 @@ export function toDocument(row: Row, model: Model): Document {
     }
   }
   return result;
-}
-
-export function rowToSnake(row: Row, model: Model): Row {
-  const result = {};
-  for (const key in row) {
-    const field = model.field(key);
-    if (field instanceof SimpleField) {
-      result[field.column.name] = _toSnake(row[key], field);
-    } else {
-      result[key] = row[key];
-    }
-  }
-  return result;
-}
-
-export function rowsToCamel(rows: Row[], model: Model): Row[] {
-  return rows.map(row => toDocument(row, model));
-}
-
-export function rowsToSnake(rows: Row[], model: Model): Row[] {
-  return rows.map(row => rowToSnake(row, model));
 }

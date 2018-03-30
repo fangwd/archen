@@ -18,6 +18,14 @@ export class Connection implements Escape {
     return Promise.reject(Error('Not implemented'));
   }
 
+  commit(): Promise<void> {
+    return Promise.reject(Error('Not implemented'));
+  }
+
+  rollback(): Promise<void> {
+    return Promise.reject(Error('Not implemented'));
+  }
+
   escape(s: string): string {
     return `'${s}'`;
   }

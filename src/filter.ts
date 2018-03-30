@@ -1,4 +1,4 @@
-import { Document, Filter, Value } from './database';
+import { Filter, Value } from './database';
 import { Model, SimpleField, ForeignKeyField, RelatedField } from './model';
 import { Escape } from './engine';
 
@@ -34,23 +34,23 @@ class Builder {
     if (Array.isArray(args)) {
       return args.length ? this.or(args) : '';
     } else {
-      return Object.keys(args).length ? this.and(args as Document) : '';
+      return Object.keys(args).length ? this.and(args as Filter) : '';
     }
   }
 
-  private or(args: Document[]): string {
+  private or(args: Filter[]): string {
     const exprs = args.map(arg => this.and(arg));
     return `(${exprs.join(' or ')})`;
   }
 
-  private and(args: Document): string {
+  private and(args: Filter): string {
     const exprs: string[] = [];
     for (const key in args) {
       const [name, operator] = splitKey(key);
       const field = this.model.field(name);
       const value = args[key];
       if (field instanceof ForeignKeyField) {
-        const query = value as Document;
+        const query = value as Filter;
         const keys = Object.keys(query);
         if (keys.length === 1) {
           const [name, operator] = splitKey(keys[0] as string);
@@ -63,7 +63,7 @@ class Builder {
       } else if (field instanceof SimpleField) {
         exprs.push(this.expr(field, operator, value as Value));
       } else if (field instanceof RelatedField) {
-        exprs.push(this.exists(field, operator, value as Document));
+        exprs.push(this.exists(field, operator, value as Filter));
       } else {
         throw Error(`Bad field: ${name}`);
       }
@@ -109,7 +109,7 @@ class Builder {
     return this.context;
   }
 
-  private select(name: string | number, args: Document = {}): string {
+  private select(name: string | number, args: Filter = {}): string {
     const where = this.where(args);
     return (
       `${this._select(name)} ${this._from()}` +
@@ -125,9 +125,11 @@ class Builder {
   }
 
   private _prefix(name: string | number): string {
-    return typeof name === 'number'
-      ? name + ''
-      : `${this.alias || this.model.table.name}.${this.escapeId(name)}`;
+    if (typeof name === 'number') {
+      return name + '';
+    }
+    name = this.escapeId(name);
+    return `${this.alias || this.escapeId(this.model.table.name)}.${name}`;
   }
 
   private _from(): string {
@@ -135,7 +137,7 @@ class Builder {
     return this.alias ? `${from} ${this.alias}` : from;
   }
 
-  private _in(field: ForeignKeyField, args: Document) {
+  private _in(field: ForeignKeyField, args: Filter) {
     const model = field.referencedField.model;
     const builder = new Builder(model, this.dialect, this.getContext());
     const lhs = this._prefix(field.column.name);
@@ -143,7 +145,7 @@ class Builder {
     return `${lhs} in (${rhs})`;
   }
 
-  private exists(field: RelatedField, operator: string, args: Document) {
+  private exists(field: RelatedField, operator: string, args: Filter) {
     const model = field.referencingField.model;
     const builder = new Builder(model, this.dialect, this.getContext());
     const scope =
