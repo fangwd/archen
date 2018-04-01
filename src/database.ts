@@ -67,9 +67,11 @@ export class Table {
     return encodeFilter(filter, this.model);
   }
 
-  private _pair(name: string, value: Value): string {
-    const field = this.model.field(name) as SimpleField;
-    return this.escapeName(field) + '=' + this.escapeValue(field, value);
+  private _pair(name: string | SimpleField, value: Value): string {
+    if (typeof name === 'string') {
+      name = this.model.field(name) as SimpleField;
+    }
+    return this.escapeName(name) + '=' + this.escapeValue(name, value);
   }
 
   select(
@@ -108,14 +110,21 @@ export class Table {
   }
 
   update(data: Document, filter?: Filter): Promise<any> {
+    if (Object.keys(data).length === 0) {
+      return Promise.resolve();
+    }
+
     let sql = `update ${this._name()} set`;
 
     const keys = Object.keys(data);
     for (let i = 0; i < keys.length; i++) {
-      if (i > 0) {
-        sql += ',';
+      const field = this.model.field(keys[i]);
+      if (field instanceof SimpleField) {
+        if (i > 0) {
+          sql += ',';
+        }
+        sql += this._pair(field, data[keys[i]] as Value);
       }
-      sql += this._pair(keys[i], data[keys[i]] as Value);
     }
 
     if (filter) {
@@ -134,7 +143,7 @@ export class Table {
   }
 
   delete(filter: Filter): Promise<any> {
-    let sql = `delete from {this._name()}`;
+    let sql = `delete from ${this._name()}`;
 
     if (filter) {
       sql += ` where ${this._where(filter)}`;
@@ -175,7 +184,6 @@ export class Table {
       const msg = `Bad selector: ${JSON.stringify(key)}`;
       return Promise.reject(Error(msg));
     }
-
     return this.select('*', { where: key } as SelectOptions).then(
       rows => rows[0]
     );
@@ -250,7 +258,7 @@ export class Table {
   }
 
   updateOne(data: Document, filter: Filter): Promise<Document> {
-    if (!this.model.checkUniqueKey(data)) {
+    if (!this.model.checkUniqueKey(filter)) {
       return Promise.reject(`Bad filter: ${JSON.stringify(filter)}`);
     }
 
@@ -314,14 +322,17 @@ export class Table {
           promises.push(table.create(doc));
         }
       } else if (method === 'upsert') {
-        const rows = args.map(arg => ({
-          create: { [field.name]: id, ...(arg.create as Document) },
-          update: { [field.name]: id, ...((arg.update || {}) as Document) }
-        }));
+        const rows = [];
         for (const arg of args) {
-          const create = arg.create as Document;
-          const update = arg.update as Document;
-          promises.push(table.upsert(create, update));
+          let { create, update } = arg;
+          if (!create && !field.isUnique()) {
+            throw Error('Bad data');
+          }
+          create = Object.assign({ [field.name]: id }, create);
+          if (create[field.name] === undefined) {
+            update = Object.assign({ [field.name]: id }, update);
+          }
+          promises.push(table.upsert(create as Document, update as Document));
         }
       } else if (method === 'update') {
         const rows = args.map(arg => ({

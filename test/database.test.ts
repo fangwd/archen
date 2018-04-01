@@ -195,10 +195,14 @@ test('upsert #2', done => {
   });
 });
 
-test('update related #1', done => {
-  expect.assertions(1);
+test('update related', async done => {
+  expect.assertions(14);
 
-  const data = {
+  const table = helper.connectToDatabase(NAME).table('category');
+
+  // connect/create child rows
+  let rowCount = await table.count();
+  let data: any = {
     name: 'Vegetable',
     parent: {
       connect: {
@@ -221,10 +225,129 @@ test('update related #1', done => {
     }
   };
 
-  const table = helper.connectToDatabase(NAME).table('category');
-  table.create(data).then(async id => {
-    const row = await table.get(id);
-    expect(row.name).toBe(data.name);
-    done();
-  });
+  let row: any = await table.create(data);
+
+  let rows: any = await table.select('*');
+  expect(rows.length).toBe(rowCount + 3);
+  expect(rows.find(r => r.name === data.name).id).toBe(row.id);
+  expect(rows.find(r => r.name === 'Cucumber').parent.id).toBe(row.id);
+  expect(rows.find(r => r.name === 'Banana').parent.id).toBe(row.id);
+
+  // upsert child rows
+  data = {
+    where: {
+      name: 'Vegetable',
+      parent: {
+        id: 1
+      }
+    },
+    data: {
+      categories: {
+        upsert: [
+          {
+            create: { name: 'Cucumber' },
+            update: { name: 'Garlic' }
+          },
+          {
+            create: { name: 'Apple' },
+            update: { name: 'Chilli' }
+          }
+        ]
+      }
+    }
+  };
+
+  rowCount = await table.count();
+  row = await table.updateOne(data.data, data.where);
+  rows = await table.select('*');
+  expect(rows.length).toBe(rowCount);
+  expect(rows.find(r => r.name === 'Garlic').parent.id).toBe(row.id);
+  expect(rows.find(r => r.name === 'Chilli').parent.id).toBe(row.id);
+
+  // update child rows
+  data = {
+    where: {
+      name: 'Vegetable',
+      parent: {
+        id: 1
+      }
+    },
+    data: {
+      categories: {
+        update: [
+          {
+            data: { name: 'Apple' },
+            where: { name: 'Chilli' }
+          },
+          {
+            data: { name: 'Cucumber' },
+            where: { name: 'Garlic' }
+          }
+        ]
+      }
+    }
+  };
+
+  row = await table.updateOne(data.data, data.where);
+  rows = await table.select('*');
+  expect(rows.find(r => r.name === 'Apple').parent.id).toBe(row.id);
+  expect(rows.find(r => r.name === 'Cucumber').parent.id).toBe(row.id);
+
+  // delete child rows
+  data = {
+    where: {
+      name: 'Vegetable',
+      parent: {
+        id: 1
+      }
+    },
+    data: {
+      categories: {
+        delete: [
+          {
+            where: { name: 'Tomato' }
+          },
+          {
+            where: { name: 'Cucumber' }
+          }
+        ]
+      }
+    }
+  };
+
+  rowCount = await table.count();
+  row = await table.updateOne(data.data, data.where);
+  rows = await table.select('*');
+  expect(rows.length).toBe(rowCount - 2);
+  expect(rows.find(r => r.name === 'Cucumber')).toBe(undefined);
+  expect(rows.find(r => r.name === 'Tomato')).toBe(undefined);
+
+  // disconnect child rows
+  data = {
+    where: {
+      name: 'Vegetable',
+      parent: {
+        id: 1
+      }
+    },
+    data: {
+      categories: {
+        disconnect: [
+          {
+            name: 'Apple'
+          },
+          {
+            name: 'Banana'
+          }
+        ]
+      }
+    }
+  };
+
+  row = await table.updateOne(data.data, data.where);
+  rows = await table.select('*');
+  expect(rows.find(r => r.name === 'Apple').parent.id).toBe(null);
+  expect(rows.find(r => r.name === 'Banana').parent.id).toBe(null);
+
+  done();
 });

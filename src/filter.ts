@@ -51,12 +51,17 @@ class Builder {
       const value = args[key];
       if (field instanceof ForeignKeyField) {
         const query = value as Filter;
-        const keys = Object.keys(query);
-        if (keys.length === 1) {
-          const [name, operator] = splitKey(keys[0] as string);
-          if (name === field.referencedField.name) {
-            exprs.push(this.expr(field, operator, query[keys[0]] as Value));
-            continue;
+        if (query === null || typeof query !== 'object') {
+          exprs.push(this.expr(field, '=', value));
+          continue;
+        } else {
+          const keys = Object.keys(query);
+          if (keys.length === 1) {
+            const [name, operator] = splitKey(keys[0] as string);
+            if (name === field.referencedField.name) {
+              exprs.push(this.expr(field, operator, query[keys[0]] as Value));
+              continue;
+            }
           }
         }
         exprs.push(this._in(field, query));
