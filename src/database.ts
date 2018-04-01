@@ -357,16 +357,13 @@ export class Table {
         const where = args.map(arg => ({ [field.name]: id, ...arg }));
         promises.push(table.update({ [field.name]: null }, where));
       } else if (method === 'set') {
-        for (const key in args) {
-          if (!/^(connect|create|upsert)$/.test(key)) {
-            return Promise.reject(`Bad operator: ${key}`);
-          }
-        }
         promises.push(
           table
             .delete({ [field.name]: id })
             .then(() =>
-              table.updateChildField(field, id, data[method] as Document)
+              table.updateChildField(field, id, {
+                create: data[method] as Document
+              })
             )
         );
       } else {

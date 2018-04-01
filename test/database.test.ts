@@ -351,3 +351,68 @@ test('update related', async done => {
 
   done();
 });
+
+// Replaces existing child rows with a new set
+test('update related - set', async done => {
+  expect.assertions(8);
+
+  const table = helper.connectToDatabase(NAME).table('category');
+
+  let rowCount = await table.count();
+  let data: any = {
+    name: 'Drinks',
+    parent: {
+      connect: {
+        id: 1
+      }
+    },
+    categories: {
+      create: [
+        {
+          name: 'Water'
+        },
+        {
+          name: 'Cordials'
+        }
+      ]
+    }
+  };
+
+  let row: any = await table.create(data);
+  let rows: any = await table.select('*');
+
+  expect(rows.length).toBe(rowCount + 3);
+  expect(rows.find(r => r.name === data.name).id).toBe(row.id);
+  expect(rows.find(r => r.name === 'Water').parent.id).toBe(row.id);
+  expect(rows.find(r => r.name === 'Cordials').parent.id).toBe(row.id);
+
+  data = {
+    where: {
+      name: 'Drinks',
+      parent: {
+        id: 1
+      }
+    },
+    data: {
+      categories: {
+        set: [
+          {
+            name: 'Water'
+          },
+          {
+            name: 'Juice'
+          }
+        ]
+      }
+    }
+  };
+
+  rowCount = await table.count();
+  row = await table.updateOne(data.data, data.where);
+  rows = await table.select('*');
+  expect(rows.length).toBe(rowCount);
+  expect(rows.find(r => r.name === 'Juice').parent.id).toBe(row.id);
+  expect(rows.find(r => r.name === 'Cordials')).toBe(undefined);
+  expect(rows.find(r => r.name === 'Water').parent.id).toBe(row.id);
+  done();
+});
