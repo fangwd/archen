@@ -289,33 +289,40 @@ export class Table {
     for (const key in data) {
       let field = this.model.field(key);
       if (field instanceof RelatedField) {
-        const related = field.referencingField;
-        promises.push(
-          this.updateChildField(related, id, data[key] as Document)
-        );
+        promises.push(this.updateChildField(field, id, data[key] as Document));
       }
     }
     return Promise.all(promises).then(() => Promise.resolve());
   }
 
   updateChildField(
-    field: ForeignKeyField,
+    related: RelatedField,
     id: Value,
     data: Document
   ): Promise<void> {
     const promises = [];
+    const field = related.referencingField;
+    if (!field) throw Error(related.name + ' the related');
     const table = this.db.table(field.model);
     for (const method in data) {
       const args = data[method] as Document[];
       if (method === 'connect') {
+        if (related.throughField) {
+          promises.push(this.connectThrough(related, id, args));
+          continue;
+        }
         // connect: [{parent: {id: 2}, name: 'Apple'}, ...]
         for (const arg of args) {
           if (!table.model.checkUniqueKey(arg)) {
-            return Promise.reject('Bad filter');
+            return Promise.reject(`Bad filter (${table.model.name})`);
           }
           promises.push(table.update({ [field.name]: id }, args));
         }
       } else if (method === 'create') {
+        if (related.throughField) {
+          promises.push(this.createThrough(related, id, args));
+          continue;
+        }
         // create: [{parent: {id: 2}, name: 'Apple'}, ...]
         const docs = args.map(arg => ({ [field.name]: id, ...arg }));
         for (const doc of docs) {
@@ -358,13 +365,11 @@ export class Table {
         promises.push(table.update({ [field.name]: null }, where));
       } else if (method === 'set') {
         promises.push(
-          table
-            .delete({ [field.name]: id })
-            .then(() =>
-              table.updateChildField(field, id, {
-                create: data[method] as Document
-              })
-            )
+          table.delete({ [field.name]: id }).then(() =>
+            table.updateChildField(related, id, {
+              create: data[method] as Document
+            })
+          )
         );
       } else {
         throw Error(`Unknown method: ${method}`);
@@ -387,6 +392,42 @@ export class Table {
         resolve(parseInt(rows[0].result));
       });
     });
+  }
+
+  connectThrough(
+    related: RelatedField,
+    value: Value,
+    args: Document[]
+  ): Promise<any> {
+    const table = this.db.table(related.throughField.referencedField.model);
+    const mapping = this.db.table(related.throughField.model);
+    const promises = args.map(arg =>
+      table.get(arg).then(row =>
+        mapping.create({
+          [related.referencingField.name]: value,
+          [related.throughField.name]: row[table.model.keyField().name]
+        })
+      )
+    );
+    return Promise.all(promises);
+  }
+
+  createThrough(
+    related: RelatedField,
+    value: Value,
+    args: Document[]
+  ): Promise<any> {
+    const table = this.db.table(related.throughField.referencedField.model);
+    const mapping = this.db.table(related.throughField.model);
+    const promises = args.map(arg =>
+      table.create(arg).then(row =>
+        mapping.create({
+          [related.referencingField.name]: value,
+          [related.throughField.name]: row[table.model.keyField().name]
+        })
+      )
+    );
+    return Promise.all(promises);
   }
 }
 

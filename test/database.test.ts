@@ -6,7 +6,7 @@ const NAME = 'database';
 
 beforeAll(() => helper.createDatabase(NAME));
 //afterAll(() => helper.dropDatabase(NAME));
-
+/*
 test('select', done => {
   expect.assertions(2);
 
@@ -195,6 +195,7 @@ test('upsert #2', done => {
   });
 });
 
+*/
 test('update related', async done => {
   expect.assertions(14);
 
@@ -414,5 +415,158 @@ test('update related - set', async done => {
   expect(rows.find(r => r.name === 'Juice').parent.id).toBe(row.id);
   expect(rows.find(r => r.name === 'Cordials')).toBe(undefined);
   expect(rows.find(r => r.name === 'Water').parent.id).toBe(row.id);
+  done();
+});
+
+const OPTIONS = {
+  models: [
+    {
+      table: 'product_category',
+      fields: [
+        {
+          column: 'category_id',
+          throughField: 'product_id'
+        },
+        {
+          column: 'product_id',
+          throughField: 'category_id',
+          relatedName: 'categorySet'
+        }
+      ]
+    }
+  ]
+};
+
+test('many to many - connect/create', async done => {
+  expect.assertions(3);
+
+  const schema = new Schema(helper.getExampleData(), OPTIONS);
+  const db = helper.connectToDatabase(NAME, schema);
+  const productTable = db.table('product');
+  const categoryTable = db.table('category');
+  const mappingTable = db.table('product_category');
+
+  await productTable.create({
+    sku: 'cream',
+    name: 'Cream'
+  });
+
+  // connect/create child rows
+  let data: any = {
+    name: 'Dairy',
+    parent: {
+      connect: {
+        id: 1
+      }
+    },
+    products: {
+      create: [
+        {
+          sku: 'yoghurt',
+          name: 'Yoghurt'
+        },
+        {
+          sku: 'butter',
+          name: 'Butter'
+        }
+      ],
+      connect: [{ sku: 'cream' }]
+    }
+  };
+
+  let category: any = await categoryTable.create(data);
+  let yoghurt = await productTable.get({ sku: 'yoghurt' });
+  let butter = await productTable.get({ sku: 'butter' });
+  let cream = await productTable.get({ sku: 'cream' });
+
+  expect(yoghurt.name).toBe('Yoghurt');
+  expect(butter.name).toBe('Butter');
+
+  let rows = await mappingTable.select('*', {
+    where: [
+      {
+        product: yoghurt.id,
+        category: category.id
+      },
+      {
+        product: butter.id,
+        category: category.id
+      },
+      {
+        product: cream.id,
+        category: category.id
+      }
+    ]
+  });
+
+  expect(rows.length).toBe(3);
+
+  done();
+});
+
+test('many to many - upsert', async done => {
+  expect.assertions(3);
+
+  const schema = new Schema(helper.getExampleData(), OPTIONS);
+  const db = helper.connectToDatabase(NAME, schema);
+  const productTable = db.table('product');
+  const categoryTable = db.table('category');
+  const mappingTable = db.table('product_category');
+
+  await productTable.create({
+    sku: 'cream',
+    name: 'Cream'
+  });
+
+  // connect/create child rows
+  let data: any = {
+    name: 'Dairy',
+    parent: {
+      connect: {
+        id: 1
+      }
+    },
+    products: {
+      create: [
+        {
+          sku: 'yoghurt',
+          name: 'Yoghurt'
+        },
+        {
+          sku: 'butter',
+          name: 'Butter'
+        }
+      ],
+      connect: [{ sku: 'cream' }]
+    }
+  };
+
+  let category: any = await categoryTable.create(data);
+  let yoghurt = await productTable.get({ sku: 'yoghurt' });
+  let butter = await productTable.get({ sku: 'butter' });
+  let cream = await productTable.get({ sku: 'cream' });
+
+  expect(yoghurt.name).toBe('Yoghurt');
+  expect(butter.name).toBe('Butter');
+
+  let rows = await mappingTable.select('*', {
+    where: [
+      {
+        product: yoghurt.id,
+        category: category.id
+      },
+      {
+        product: butter.id,
+        category: category.id
+      },
+      {
+        product: cream.id,
+        category: category.id
+      }
+    ]
+  });
+
+  expect(rows.length).toBe(3);
+
   done();
 });
