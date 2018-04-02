@@ -507,6 +507,8 @@ test('many to many - connect/create', async done => {
 test('many to many - upsert', async done => {
   expect.assertions(3);
 
+  const test = 'upsert';
+
   const schema = new Schema(helper.getExampleData(), OPTIONS);
   const db = helper.connectToDatabase(NAME, schema);
   const productTable = db.table('product');
@@ -514,47 +516,42 @@ test('many to many - upsert', async done => {
   const mappingTable = db.table('product_category');
 
   await productTable.create({
-    sku: 'cream',
-    name: 'Cream'
+    sku: `cream-${test}`,
+    name: `Cream - ${test}`
   });
 
-  // connect/create child rows
   let data: any = {
-    name: 'Dairy',
+    name: `Dairy - ${test}`,
     parent: {
       connect: {
         id: 1
       }
     },
     products: {
-      create: [
+      upsert: [
         {
-          sku: 'yoghurt',
-          name: 'Yoghurt'
+          create: { sku: `cream-${test}` },
+          update: { name: `Cream - ${test}2` }
         },
         {
-          sku: 'butter',
-          name: 'Butter'
+          create: {
+            sku: `butter-${test}`,
+            name: `Butter - ${test}`
+          }
         }
-      ],
-      connect: [{ sku: 'cream' }]
+      ]
     }
   };
 
   let category: any = await categoryTable.create(data);
-  let yoghurt = await productTable.get({ sku: 'yoghurt' });
-  let butter = await productTable.get({ sku: 'butter' });
-  let cream = await productTable.get({ sku: 'cream' });
+  let butter = await productTable.get({ sku: `butter-${test}` });
+  let cream = await productTable.get({ sku: `cream-${test}` });
 
-  expect(yoghurt.name).toBe('Yoghurt');
-  expect(butter.name).toBe('Butter');
+  expect(butter.name).toBe(`Butter - ${test}`);
+  expect(cream.name).toBe(`Cream - ${test}2`);
 
   let rows = await mappingTable.select('*', {
     where: [
-      {
-        product: yoghurt.id,
-        category: category.id
-      },
       {
         product: butter.id,
         category: category.id
@@ -566,7 +563,7 @@ test('many to many - upsert', async done => {
     ]
   });
 
-  expect(rows.length).toBe(3);
+  expect(rows.length).toBe(2);
 
   done();
 });
