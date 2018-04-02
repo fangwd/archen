@@ -236,7 +236,7 @@ export class Table {
 
   upsert(data: Document, update?: Document): Promise<Document> {
     if (!this.model.checkUniqueKey(data)) {
-      return Promise.reject('Incomplete data');
+      return Promise.reject(`Incomplete: ${JSON.stringify(data)}`);
     }
 
     const self = this;
@@ -329,6 +329,10 @@ export class Table {
           promises.push(table.create(doc));
         }
       } else if (method === 'upsert') {
+        if (related.throughField) {
+          promises.push(this.upsertThrough(related, id, args));
+          continue;
+        }
         const rows = [];
         for (const arg of args) {
           let { create, update } = arg;
@@ -422,6 +426,24 @@ export class Table {
     const promises = args.map(arg =>
       table.create(arg).then(row =>
         mapping.create({
+          [related.referencingField.name]: value,
+          [related.throughField.name]: row[table.model.keyField().name]
+        })
+      )
+    );
+    return Promise.all(promises);
+  }
+
+  upsertThrough(
+    related: RelatedField,
+    value: Value,
+    args: Document[]
+  ): Promise<any> {
+    const table = this.db.table(related.throughField.referencedField.model);
+    const mapping = this.db.table(related.throughField.model);
+    const promises = args.map(arg =>
+      table.upsert(arg.create as Document, arg.update as Document).then(row =>
+        mapping.upsert({
           [related.referencingField.name]: value,
           [related.throughField.name]: row[table.model.keyField().name]
         })
