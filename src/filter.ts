@@ -70,7 +70,7 @@ class Builder {
       } else if (field instanceof RelatedField) {
         exprs.push(this.exists(field, operator, value as Filter));
       } else {
-        throw Error(`Bad field: ${name}`);
+        throw Error(`Bad field: ${this.model.name}.${name}`);
       }
     }
     return `(${exprs.join(' and ')})`;
@@ -145,6 +145,10 @@ class Builder {
   private _in(field: ForeignKeyField, args: Filter) {
     const model = field.referencedField.model;
     const builder = new Builder(model, this.dialect, this.getContext());
+    const keys = Object.keys(args);
+    if (keys.length === 1 && keys[0] === model.keyField().name) {
+      return this.expr(field, null, args[keys[0]]);
+    }
     const lhs = this._prefix(field.column.name);
     const rhs = builder.select(model.keyField().column.name, args);
     return `${lhs} in (${rhs})`;
