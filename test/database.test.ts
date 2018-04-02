@@ -567,3 +567,84 @@ test('many to many - upsert', async done => {
 
   done();
 });
+
+test('many to many - update', async done => {
+  expect.assertions(3);
+
+  const test = 'update';
+
+  const schema = new Schema(helper.getExampleData(), OPTIONS);
+  const db = helper.connectToDatabase(NAME, schema);
+  const productTable = db.table('product');
+  const categoryTable = db.table('category');
+  const mappingTable = db.table('product_category');
+
+  let data: any = {
+    name: `Dairy - ${test}`,
+    parent: {
+      connect: {
+        id: 1
+      }
+    },
+    products: {
+      create: [
+        {
+          sku: `cream-${test}`,
+          name: `Cream - ${test}`
+        },
+        {
+          sku: `butter-${test}`,
+          name: `Butter - ${test}`
+        }
+      ]
+    }
+  };
+
+  let category: any = await categoryTable.create(data);
+
+  data = {
+    where: {
+      name: `Dairy - ${test}`,
+      parent: {
+        connect: {
+          id: 1
+        }
+      }
+    },
+    products: {
+      update: [
+        {
+          data: { name: `Cream - ${test}2` },
+          where: { sku: `cream-${test}` }
+        },
+        {
+          where: { sku: `butter-${test}` },
+          data: { name: `Butter - ${test}2` }
+        }
+      ]
+    }
+  };
+
+  let butter = await productTable.get({ sku: `butter-${test}` });
+  let cream = await productTable.get({ sku: `cream-${test}` });
+
+  expect(butter.name).toBe(`Butter - ${test}2`);
+  expect(cream.name).toBe(`Cream - ${test}2`);
+
+  let rows = await mappingTable.select('*', {
+    where: [
+      {
+        product: butter.id,
+        category: category.id
+      },
+      {
+        product: cream.id,
+        category: category.id
+      }
+    ]
+  });
+
+  expect(rows.length).toBe(2);
+
+  done();
+});
