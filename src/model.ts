@@ -231,6 +231,7 @@ export class Model {
       if (field instanceof ForeignKeyField) {
         const relatedField = new RelatedField(field);
         relatedField.model.addField(relatedField);
+        field.relatedField = relatedField;
       }
     }
   }
@@ -291,6 +292,7 @@ export class SimpleField extends Field {
 
 export class ForeignKeyField extends SimpleField {
   referencedField: SimpleField;
+  relatedField?: RelatedField;
 
   constructor(model: Model, column: ColumnInfo, config) {
     super(model, column, config);
