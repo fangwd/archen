@@ -569,7 +569,7 @@ test('many to many - upsert', async done => {
 });
 
 test('many to many - update', async done => {
-  expect.assertions(3);
+  expect.assertions(4);
 
   const test = 'update';
 
@@ -578,6 +578,11 @@ test('many to many - update', async done => {
   const productTable = db.table('product');
   const categoryTable = db.table('category');
   const mappingTable = db.table('product_category');
+
+  await productTable.create({
+    sku: `alien-${test}`,
+    name: `Alien - ${test}`
+  });
 
   let data: any = {
     name: `Dairy - ${test}`,
@@ -606,30 +611,38 @@ test('many to many - update', async done => {
     where: {
       name: `Dairy - ${test}`,
       parent: {
-        connect: {
-          id: 1
-        }
+        id: 1
       }
     },
-    products: {
-      update: [
-        {
-          data: { name: `Cream - ${test}2` },
-          where: { sku: `cream-${test}` }
-        },
-        {
-          where: { sku: `butter-${test}` },
-          data: { name: `Butter - ${test}2` }
-        }
-      ]
+    data: {
+      products: {
+        update: [
+          {
+            data: { name: `Cream - ${test}2` },
+            where: { sku: `cream-${test}` }
+          },
+          {
+            where: { sku: `butter-${test}` },
+            data: { name: `Butter - ${test}2` }
+          },
+          {
+            where: { sku: `alien-${test}` },
+            data: { name: `Alien - ${test}2` }
+          }
+        ]
+      }
     }
   };
 
+  await categoryTable.updateOne(data.data, data.where);
+
   let butter = await productTable.get({ sku: `butter-${test}` });
   let cream = await productTable.get({ sku: `cream-${test}` });
+  let alien = await productTable.get({ sku: `alien-${test}` });
 
   expect(butter.name).toBe(`Butter - ${test}2`);
   expect(cream.name).toBe(`Cream - ${test}2`);
+  expect(alien.name).toBe(`Alien - ${test}`);
 
   let rows = await mappingTable.select('*', {
     where: [
@@ -639,6 +652,10 @@ test('many to many - update', async done => {
       },
       {
         product: cream.id,
+        category: category.id
+      },
+      {
+        product: alien.id,
         category: category.id
       }
     ]

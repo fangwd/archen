@@ -346,6 +346,10 @@ export class Table {
           promises.push(table.upsert(create as Document, update as Document));
         }
       } else if (method === 'update') {
+        if (related.throughField) {
+          promises.push(this.updateThrough(related, id, args));
+          continue;
+        }
         const rows = args.map(arg => ({
           data: arg.data,
           where: { ...(arg.where as Document), [field.name]: id }
@@ -449,6 +453,32 @@ export class Table {
         })
       )
     );
+    return Promise.all(promises);
+  }
+
+  updateThrough(
+    related: RelatedField,
+    value: Value,
+    args: Document[]
+  ): Promise<any> {
+    const table = this.db.table(related.throughField.referencedField.model);
+    const mapping = this.db.table(related.throughField.model);
+    const promises = args.map(arg => {
+      const model = related.referencingField.referencedField.model;
+      let fieldName; // TODO: Create a method
+      for (const field of related.throughField.referencedField.model.fields) {
+        if (field instanceof RelatedField) {
+          if (field.referencingField === related.throughField) {
+            fieldName = field.name;
+          }
+        }
+      }
+      const where = {
+        [fieldName]: { [model.keyField().name]: value },
+        ...(arg.where as object)
+      };
+      return table.updateOne(arg.data as Document, where);
+    });
     return Promise.all(promises);
   }
 }
