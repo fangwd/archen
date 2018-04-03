@@ -66,7 +66,7 @@ const QueryOptions = {
   orderBy: { type: GraphQLString }
 };
 
-class SchemaBuilder {
+export class SchemaBuilder {
   private domain: Schema;
   private schema: GraphQLSchema;
 

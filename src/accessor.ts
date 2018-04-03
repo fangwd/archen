@@ -1,7 +1,7 @@
 import DataLoader = require('dataloader');
 import { Schema, Model, SimpleField, ForeignKeyField } from './model';
 import { Database, Value, Document, rowsToCamel, Filter } from './database';
-import { Row } from './engine';
+import { Row, Connection } from './engine';
 
 interface FieldLoader {
   field: SimpleField;
@@ -20,7 +20,7 @@ export class Accessor {
   loaders: FieldLoaderMap;
   queryLoader: DataLoader<string, Row[]>;
 
-  constructor(db: Database) {
+  constructor(schema: Schema, connection: Connection) {
     this.db = db;
     this.queryLoader = createQueryLoader(db);
     this.loaders = {};
