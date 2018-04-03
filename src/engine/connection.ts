@@ -12,6 +12,7 @@ export type Row = {
 };
 
 export interface Connection extends Escape {
+  type: string;
   query(sql: string): Promise<any>;
   transaction(callback: TransactionCallback): Promise<any>;
   commit(): Promise<void>;

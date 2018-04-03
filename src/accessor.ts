@@ -1,7 +1,9 @@
 import DataLoader = require('dataloader');
+
 import { Schema, Model, SimpleField, ForeignKeyField } from './model';
 import { Database, Value, Document, rowsToCamel, Filter } from './database';
 import { Row, Connection } from './engine';
+import { encodeFilter } from './filter';
 
 interface FieldLoader {
   field: SimpleField;
@@ -22,19 +24,14 @@ export class Accessor {
 
   constructor(schema: Schema, connection: Connection) {
     this.db = new Database(schema, connection);
-    this.queryLoader = createQueryLoader(this.db);
+    this.domain = this.db.schema;
+    this.queryLoader = createQueryLoader(this.db.engine);
     this.loaders = {};
     for (const model of this.domain.models) {
       const loaders = {};
-      for (const key of model.uniqueKeys) {
-        if (key.fields.length == 1) {
-          const field = key.fields[0];
-          loaders[field.name] = this._createLoader(field);
-        }
-      }
       for (const field of model.fields) {
-        if (field instanceof ForeignKeyField) {
-          loaders[field.name] = this._createLoader(field);
+        if (field.isUnique()) {
+          loaders[field.name] = this._createLoader(field as SimpleField);
         }
       }
       this.loaders[model.name] = loaders;
@@ -42,28 +39,19 @@ export class Accessor {
   }
 
   _createLoader(field: SimpleField): FieldLoader {
-    const me = this;
+    const table = this.db.table(field.model);
     const loader = new DataLoader<Value, Row | Row[]>((keys: Value[]) => {
-      return new Promise((resolve, reject) => {
-        me.db
-          .table(field.model.table.name)
-          .whereIn(field.column.name, keys)
-          .then(result => {
-            const rows = rowsToCamel(result, field.model);
-            const loaders = me.loaders[field.model.name];
-            for (const row of rows) {
-              for (const key in loaders) {
-                if (key != field.name && loaders[key].field.isUnique) {
-                  loaders[key].loader.prime(row[key], row);
-                }
-              }
+      return table.select('*', { [field.name]: keys }).then(rows => {
+        const loaders = this.loaders[field.model.name];
+        for (const row of rows) {
+          for (const key in loaders) {
+            if (key != field.name && loaders[key].field.isUnique()) {
+              // TEST: order_shipping.order_id
+              loaders[key].loader.prime(row[key] as Value, row);
             }
-            if (field.isUnique()) {
-              resolve(keys.map(k => rows.find(r => r[field.name] === k)));
-            } else {
-              resolve(keys.map(k => rows.filter(r => r[field.name] === k)));
-            }
-          });
+          }
+        }
+        return keys.map(k => rows.find(r => r[field.name] === k));
       });
     });
     return { field, loader };
@@ -71,15 +59,29 @@ export class Accessor {
 
   // args: { where, limit, offset, orderBy }
   query(model: Model, args: Document) {
-    const query = buildQuery(this.db, model, args);
+    let sql = `select * from ${this.db.engine.escapeId(model.table.name)}`;
+
+    const where = encodeFilter(args.where as Filter, model, this.db.engine);
+    if (where.length > 0) {
+      sql += ` where ${where}`;
+    }
+
+    sql += ` limit ${args.limit || 50}`;
+
+    if (args.offset !== undefined) {
+      sql += ` offset ${args.offset}`;
+    }
+
+    if (args.orderBy !== undefined) {
+      sql += ` order by ${args.orderBy}`;
+    }
+
     const loaders = this.loaders[model.name];
-    return this.queryLoader.load(query.toString()).then(rows => {
+    return this.queryLoader.load(sql).then(rows => {
       rows = rowsToCamel(rows, model);
       for (const row of rows) {
         for (const name in loaders) {
-          if (loaders[name].field.isUnique()) {
-            loaders[name].loader.prime(row[name], row);
-          }
+          loaders[name].loader.prime(row[name], row);
         }
       }
       return rows;
@@ -96,23 +98,23 @@ export class Accessor {
   }
 
   create(model: Model, args: Document) {
-    return this.db.transaction(trx => createOne(trx, model, args));
+    return this.db.transaction(() => this.db.table(model).create(args));
   }
 
-  update(table, args) {
-    return this.db.transaction(trx => updateOne(trx, table, args));
+  update(model: Model, data: Document, filter: Filter) {
+    return this.db.transaction(() => this.db.table(model).update(data, filter));
   }
 
-  upsert(table, args) {
-    return this.db.transaction(trx => upsertOne(trx, table, args));
+  upsert(model: Model, data: Document, update: Document) {
+    return this.db.transaction(() => this.db.table(model).upsert(data, update));
   }
 
-  delete(table: Model, args: Document) {
-    return deleteOne(this.db, table, args);
+  delete(model: Model, filter: Filter) {
+    return this.db.transaction(() => this.db.table(model).delete(filter));
   }
 }
 
-function createQueryLoader(db: knex): DataLoader<string, Row[]> {
+function createQueryLoader(db: Connection): DataLoader<string, Row[]> {
   type Result = { index: number; response: Row[] };
   const loader = new DataLoader<string, Row[]>(
     (queries: string[]) =>
@@ -120,7 +122,7 @@ function createQueryLoader(db: knex): DataLoader<string, Row[]> {
         const makePromise = (query: string, index: number) =>
           new Promise(resolve => {
             db
-              .raw(query)
+              .query(query)
               .then((response: Row[]) => resolve({ index, response }));
           });
         const promises = queries.map((query, index) =>
@@ -128,44 +130,11 @@ function createQueryLoader(db: knex): DataLoader<string, Row[]> {
         );
         Promise.all(promises).then((responses: Result[]) => {
           const results = [];
-          if (/mysql/i.test(db.client.dialect)) {
-            responses.forEach(r => (results[r.index] = r.response[0]));
-          } else {
-            // sqlite3
-            responses.forEach(r => (results[r.index] = r.response));
-          }
+          responses.forEach(r => (results[r.index] = r.response));
           resolve(results);
         });
       }),
     { cache: false }
   );
   return loader;
-}
-
-export function buildQuery(db: knex, table: Model, args: Document) {
-  const builder = new QueryBuilder(db, table);
-  const query = builder.select();
-
-  if (args.where) {
-    const where = args.where as Document;
-    builder.join(query, where);
-    builder.reset(table);
-    query.where(builder.buildWhere(where));
-  }
-
-  if (args.limit !== undefined) {
-    query.limit(args.limit as number);
-  } else {
-    query.limit(50); // DEFAULT_LIMIT
-  }
-
-  if (args.offset !== undefined) {
-    query.offset(args.offset as number);
-  }
-
-  if (args.orderBy !== undefined) {
-    query.orderBy(args.orderBy as string);
-  }
-
-  return query;
 }

@@ -35,6 +35,7 @@ class Builder {
   }
 
   where(args: Filter): string {
+    if (!args) return '';
     if (Array.isArray(args)) {
       return args.length ? this.or(args) : '';
     } else {

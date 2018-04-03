@@ -244,7 +244,8 @@ export class SchemaBuilder {
           modelFields[field.name] = {
             type: modelTypeMap[field.referencedField.model.name],
             resolve(obj, args, req) {
-              return req.accessor.load(field.referencedField, obj[field.name]);
+              const key = field.referencedField.model.keyField().name;
+              return req.accessor.load(field.referencedField, obj[field.name][key]);
             }
           };
         } else if (field instanceof SimpleField) {
@@ -264,7 +265,7 @@ export class SchemaBuilder {
             },
             resolve(object, args, context) {
               args.where = args.where || {};
-              args.where[related.name] = object[field.name];
+              args.where[related.name] = object[related.referencedField.name];
               return context.accessor.query(related.model, args);
             }
           };
@@ -553,9 +554,20 @@ export class SchemaBuilder {
           const inputType = new GraphQLInputObjectType({
             name: getModelInputTypeChildName(model, field),
             fields() {
+              if (field.referencingField.isUnique()) {
+                return {
+                  create: {
+                    type: inputTypesCreateEx[model.name][field.name]
+                  },
+                  upsert: {
+                    type: upsertTypesEx[model.name][field.name]
+                  }
+                };
+              }
+
               return {
                 connect: {
-                  type: new GraphQLList(uniqueTypeMap[model.name])
+                  type: new GraphQLList(uniqueTypeMapEx[model.name][field.name])
                 },
                 create: {
                   type: new GraphQLList(
