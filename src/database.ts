@@ -373,6 +373,10 @@ export class Table {
         }));
         promises.push(table.delete(filter as Filter));
       } else if (method === 'disconnect') {
+        if (related.throughField) {
+          promises.push(this.disconnectThrough(related, id, args));
+          continue;
+        }
         const where = args.map(arg => ({ [field.name]: id, ...arg }));
         promises.push(table.update({ [field.name]: null }, where));
       } else if (method === 'set') {
@@ -503,6 +507,18 @@ export class Table {
           })
         );
       });
+  }
+
+  disconnectThrough(
+    related: RelatedField,
+    value: Value,
+    args: Document[]
+  ): Promise<any> {
+    const mapping = this.db.table(related.throughField.model);
+    return mapping.delete({
+      [related.referencingField.name]: value,
+      [related.throughField.name]: args
+    });
   }
 }
 

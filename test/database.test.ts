@@ -749,3 +749,95 @@ test('many to many - delete', async done => {
 
   done();
 });
+
+test('many to many - disconnect', async done => {
+  expect.assertions(4);
+
+  const test = 'disconnect';
+
+  const schema = new Schema(helper.getExampleData(), OPTIONS);
+  const db = helper.connectToDatabase(NAME, schema);
+  const productTable = db.table('product');
+  const categoryTable = db.table('category');
+  const mappingTable = db.table('product_category');
+
+  await productTable.create({
+    sku: `alien-${test}`,
+    name: `Alien - ${test}`
+  });
+
+  let data: any = {
+    name: `Dairy - ${test}`,
+    parent: {
+      connect: {
+        id: 1
+      }
+    },
+    products: {
+      create: [
+        {
+          sku: `cream-${test}`,
+          name: `Cream - ${test}`
+        },
+        {
+          sku: `butter-${test}`,
+          name: `Butter - ${test}`
+        }
+      ]
+    }
+  };
+
+  let category: any = await categoryTable.create(data);
+
+  data = {
+    where: {
+      name: `Dairy - ${test}`,
+      parent: {
+        id: 1
+      }
+    },
+    data: {
+      products: {
+        disconnect: [
+          {
+            sku: `cream-${test}`
+          },
+          {
+            sku: `alien-${test}`
+          }
+        ]
+      }
+    }
+  };
+
+  await categoryTable.updateOne(data.data, data.where);
+
+  let butter = await productTable.get({ sku: `butter-${test}` });
+  let cream = await productTable.get({ sku: `cream-${test}` });
+  let alien = await productTable.get({ sku: `alien-${test}` });
+
+  expect(butter.name).toBe(`Butter - ${test}`);
+  expect(cream.name).toBe(`Cream - ${test}`);
+  expect(alien.name).toBe(`Alien - ${test}`);
+
+  let rows = await mappingTable.select('*', {
+    where: [
+      {
+        product: butter.id,
+        category: category.id
+      },
+      {
+        product: cream.id,
+        category: category.id
+      },
+      {
+        product: alien.id,
+        category: category.id
+      }
+    ]
+  });
+
+  expect(rows.length).toBe(1);
+
+  done();
+});
