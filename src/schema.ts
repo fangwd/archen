@@ -635,7 +635,7 @@ export class SchemaBuilder {
         type: this.modelTypeMap[model.name],
         args: { data: { type: inputTypesCreate[model.name] } },
         resolve(_, args, context) {
-          return context.accessor.create(model, args);
+          return context.accessor.create(model, args.data);
         }
       };
     }
@@ -646,7 +646,7 @@ export class SchemaBuilder {
         type: this.modelTypeMap[model.name],
         args: updateOneTypes[model.name].getFields(),
         resolve(_, args, context) {
-          return context.accessor.update(model, args);
+          return context.accessor.update(model, args.data, args.where);
         }
       };
     }
@@ -657,7 +657,7 @@ export class SchemaBuilder {
         type: this.modelTypeMap[model.name],
         args: upsertTypes[model.name].getFields(),
         resolve(_, args, context) {
-          return context.accessor.upsert(model, args);
+          return context.accessor.upsert(model, args.create, args.update);
         }
       };
     }
@@ -670,7 +670,7 @@ export class SchemaBuilder {
           where: { type: uniqueTypeMap[model.name] }
         },
         resolve(_, args, context) {
-          return context.accessor.delete(model, args);
+          return context.accessor.delete(model, args.where);
         }
       };
     }

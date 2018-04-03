@@ -98,19 +98,44 @@ export class Accessor {
   }
 
   create(model: Model, args: Document) {
-    return this.db.transaction(() => this.db.table(model).create(args));
+    return new Promise(resolve => {
+      this.db.transaction(() => {
+        this.db
+          .table(model)
+          .create(args)
+          .then(resolve);
+      });
+    });
   }
 
   update(model: Model, data: Document, filter: Filter) {
-    return this.db.transaction(() => this.db.table(model).update(data, filter));
+    return new Promise(resolve => {
+      this.db.transaction(() => {
+        this.db
+          .table(model)
+          .modify(data, filter)
+          .then(resolve);
+      });
+    });
   }
 
-  upsert(model: Model, data: Document, update: Document) {
-    return this.db.transaction(() => this.db.table(model).upsert(data, update));
+  upsert(model: Model, create: Document, update: Document) {
+    return new Promise(resolve => {
+      this.db.transaction(() => {
+        this.db
+          .table(model)
+          .upsert(create, update)
+          .then(resolve);
+      });
+    });
   }
 
   delete(model: Model, filter: Filter) {
-    return this.db.transaction(() => this.db.table(model).delete(filter));
+    const table = this.db.table(model);
+    return table.get(filter).then(row => {
+      if (!row) return row;
+      return this.db.transaction(() => table.delete(filter)).then(() => row);
+    });
   }
 }
 

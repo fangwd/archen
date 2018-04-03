@@ -179,7 +179,7 @@ export class Table {
     return this.db.engine.escape(value + '');
   }
 
-  get(key: Value | Document): Promise<Document> {
+  get(key: Value | Filter): Promise<Document> {
     if (key === null || typeof key !== 'object') {
       key = {
         [this.model.keyField().name]: key
@@ -231,6 +231,7 @@ export class Table {
   }
 
   create(data: Document): Promise<Document> {
+    // TODO: Don't allow inserting empty objects
     return this.resolveParentFields(data).then(row =>
       this.insert(row).then(id => {
         return this.updateChildFields(data, id).then(() => this.get(id));
@@ -372,7 +373,7 @@ export class Table {
           continue;
         }
         const filter = args.map(arg => ({
-          ...(arg.where as Document),
+          ...(arg /*.where*/ as Document),
           [field.name]: id
         }));
         promises.push(table.delete(filter as Filter));
