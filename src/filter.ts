@@ -2,6 +2,10 @@ import { Filter, Value } from './database';
 import { Model, SimpleField, ForeignKeyField, RelatedField } from './model';
 import { Escape } from './engine';
 
+export const AND = 'and';
+export const OR = 'or';
+export const NOT = 'not';
+
 class Context {
   private counter: number;
 

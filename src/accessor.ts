@@ -1,6 +1,6 @@
 import DataLoader = require('dataloader');
 import { Schema, Model, SimpleField, ForeignKeyField } from './model';
-import { Database, Value, Document, rowsToCamel } from './database';
+import { Database, Value, Document, rowsToCamel, Filter } from './database';
 import { Row } from './engine';
 
 interface FieldLoader {
@@ -14,17 +14,16 @@ interface FieldLoaderMap {
   };
 }
 
-class Accessor {
+export class Accessor {
   db: Database;
   domain: Schema;
   loaders: FieldLoaderMap;
   queryLoader: DataLoader<string, Row[]>;
 
-  constructor(domain: Schema, db: Database) {
+  constructor(db: Database) {
     this.db = db;
     this.queryLoader = createQueryLoader(db);
     this.loaders = {};
-    this.domain = domain;
     for (const model of this.domain.models) {
       const loaders = {};
       for (const key of model.uniqueKeys) {
@@ -85,6 +84,10 @@ class Accessor {
       }
       return rows;
     });
+  }
+
+  get(model: Model, args: Document) {
+    return this.db.table(model.name).get(args);
   }
 
   load(field: SimpleField, value: Value) {
