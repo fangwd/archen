@@ -1,9 +1,7 @@
 import DataLoader = require('dataloader');
-import knex = require('knex');
-import { Value, Row, Document, rowsToCamel } from './common';
 import { Schema, Model, SimpleField, ForeignKeyField } from './model';
-import { QueryBuilder, buildQuery } from './query-builder';
-import { createOne, updateOne, upsertOne, deleteOne } from './mutation';
+import { Database, Value, Document, rowsToCamel } from './database';
+import { Row } from './engine';
 
 interface FieldLoader {
   field: SimpleField;
@@ -16,13 +14,13 @@ interface FieldLoaderMap {
   };
 }
 
-class Connector {
-  db: knex;
+class Accessor {
+  db: Database;
   domain: Schema;
   loaders: FieldLoaderMap;
   queryLoader: DataLoader<string, Row[]>;
 
-  constructor(domain: Schema, db: knex) {
+  constructor(domain: Schema, db: Database) {
     this.db = db;
     this.queryLoader = createQueryLoader(db);
     this.loaders = {};

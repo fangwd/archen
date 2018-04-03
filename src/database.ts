@@ -41,6 +41,10 @@ export class Database {
     }
     return this.tables[name];
   }
+
+  transaction(callback): Promise<Database> {
+    return this.engine.transaction(callback);
+  }
 }
 
 interface SelectOptions {
@@ -248,7 +252,7 @@ export class Table {
           return self.create(data);
         } else {
           if (update && Object.keys(update).length > 0) {
-            return self.updateOne(update, uniqueFields);
+            return self.modify(update, uniqueFields);
           } else {
             return row;
           }
@@ -257,7 +261,7 @@ export class Table {
     });
   }
 
-  updateOne(data: Document, filter: Filter): Promise<Document> {
+  modify(data: Document, filter: Filter): Promise<Document> {
     if (!this.model.checkUniqueKey(filter)) {
       return Promise.reject(`Bad filter: ${JSON.stringify(filter)}`);
     }
@@ -360,7 +364,7 @@ export class Table {
             [field.name]: id,
             ...((arg.where || {}) as Document)
           };
-          promises.push(table.updateOne(data, filter));
+          promises.push(table.modify(data, filter));
         }
       } else if (method === 'delete') {
         if (related.throughField) {
@@ -470,7 +474,7 @@ export class Table {
         [name]: { [model.keyField().name]: value },
         ...(arg.where as object)
       };
-      return table.updateOne(arg.data as Document, where);
+      return table.modify(arg.data as Document, where);
     });
     return Promise.all(promises);
   }
@@ -546,4 +550,8 @@ export function toDocument(row: Row, model: Model): Document {
     }
   }
   return result;
+}
+
+export function rowsToCamel(rows: Row[], model: Model): Row[] {
+  return rows.map(row => toDocument(row, model));
 }

@@ -258,7 +258,7 @@ test('update related', async done => {
   };
 
   rowCount = await table.count();
-  row = await table.updateOne(data.data, data.where);
+  row = await table.modify(data.data, data.where);
   rows = await table.select('*');
   expect(rows.length).toBe(rowCount);
   expect(rows.find(r => r.name === 'Garlic').parent.id).toBe(row.id);
@@ -288,7 +288,7 @@ test('update related', async done => {
     }
   };
 
-  row = await table.updateOne(data.data, data.where);
+  row = await table.modify(data.data, data.where);
   rows = await table.select('*');
   expect(rows.find(r => r.name === 'Apple').parent.id).toBe(row.id);
   expect(rows.find(r => r.name === 'Cucumber').parent.id).toBe(row.id);
@@ -316,7 +316,7 @@ test('update related', async done => {
   };
 
   rowCount = await table.count();
-  row = await table.updateOne(data.data, data.where);
+  row = await table.modify(data.data, data.where);
   rows = await table.select('*');
   expect(rows.length).toBe(rowCount - 2);
   expect(rows.find(r => r.name === 'Cucumber')).toBe(undefined);
@@ -344,7 +344,7 @@ test('update related', async done => {
     }
   };
 
-  row = await table.updateOne(data.data, data.where);
+  row = await table.modify(data.data, data.where);
   rows = await table.select('*');
   expect(rows.find(r => r.name === 'Apple').parent.id).toBe(null);
   expect(rows.find(r => r.name === 'Banana').parent.id).toBe(null);
@@ -568,7 +568,7 @@ test('many to many - update', async done => {
     }
   };
 
-  await categoryTable.updateOne(data.data, data.where);
+  await categoryTable.modify(data.data, data.where);
 
   let butter = await productTable.get({ sku: `butter-${test}` });
   let cream = await productTable.get({ sku: `cream-${test}` });
@@ -661,7 +661,7 @@ test('many to many - delete', async done => {
     }
   };
 
-  await categoryTable.updateOne(data.data, data.where);
+  await categoryTable.modify(data.data, data.where);
 
   let butter = await productTable.get({ sku: `butter-${test}` });
   let cream = await productTable.get({ sku: `cream-${test}` });
@@ -744,7 +744,7 @@ test('many to many - disconnect', async done => {
     }
   };
 
-  await categoryTable.updateOne(data.data, data.where);
+  await categoryTable.modify(data.data, data.where);
 
   let butter = await productTable.get({ sku: `butter-${test}` });
   let cream = await productTable.get({ sku: `cream-${test}` });

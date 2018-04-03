@@ -1,4 +1,6 @@
-export type TransactionCallback = (connection: Connection) => Promise<any>;
+export type TransactionCallback = (
+  connection: Connection | any
+) => Promise<any>;
 
 export interface Escape {
   escape: (unsafe: string) => string;
@@ -9,28 +11,11 @@ export type Row = {
   [key: string]: any;
 };
 
-export class Connection implements Escape {
-  query(sql: string): Promise<any> {
-    return Promise.resolve();
-  }
-
-  transaction(callback: TransactionCallback): Promise<any> {
-    return Promise.reject(Error('Not implemented'));
-  }
-
-  commit(): Promise<void> {
-    return Promise.reject(Error('Not implemented'));
-  }
-
-  rollback(): Promise<void> {
-    return Promise.reject(Error('Not implemented'));
-  }
-
-  escape(s: string): string {
-    return `'${s}'`;
-  }
-
-  escapeId(name: string): string {
-    return name;
-  }
+export interface Connection extends Escape {
+  query(sql: string): Promise<any>;
+  transaction(callback: TransactionCallback): Promise<any>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+  escape(s: string): string;
+  escapeId(name: string): string;
 }

@@ -2,11 +2,10 @@ import { Connection, TransactionCallback } from './connection';
 
 import mysql = require('mysql');
 
-class MySQL extends Connection {
+class MySQL implements Connection {
   private connection: mysql.Connection;
 
   constructor(options) {
-    super();
     this.connection = mysql.createConnection(options);
   }
 
