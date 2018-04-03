@@ -195,7 +195,6 @@ test('upsert #2', done => {
   });
 });
 
-*/
 test('update related', async done => {
   expect.assertions(14);
 
@@ -418,6 +417,7 @@ test('update related - set', async done => {
   done();
 });
 
+*/
 const OPTIONS = {
   models: [
     {
@@ -662,6 +662,90 @@ test('many to many - update', async done => {
   });
 
   expect(rows.length).toBe(2);
+
+  done();
+});
+
+test('many to many - delete', async done => {
+  expect.assertions(4);
+
+  const test = 'delete';
+
+  const schema = new Schema(helper.getExampleData(), OPTIONS);
+  const db = helper.connectToDatabase(NAME, schema);
+  const productTable = db.table('product');
+  const categoryTable = db.table('category');
+  const mappingTable = db.table('product_category');
+
+  const alian = await productTable.create({
+    sku: `alien-${test}`,
+    name: `Alien - ${test}`
+  });
+
+  let data: any = {
+    name: `Dairy - ${test}`,
+    parent: {
+      connect: {
+        id: 1
+      }
+    },
+    products: {
+      create: [
+        {
+          sku: `cream-${test}`,
+          name: `Cream - ${test}`
+        },
+        {
+          sku: `butter-${test}`,
+          name: `Butter - ${test}`
+        }
+      ]
+    }
+  };
+
+  let category: any = await categoryTable.create(data);
+
+  data = {
+    where: {
+      name: `Dairy - ${test}`,
+      parent: {
+        id: 1
+      }
+    },
+    data: {
+      products: {
+        delete: [
+          {
+            sku: `cream-${test}`
+          },
+          {
+            sku: `butter-${test}`
+          },
+          alian.id
+        ]
+      }
+    }
+  };
+
+  await categoryTable.updateOne(data.data, data.where);
+
+  let butter = await productTable.get({ sku: `butter-${test}` });
+  let cream = await productTable.get({ sku: `cream-${test}` });
+  let alien = await productTable.get({ sku: `alien-${test}` });
+
+  expect(butter).toBe(undefined);
+  expect(cream).toBe(undefined);
+  expect(alien.name).toBe(`Alien - ${test}`);
+
+  let rows = await mappingTable.select('*', {
+    where: [
+      {
+        category: category.id
+      }
+    ]
+  });
+
+  expect(rows.length).toBe(0);
 
   done();
 });

@@ -53,8 +53,24 @@ class Builder {
         const query = value as Filter;
         if (query === null || typeof query !== 'object') {
           exprs.push(this.expr(field, '=', value));
-          continue;
+        } else if (Array.isArray(query)) {
+          const values = [];
+          const filter = [];
+          for (const arg of query) {
+            if (arg === null || typeof arg !== 'object') {
+              values.push(arg);
+            } else {
+              filter.push(arg);
+            }
+          }
+          let expr = values.length > 0 ? this.expr(field, 'in', values) : '';
+          if (filter.length > 0) {
+            if (expr.length > 0) expr += ' or ';
+            expr += this._in(field, filter);
+          }
+          exprs.push(`(${expr})`);
         } else {
+          // TODO: Check if the following duplicates some logic in _in()
           const keys = Object.keys(query);
           if (keys.length === 1) {
             const [name, operator] = splitKey(keys[0] as string);
@@ -63,8 +79,8 @@ class Builder {
               continue;
             }
           }
+          exprs.push(this._in(field, query));
         }
-        exprs.push(this._in(field, query));
       } else if (field instanceof SimpleField) {
         exprs.push(this.expr(field, operator, value as Value));
       } else if (field instanceof RelatedField) {

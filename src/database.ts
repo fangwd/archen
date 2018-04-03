@@ -363,6 +363,10 @@ export class Table {
           promises.push(table.updateOne(data, filter));
         }
       } else if (method === 'delete') {
+        if (related.throughField) {
+          promises.push(this.deleteThrough(related, id, args));
+          continue;
+        }
         const filter = args.map(arg => ({
           ...(arg.where as Document),
           [field.name]: id
@@ -473,6 +477,32 @@ export class Table {
       return table.updateOne(arg.data as Document, where);
     });
     return Promise.all(promises);
+  }
+
+  deleteThrough(
+    related: RelatedField,
+    value: Value,
+    args: Document[]
+  ): Promise<any> {
+    const mapping = this.db.table(related.throughField.model);
+    const table = this.db.table(related.throughField.referencedField.model);
+    return mapping
+      .select('*', {
+        where: {
+          [related.referencingField.name]: value,
+          [related.throughField.name]: args
+        }
+      })
+      .then(rows => {
+        const values = rows.map(
+          row => row[related.throughField.name][table.model.keyField().name]
+        );
+        return mapping.delete(rows).then(() =>
+          table.delete({
+            [table.model.keyField().name]: values
+          })
+        );
+      });
   }
 }
 
