@@ -21,8 +21,8 @@ export class Accessor {
   queryLoader: DataLoader<string, Row[]>;
 
   constructor(schema: Schema, connection: Connection) {
-    this.db = db;
-    this.queryLoader = createQueryLoader(db);
+    this.db = new Database(schema, connection);
+    this.queryLoader = createQueryLoader(this.db);
     this.loaders = {};
     for (const model of this.domain.models) {
       const loaders = {};

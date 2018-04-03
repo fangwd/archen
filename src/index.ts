@@ -4,7 +4,7 @@ import { GraphQLSchema } from 'graphql';
 import { Schema, SchemaConfig } from './model';
 import { SchemaBuilder } from './schema';
 
-class Archen {
+export class Archen {
   domain: Schema;
   schema: GraphQLSchema;
 
@@ -31,7 +31,3 @@ class Archen {
     };
   }
 }
-
-module.exports = function(schema, options) {
-  return new Archen(schema, options);
-};
