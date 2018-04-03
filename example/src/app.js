@@ -4,9 +4,9 @@ const fs = require('fs');
 const engine = require('../../lib/engine');
 
 const mysql = engine.createConnection('mysql', {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
+  host: 'localhost',
+  user: 'root',
+  password: 'secret',
   database: 'example',
   timezone: 'Z',
   connectionLimit: 10
