@@ -11,8 +11,7 @@
   "license": "MIT",
   "dependencies": {
     "dataloader": "^1.4.0",
-    "graphql": "^0.13.1",
-    "knex": "0.14.2"
+    "graphql": "^0.13.1"
   },
   "repository": {
     "type": "git",
@@ -36,7 +35,7 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "/test/(database).test.ts",
+    "testRegex": "/test/(.+).test.ts",
     "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
     "collectCoverage": false,
     "collectCoverageFrom": ["src/**/*.ts"],
