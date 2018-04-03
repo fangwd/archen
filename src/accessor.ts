@@ -41,7 +41,7 @@ export class Accessor {
   _createLoader(field: SimpleField): FieldLoader {
     const table = this.db.table(field.model);
     const loader = new DataLoader<Value, Row | Row[]>((keys: Value[]) => {
-      return table.select('*', { [field.name]: keys }).then(rows => {
+      return table.select('*', { where: { [field.name]: keys } }).then(rows => {
         const loaders = this.loaders[field.model.name];
         for (const row of rows) {
           for (const key in loaders) {

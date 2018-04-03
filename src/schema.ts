@@ -245,7 +245,10 @@ export class SchemaBuilder {
             type: modelTypeMap[field.referencedField.model.name],
             resolve(obj, args, req) {
               const key = field.referencedField.model.keyField().name;
-              return req.accessor.load(field.referencedField, obj[field.name][key]);
+              return req.accessor.load(
+                field.referencedField,
+                obj[field.name][key]
+              );
             }
           };
         } else if (field instanceof SimpleField) {
