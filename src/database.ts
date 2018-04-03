@@ -379,14 +379,6 @@ export class Table {
         }
         const where = args.map(arg => ({ [field.name]: id, ...arg }));
         promises.push(table.update({ [field.name]: null }, where));
-      } else if (method === 'set') {
-        promises.push(
-          table.delete({ [field.name]: id }).then(() =>
-            table.updateChildField(related, id, {
-              create: data[method] as Document
-            })
-          )
-        );
       } else {
         throw Error(`Unknown method: ${method}`);
       }
