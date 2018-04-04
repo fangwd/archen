@@ -194,6 +194,19 @@ export class Model {
     }
   }
 
+  // Get the number of foreign key fields pointing to the given model
+  getForeignKeyCount(model: Model): number {
+    let count = 0;
+    for (const field of this.fields) {
+      if (field instanceof ForeignKeyField) {
+        if (field.referencedField.model === model) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
   resolveForeignKeyFields() {
     for (const index of this.table.indexes) {
       if (index.primaryKey || index.unique) {
@@ -328,8 +341,7 @@ export class RelatedField extends Field {
       if (this.throughField) {
         this.name = this.throughField.referencedField.model.pluralName;
       } else if (field.isUnique()) {
-        const name = field.model.name;
-        this.name = name.charAt(0).toLowerCase() + name.slice(1);
+        this.name = lcfirst(field.model.name);
       } else {
         this.name = field.model.pluralName;
       }
@@ -345,4 +357,8 @@ class UniqueKey {
     this.fields = fields as SimpleField[];
     this.primary = primary;
   }
+}
+
+function lcfirst(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1);
 }
