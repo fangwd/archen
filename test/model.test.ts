@@ -142,7 +142,7 @@ test('through fields', () => {
   };
   const domain = new Schema(data, options);
   const categoryModel = domain.model('Category');
-  expect(categoryModel.fields.length).toBe(5);
+  expect(categoryModel.fields.length).toBe(7);
   const products = categoryModel.field('products') as RelatedField;
   expect(products.referencingField.model.name).toBe('ProductCategory');
   expect(products.throughField.referencedField.model.name).toBe('Product');
@@ -172,4 +172,22 @@ test('one to one relation', () => {
   const orderModel = domain.model('Order');
   const shipping = orderModel.field('orderShipping') as RelatedField;
   expect(shipping.referencingField.isUnique()).toBe(true);
+});
+
+test('getForeignKeyCount', () => {
+  const domain = new Schema(data);
+  const user = domain.model('user');
+  const order = domain.model('order');
+  expect(order.getForeignKeyCount(user)).toBe(1);
+  expect(user.getForeignKeyCount(order)).toBe(0);
+});
+
+test('pascal name of related field', () => {
+  const domain = new Schema(data);
+  const order = domain.model('User').field('orders') as RelatedField;
+  expect(order.getPascalName()).toBe('UserOrder');
+  const category = domain
+    .model('Category')
+    .field('categoryTreesAncestor') as RelatedField;
+  expect(category.getPascalName()).toBe('CategoryCategoryTreeAncestor');
 });

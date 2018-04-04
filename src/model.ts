@@ -343,9 +343,23 @@ export class RelatedField extends Field {
       } else if (field.isUnique()) {
         this.name = lcfirst(field.model.name);
       } else {
-        this.name = field.model.pluralName;
+        if (field.model.getForeignKeyCount(this.model) === 1) {
+          this.name = field.model.pluralName;
+        } else {
+          this.name = field.model.pluralName + toPascalCase(field.name);
+        }
       }
     }
+  }
+
+  // Example: UserOrder, CategoryCategoryAncestor
+  getPascalName() {
+    const model = this.referencingField.model;
+    if (model.getForeignKeyCount(this.model) === 1) {
+      return `${this.model.name}${model.name}`;
+    }
+    const suffix = toPascalCase(this.referencingField.name);
+    return `${this.model.name}${model.name}${suffix}`;
   }
 }
 
