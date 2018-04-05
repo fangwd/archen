@@ -33,14 +33,14 @@ class MySQL implements Connection {
         const promise = callback(this);
         if (promise instanceof Promise) {
           promise
-            .then(() => {
+            .then(result => {
               this.connection.commit(function(error) {
                 if (error) {
                   this.conn.rollback(function() {
                     reject(error);
                   });
                 } else {
-                  resolve();
+                  resolve(result);
                 }
               });
             })
