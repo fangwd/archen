@@ -21,7 +21,8 @@ import {
   SimpleField,
   ForeignKeyField,
   RelatedField,
-  Field
+  Field,
+  SchemaConfig
 } from './model';
 
 import { Accessor } from './accessor';
@@ -679,9 +680,9 @@ function getInputType(field: SimpleField): GraphQLInputType {
     : new GraphQLNonNull(type);
 }
 
-export function createSchema(data, config = undefined): GraphQLSchema {
-  const builder = new SchemaBuilder(new Schema(data, config));
-  return builder.getSchema();
+export function createSchema(data, config?: SchemaConfig): GraphQLSchema {
+  const schema = data instanceof Schema ? data : new Schema(data, config);
+  return new SchemaBuilder(schema).getSchema();
 }
 
 function _exclude(data, except: string | Field) {
