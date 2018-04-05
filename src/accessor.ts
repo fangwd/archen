@@ -22,8 +22,12 @@ export class Accessor {
   loaders: FieldLoaderMap;
   queryLoader: DataLoader<string, Row[]>;
 
-  constructor(schema: Schema, connection: Connection) {
-    this.db = new Database(schema, connection);
+  constructor(schema: Schema, connection: Connection | Database) {
+    if (connection instanceof Database) {
+      this.db = connection;
+    } else {
+      this.db = new Database(schema, connection);
+    }
     this.domain = this.db.schema;
     this.queryLoader = createQueryLoader(this.db.engine);
     this.loaders = {};
@@ -109,14 +113,7 @@ export class Accessor {
   }
 
   update(model: Model, data: Document, filter: Filter) {
-    return new Promise(resolve => {
-      this.db.transaction(() => {
-        this.db
-          .table(model)
-          .modify(data, filter)
-          .then(resolve);
-      });
-    });
+    return this.db.transaction(() => this.db.table(model).modify(data, filter));
   }
 
   upsert(model: Model, create: Document, update: Document) {
