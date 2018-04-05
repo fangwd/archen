@@ -2,10 +2,6 @@ import { Filter, Value } from './database';
 import { Model, SimpleField, ForeignKeyField, RelatedField } from './model';
 import { Escape } from './engine';
 
-export const AND = 'and';
-export const OR = 'or';
-export const NOT = 'not';
-
 class Context {
   private counter: number;
 
@@ -229,15 +225,28 @@ export function encodeFilter(
   return builder.where(args);
 }
 
+export const AND = 'and';
+export const OR = 'or';
+export const NOT = 'not';
+export const LT = 'lt';
+export const LE = 'le';
+export const GE = 'ge';
+export const GT = 'gt';
+export const NE = 'ne';
+export const IN = 'in';
+export const LIKE = 'like';
+export const NULL = 'null';
+export const SOME = 'some';
+export const NONE = 'none';
+
 const OPERATOR_MAP = {
-  lt: '<',
-  le: '<=',
-  ge: '>=',
-  gt: '>',
-  ne: '<>',
-  in: 'in',
-  like: 'like',
-  null: 'null'
+  [LT]: '<',
+  [LE]: '<=',
+  [GE]: '>=',
+  [GT]: '>',
+  [NE]: '<>',
+  [IN]: 'in',
+  [LIKE]: 'like'
 };
 
 export function splitKey(arg: string): string[] {
