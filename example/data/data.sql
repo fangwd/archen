@@ -47,3 +47,6 @@ insert into order_item (order_id, product_id, quantity) values
   (2, 2, 2), -- 2 kg of australian banana
   (2, 1, 1), -- 1 kg of australian apple
   (2, 7, 2); -- 2 kg of american beef
+insert into order_shipping(order_id, status) values
+  (1, 1),
+  (2, 2);

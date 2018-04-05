@@ -305,10 +305,10 @@ test('update related', async done => {
       categories: {
         delete: [
           {
-            where: { name: 'Tomato' }
+            name: 'Tomato'
           },
           {
-            where: { name: 'Cucumber' }
+            name: 'Cucumber'
           }
         ]
       }

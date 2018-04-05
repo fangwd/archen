@@ -194,6 +194,69 @@
             ]
         },
         {
+            "name": "category_tree",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "ancestor_id",
+                    "type": "integer",
+                    "nullable": false
+                },
+                {
+                    "name": "descendant_id",
+                    "type": "integer",
+                    "nullable": false
+                },
+                {
+                    "name": "distance",
+                    "type": "int",
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "columns": [
+                        "ancestor_id"
+                    ],
+                    "references": {
+                        "table": "category",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "columns": [
+                        "descendant_id"
+                    ],
+                    "references": {
+                        "table": "category",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "ancestor_id",
+                        "descendant_id"
+                    ]
+                }
+            ]
+        },
+        {
             "name": "product",
             "columns": [
                 {

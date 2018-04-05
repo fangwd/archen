@@ -56,20 +56,8 @@ interface InputTypeMap {
   [key: string]: GraphQLInputObjectType;
 }
 
-interface InputTypeMapEx {
-  [key: string]: {
-    [key: string]: GraphQLInputObjectType;
-  };
-}
-
 interface InputFieldsMap {
   [key: string]: GraphQLInputFieldConfigMap;
-}
-
-interface InputFieldsMapEx {
-  [key: string]: {
-    [key: string]: GraphQLInputFieldConfigMap;
-  };
 }
 
 interface QueryContext {
@@ -93,8 +81,6 @@ export class SchemaBuilder {
 
   private inputTypesConnect: InputTypeMap = {};
   private inputFieldsConnectMap: InputFieldsMap = {};
-
-  private inputTypesConnectEx = {};
 
   constructor(domain: Schema) {
     this.domain = domain;
@@ -155,7 +141,7 @@ export class SchemaBuilder {
       }
 
       const filterDataType = new GraphQLInputObjectType({
-        name: getFilterInputTypeName(model),
+        name: getFilterTypeName(model),
         fields() {
           return filterInputFields;
         }
@@ -166,7 +152,7 @@ export class SchemaBuilder {
       filterInputFields[NOT] = { type: new GraphQLList(filterDataType) };
 
       const findDataType = new GraphQLInputObjectType({
-        name: getFindInputTypeName(model),
+        name: getFindTypeName(model),
         fields() {
           return findInputFields;
         }
@@ -198,16 +184,11 @@ export class SchemaBuilder {
     // Step 3. Related fields
     for (const model of this.domain.models) {
       this.filterInputTypeMapEx[model.name] = {};
-      this.inputTypesConnectEx[model.name] = {};
       for (const field of model.fields) {
         if (field instanceof RelatedField) {
           this.filterInputTypeMapEx[model.name][
             field.name
           ] = this.relatedFilterInputType(field, filterInputFieldsMap);
-
-          this.inputTypesConnectEx[model.name][
-            field.name
-          ] = this.relatedFindInputType(field, findInputFieldsMap);
 
           for (const op of [SOME, NONE]) {
             const name = field.name + '_' + op;
@@ -229,7 +210,7 @@ export class SchemaBuilder {
       field.referencingField
     );
     const filterInputType = new GraphQLInputObjectType({
-      name: getFilterInputTypeName(field.model, field),
+      name: getFilterTypeName(field),
       fields() {
         return fields;
       }
@@ -238,25 +219,6 @@ export class SchemaBuilder {
     fields[OR] = { type: new GraphQLList(filterInputType) };
     fields[NOT] = { type: new GraphQLList(filterInputType) };
     return filterInputType;
-  }
-
-  private relatedFindInputType(
-    field: RelatedField,
-    findInputFieldsMap: InputFieldsMap
-  ): GraphQLInputObjectType {
-    if (!field.referencingField.uniqueKey) {
-      return this.inputTypesConnect[field.referencingField.model.name];
-    }
-    const fields = _exclude(
-      findInputFieldsMap[field.referencingField.model.name],
-      field.referencingField
-    );
-    return new GraphQLInputObjectType({
-      name: getFindInputTypeName(field.model, field),
-      fields() {
-        return fields;
-      }
-    });
   }
 
   createModelTypes() {
@@ -269,7 +231,7 @@ export class SchemaBuilder {
 
     for (const model of this.domain.models) {
       this.modelTypeMap[model.name] = new GraphQLObjectType({
-        name: getModelDataTypeName(model),
+        name: getTypeName(model),
         fields(): GraphQLFieldConfigMap<any, QueryContext> {
           return modelFieldsMap[model.name];
         }
@@ -283,7 +245,7 @@ export class SchemaBuilder {
       for (const field of model.fields) {
         if (field instanceof RelatedField) {
           modelTypeMapEx[model.name][field.name] = new GraphQLObjectType({
-            name: getModelDataTypeName(model, field),
+            name: getTypeName(field),
             fields(): GraphQLFieldConfigMap<any, QueryContext> {
               return modelFieldsMapEx[model.name][field.name];
             }
@@ -385,14 +347,14 @@ export class SchemaBuilder {
 
     for (const model of this.domain.models) {
       inputTypesCreate[model.name] = new GraphQLInputObjectType({
-        name: getCreateInputTypeName(model),
+        name: getCreateTypeName(model),
         fields() {
           return inputFieldsCreate[model.name];
         }
       });
 
       inputTypesUpdate[model.name] = new GraphQLInputObjectType({
-        name: getUpdateInputTypeName(model),
+        name: getUpdateTypeName(model),
         fields() {
           return inputFieldsUpdate[model.name];
         }
@@ -401,7 +363,7 @@ export class SchemaBuilder {
 
     for (const model of this.domain.models) {
       const inputType = new GraphQLInputObjectType({
-        name: getUpsertInputTypeName(model),
+        name: getUpsertTypeName(model),
         fields() {
           return {
             create: { type: inputTypesCreate[model.name] },
@@ -419,7 +381,7 @@ export class SchemaBuilder {
 
     for (const model of this.domain.models) {
       const inputType = new GraphQLInputObjectType({
-        name: getCreateInputParentTypeName(model),
+        name: getCreateParentTypeName(model),
         fields() {
           return {
             connect: { type: inputTypesConnect[model.name] },
@@ -433,7 +395,7 @@ export class SchemaBuilder {
 
     for (const model of this.domain.models) {
       const inputType = new GraphQLInputObjectType({
-        name: getUpdateInputParentTypeName(model),
+        name: getUpdateParentTypeName(model),
         fields() {
           return {
             connect: { type: inputTypesConnect[model.name] },
@@ -473,7 +435,7 @@ export class SchemaBuilder {
 
           if (field.referencingField.uniqueKey) {
             connectType = new GraphQLInputObjectType({
-              name: getConnectChildInputTypeName(field),
+              name: getConnectChildTypeName(field),
               fields() {
                 return getFieldsExclude(inputFieldsConnectMap, field);
               }
@@ -481,21 +443,21 @@ export class SchemaBuilder {
           }
 
           const createType = new GraphQLInputObjectType({
-            name: getCreateChildInputTypeName(field),
+            name: getCreateChildTypeName(field),
             fields() {
               return getFieldsExclude(inputFieldsCreate, field);
             }
           });
 
           const updateType = new GraphQLInputObjectType({
-            name: getUpdateChildInputTypeName(field),
+            name: getUpdateChildTypeName(field),
             fields() {
               return getFieldsExclude(inputFieldsUpdate, field);
             }
           });
 
           const upsertType = new GraphQLInputObjectType({
-            name: getUpsertChildInputTypeName(field),
+            name: getUpsertChildTypeName(field),
             fields() {
               return {
                 create: { type: createType },
@@ -503,35 +465,65 @@ export class SchemaBuilder {
               };
             }
           });
+          if (field.referencingField.isUnique()) {
+            inputFieldsUpdate[model.name][field.name] = {
+              type: new GraphQLInputObjectType({
+                name: getUpdateChildTypeName(field, 'One'),
+                fields() {
+                  return {
+                    connect: { type: connectType },
+                    create: { type: createType },
+                    upsert: { type: upsertType },
+                    update: { type: updateType },
+                    delete: { type: connectType },
+                    disconnect: { type: connectType }
+                  };
+                }
+              })
+            };
 
-          inputFieldsUpdate[model.name][field.name] = {
-            type: new GraphQLInputObjectType({
-              name: getUpdateChildInputTypeName(field) + 'X',
-              fields() {
-                return {
-                  connect: { type: new GraphQLList(connectType) },
-                  create: { type: new GraphQLList(createType) },
-                  upsert: { type: new GraphQLList(upsertType) }
-                };
-              }
-            })
-          };
+            inputFieldsCreate[model.name][field.name] = {
+              type: new GraphQLInputObjectType({
+                name: getCreateChildTypeName(field, 'One'),
+                fields() {
+                  return {
+                    connect: { type: connectType },
+                    create: { type: createType },
+                    upsert: { type: upsertType }
+                  };
+                }
+              })
+            };
+          } else {
+            inputFieldsUpdate[model.name][field.name] = {
+              type: new GraphQLInputObjectType({
+                name: getUpdateManyChildTypeName(field),
+                fields() {
+                  return {
+                    connect: { type: new GraphQLList(connectType) },
+                    create: { type: new GraphQLList(createType) },
+                    upsert: { type: new GraphQLList(upsertType) },
+                    update: { type: new GraphQLList(updateType) },
+                    delete: { type: new GraphQLList(connectType) },
+                    disconnect: { type: new GraphQLList(connectType) }
+                  };
+                }
+              })
+            };
 
-          inputFieldsCreate[model.name][field.name] = {
-            type: new GraphQLInputObjectType({
-              name: getCreateChildInputTypeName(field) + 'X',
-              fields() {
-                return {
-                  connect: { type: new GraphQLList(connectType) },
-                  create: { type: new GraphQLList(createType) },
-                  update: { type: new GraphQLList(updateType) },
-                  upsert: { type: new GraphQLList(upsertType) },
-                  delete: { type: new GraphQLList(connectType) },
-                  disconnect: { type: new GraphQLList(connectType) }
-                };
-              }
-            })
-          };
+            inputFieldsCreate[model.name][field.name] = {
+              type: new GraphQLInputObjectType({
+                name: getCreateManyChildTypeName(field),
+                fields() {
+                  return {
+                    connect: { type: new GraphQLList(connectType) },
+                    create: { type: new GraphQLList(createType) },
+                    upsert: { type: new GraphQLList(upsertType) }
+                  };
+                }
+              })
+            };
+          }
         }
       }
     }
@@ -563,7 +555,10 @@ export class SchemaBuilder {
       const name = 'update' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
-        args: inputTypesUpdate[model.name].getFields(),
+        args: {
+          where: { type: this.inputTypesConnect[model.name] },
+          data: { type: inputTypesUpdate[model.name] }
+        },
         resolve(_, args, context) {
           return context.accessor.update(model, args.data, args.where);
         }
@@ -602,82 +597,65 @@ export class SchemaBuilder {
   }
 }
 
-function _typeName(
-  usage: string,
-  model: Model,
-  field: Field,
-  kind: string
-): string {
-  let typeName = model.name;
-  if (field) {
-    typeName += toPascalCase(field.name);
+function getTypeName(input: Model | RelatedField) {
+  if (input instanceof RelatedField) {
+    return input.getPascalName();
   }
-  return `${usage}${typeName}${kind}Type`;
+  return input.name;
 }
 
-// Example: FilterUserDataType, FilterUserOrdersDataType
-function getFilterInputTypeName(model: Model, field?: Field) {
-  return _typeName('Filter', model, field, 'Input');
-}
-
-function getFindInputTypeName(model: Model, field?: Field) {
-  return _typeName('Find', model, field, 'Input');
-}
-
-// Example: User, UserOrders
-function getModelDataTypeName(model: Model, field?: Field) {
-  return _typeName('', model, field, '');
-}
-
-function getCreateInputTypeName(model: Model, field?: Field) {
-  return _typeName('Create', model, field, 'Data');
-}
-
-function getUpdateInputTypeName(model: Model, field?: Field) {
-  return _typeName('Update', model, field, 'Data');
-}
-
-function getCreateInputParentTypeName(model: Model) {
-  return _typeName('Set', model, undefined, 'Parent');
-}
-
-function getUpdateInputParentTypeName(model: Model) {
-  return _typeName('Update', model, undefined, 'Parent');
-}
-
-function getUpdateOneInputTypeName(model: Model, field?: Field) {
-  return _typeName2(model, field, 'UpdateOneInputType');
-}
-
-function getUpsertInputTypeName(model: Model, field?: Field) {
-  return _typeName2(model, field, 'UpsertInputType');
-}
-
-function getCreateInputChildTypeName(model: Model, field?: Field) {
-  return _typeName2(model, field, 'InputTypeChild');
-}
-
-function _typeName2(model: Model, field: Field, kind: string): string {
-  let typeName = model.name;
-  if (field) {
-    typeName += toPascalCase(field.name);
+function getFilterTypeName(input: Model | RelatedField) {
+  if (input instanceof RelatedField) {
+    return `Filter${input.getPascalName()}Input`;
   }
-  return `${typeName}${kind}`;
+  return `Filter${input.name}Input`;
 }
 
-function getConnectChildInputTypeName(field: RelatedField): string {
+function getFindTypeName(model: Model) {
+  return `Find${model.name}Input`;
+}
+
+function getCreateTypeName(model: Model) {
+  return `Create${model.name}Input`;
+}
+
+function getUpdateTypeName(model: Model) {
+  return `Update${model.name}Input`;
+}
+
+function getUpsertTypeName(model: Model) {
+  return `Upsert${model.name}Input`;
+}
+
+function getCreateParentTypeName(model: Model) {
+  return `Create${model.name}ParentInput`;
+}
+
+function getUpdateParentTypeName(model: Model) {
+  return `Upsert${model.name}ParentInput`;
+}
+
+function getConnectChildTypeName(field: RelatedField): string {
   return `Connect${field.getPascalName()}Input`;
 }
 
-function getCreateChildInputTypeName(field: RelatedField): string {
-  return `Create${field.getPascalName()}Input`;
+function getCreateChildTypeName(field: RelatedField, one?: string): string {
+  return `Create${one || ''}${field.getPascalName()}Input`;
 }
 
-function getUpdateChildInputTypeName(field: RelatedField): string {
-  return `Update${field.getPascalName()}Input`;
+function getUpdateChildTypeName(field: RelatedField, one?: string): string {
+  return `Update${one || ''}${field.getPascalName()}Input`;
 }
 
-function getUpsertChildInputTypeName(field: RelatedField): string {
+function getCreateManyChildTypeName(field: RelatedField): string {
+  return `CreateMany${field.getPascalName(true)}Input`;
+}
+
+function getUpdateManyChildTypeName(field: RelatedField): string {
+  return `UpdateMany${field.getPascalName(true)}Input`;
+}
+
+function getUpsertChildTypeName(field: RelatedField): string {
   return `Upsert${field.getPascalName()}Input`;
 }
 
@@ -723,8 +701,15 @@ function getFieldsExclude(
   fieldsMap: InputFieldsMap,
   related: RelatedField
 ): GraphQLInputFieldConfigMap {
-  return _exclude(
+  const fields = _exclude(
     fieldsMap[related.referencingField.model.name],
     related.referencingField.name
   );
+
+  if (!Object.keys(fields).length && related.referencingField.isUnique()) {
+    const field = related.referencingField;
+    fields[field.name] = fieldsMap[field.model.name][field.name];
+  }
+
+  return fields;
 }

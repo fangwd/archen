@@ -353,12 +353,13 @@ export class RelatedField extends Field {
   }
 
   // Example: UserOrder, CategoryCategoryAncestor
-  getPascalName() {
+  getPascalName(plural?: boolean) {
     const model = this.referencingField.model;
     if (model.getForeignKeyCount(this.model) === 1) {
-      return `${this.model.name}${model.name}`;
+      return `${this.model.name}${plural ? pluralise(model.name) : model.name}`;
     }
-    const suffix = toPascalCase(this.referencingField.name);
+    const name = this.referencingField.name;
+    const suffix = toPascalCase(plural ? pluralise(name) : name);
     return `${this.model.name}${model.name}${suffix}`;
   }
 }
