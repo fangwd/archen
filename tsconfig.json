@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es6",
+    "types": ["node", "graphql", "jest", "mysql"],
+    "typeRoots": ["node_modules/@types"],
+    "inlineSourceMap": true,
+    "outDir": "lib"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

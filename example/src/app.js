@@ -1,26 +1,20 @@
 const express = require('express');
 const graphqlHTTP = require('express-graphql');
 const fs = require('fs');
+const engine = require('../../lib/engine');
 
-const knex = require('knex')({
-  client: 'mysql',
-  connection: {
-    host: '127.0.0.1',
-    user: 'root',
-    password: 'secret',
-    database: 'example',
-    timezone: 'Z'
-  },
-  pool: { min: 0, max: 7 }
+const mysql = engine.createConnection('mysql', {
+  host: 'localhost',
+  user: 'root',
+  password: 'secret',
+  database: 'example',
+  timezone: 'Z',
+  connectionLimit: 10
 });
 
-let archen;
-
-if (process.env.NODE_ENV === 'development') {
-  archen = require('../..')(fs.readFileSync('example/data/schema.json'));
-} else {
-  archen = require('archen')(fs.readFileSync('data/schema.json'));
-}
+const archen = new (require('../../lib')).Archen(
+  fs.readFileSync('example/data/schema.json')
+);
 
 const app = express();
 
@@ -30,7 +24,7 @@ app.use(
   '/graphql',
   graphqlHTTP(async (request, response, params) => ({
     schema: archen.getSchema(),
-    context: archen.getContext(knex),
+    context: archen.getContext(mysql),
     pretty: false,
     graphiql: true,
     formatError: error => ({

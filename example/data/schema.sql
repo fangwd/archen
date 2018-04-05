@@ -29,6 +29,16 @@ create table category (
   unique (parent_id, name)
 );
 
+create table category_tree (
+  id integer primary key auto_increment,
+  ancestor_id integer not null,
+  descendant_id integer not null,
+  distance int,
+  foreign key (ancestor_id) references category(id),
+  foreign key (descendant_id) references category(id),
+  unique (ancestor_id, descendant_id)
+);
+
 create table product (
   id integer primary key auto_increment,
   sku char(40) unique,
@@ -42,6 +52,8 @@ create table product_category (
   id integer primary key auto_increment,
   product_id integer,
   category_id integer,
+  foreign key (product_id) references product(id),
+  foreign key (category_id) references category(id),
   unique (product_id, category_id)
 );
 
@@ -76,3 +88,8 @@ create table order_item (
   foreign key (product_id) references product(id)
 );
 
+create table `order_shipping` (
+  order_id integer primary key,
+  status int,
+  foreign key (order_id) references `order`(id)
+);

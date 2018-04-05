@@ -120,26 +120,28 @@
                         "user_id",
                         "group_id"
                     ]
-                }
-            ],
-            "foreignKeys": [
+                },
                 {
                     "columns": [
                         "user_id"
                     ],
-                    "referencedTable": "user",
-                    "referencedColumns": [
-                        "id"
-                    ]
+                    "references": {
+                        "table": "user",
+                        "columns": [
+                            "id"
+                        ]
+                    }
                 },
                 {
                     "columns": [
                         "group_id"
                     ],
-                    "referencedTable": "group",
-                    "referencedColumns": [
-                        "id"
-                    ]
+                    "references": {
+                        "table": "group",
+                        "columns": [
+                            "id"
+                        ]
+                    }
                 }
             ]
         },
@@ -172,21 +174,84 @@
                     ]
                 },
                 {
+                    "columns": [
+                        "parent_id"
+                    ],
+                    "references": {
+                        "table": "category",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                },
+                {
                     "unique": true,
                     "columns": [
                         "parent_id",
                         "name"
                     ]
                 }
+            ]
+        },
+        {
+            "name": "category_tree",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "ancestor_id",
+                    "type": "integer",
+                    "nullable": false
+                },
+                {
+                    "name": "descendant_id",
+                    "type": "integer",
+                    "nullable": false
+                },
+                {
+                    "name": "distance",
+                    "type": "int",
+                    "nullable": true
+                }
             ],
-            "foreignKeys": [
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
                 {
                     "columns": [
-                        "parent_id"
+                        "ancestor_id"
                     ],
-                    "referencedTable": "category",
-                    "referencedColumns": [
-                        "id"
+                    "references": {
+                        "table": "category",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "columns": [
+                        "descendant_id"
+                    ],
+                    "references": {
+                        "table": "category",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "ancestor_id",
+                        "descendant_id"
                     ]
                 }
             ]
@@ -269,6 +334,28 @@
                     "columns": [
                         "id"
                     ]
+                },
+                {
+                    "columns": [
+                        "product_id"
+                    ],
+                    "references": {
+                        "table": "product",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "columns": [
+                        "category_id"
+                    ],
+                    "references": {
+                        "table": "category",
+                        "columns": [
+                            "id"
+                        ]
+                    }
                 },
                 {
                     "unique": true,
@@ -387,26 +474,28 @@
                     "columns": [
                         "code"
                     ]
-                }
-            ],
-            "foreignKeys": [
+                },
                 {
                     "columns": [
                         "delivery_address_id"
                     ],
-                    "referencedTable": "delivery_address",
-                    "referencedColumns": [
-                        "id"
-                    ]
+                    "references": {
+                        "table": "delivery_address",
+                        "columns": [
+                            "id"
+                        ]
+                    }
                 },
                 {
                     "columns": [
                         "user_id"
                     ],
-                    "referencedTable": "user",
-                    "referencedColumns": [
-                        "id"
-                    ]
+                    "references": {
+                        "table": "user",
+                        "columns": [
+                            "id"
+                        ]
+                    }
                 }
             ]
         },
@@ -449,26 +538,57 @@
                         "order_id",
                         "product_id"
                     ]
-                }
-            ],
-            "foreignKeys": [
+                },
                 {
                     "columns": [
                         "order_id"
                     ],
-                    "referencedTable": "order",
-                    "referencedColumns": [
-                        "id"
-                    ]
+                    "references": {
+                        "table": "order",
+                        "columns": [
+                            "id"
+                        ]
+                    }
                 },
                 {
                     "columns": [
                         "product_id"
                     ],
-                    "referencedTable": "product",
-                    "referencedColumns": [
-                        "id"
-                    ]
+                    "references": {
+                        "table": "product",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "order_shipping",
+            "columns": [
+                {
+                    "name": "order_id",
+                    "type": "integer",
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "int",
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references": {
+                        "table": "order",
+                        "columns": [
+                            "id"
+                        ]
+                    }
                 }
             ]
         }
