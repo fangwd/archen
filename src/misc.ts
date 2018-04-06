@@ -60,8 +60,6 @@ export function btoa(node: any, orders) {
     return { ...acc, [order.field.name]: string };
   }, {});
 
-  console.log(cursorObject);
-
   return Buffer.from(JSON.stringify(cursorObject)).toString('base64');
 }
 

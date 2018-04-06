@@ -76,7 +76,6 @@ export class Accessor {
 
     if (args.orderBy !== undefined) {
       const orderBy = args.orderBy.map((order) => {
-        console.log(order);
         const [fieldName, direction] = order.split(' ');
         const field = model.field(fieldName);
 
