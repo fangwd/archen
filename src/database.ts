@@ -325,11 +325,26 @@ export class Table {
           continue;
         }
         // connect: [{parent: {id: 2}, name: 'Apple'}, ...]
-        for (const arg of args) {
+        for (const arg of toArray(args)) {
           if (!table.model.checkUniqueKey(arg)) {
             return Promise.reject(`Bad filter (${table.model.name})`);
           }
-          promises.push(table.update({ [field.name]: id }, args));
+          let promise;
+          if (field.isUnique()) {
+            if (field.column.nullable) {
+              promise = table
+                .update({ [field.name]: null }, { [field.name]: id })
+                .then(() => table.update({ [field.name]: id }, args));
+            } else {
+              promise = table
+                .delete({ [field.name]: id })
+                .then(() => table.update({ [field.name]: id }, args));
+            }
+          } else {
+            promise = table.update({ [field.name]: id }, args);
+          }
+
+          promises.push(promise);
         }
       } else if (method === 'create') {
         if (related.throughField) {
@@ -363,16 +378,16 @@ export class Table {
           promises.push(this.updateThrough(related, id, args));
           continue;
         }
-        const rows = args.map(arg => ({
-          data: arg.data,
-          where: { ...(arg.where as Document), [field.name]: id }
-        }));
-        for (const arg of args) {
-          const data = arg.data as Document;
-          const filter = {
-            [field.name]: id,
-            ...((arg.where || {}) as Document)
-          };
+        for (const arg of toArray(args)) {
+          let data, where;
+          if (arg.data === undefined) {
+            data = arg;
+            where = {};
+          } else {
+            data = arg.data;
+            where = arg.where;
+          }
+          const filter = { [field.name]: id, ...where };
           promises.push(table.modify(data, filter));
         }
       } else if (method === 'delete') {
