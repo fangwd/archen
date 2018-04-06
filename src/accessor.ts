@@ -136,9 +136,9 @@ export class Accessor {
         if (index + 2 === orders.length) {
           return {
             [`${level.field.name}_${levelOp}e`]: values[level.field.name],
-            AND: {
+            and: {
               [`${level.field.name}_${levelOp}`]: values[level.field.name],
-              OR: {
+              or: {
                 [`${nextLevel.field.name}_${nextLevelOp}`]: values[nextLevel.field.name]
               }
             }
