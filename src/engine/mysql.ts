@@ -30,7 +30,14 @@ class MySQL implements Connection {
     return new Promise((resolve, reject) => {
       this.connection.beginTransaction(error => {
         if (error) return reject(error);
-        const promise = callback(this);
+        let promise;
+        try {
+          promise = callback(this);
+        } catch (error) {
+          return this.connection.rollback(function() {
+            reject(error);
+          });
+        }
         if (promise instanceof Promise) {
           promise
             .then(result => {
