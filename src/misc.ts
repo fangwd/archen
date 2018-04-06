@@ -1,4 +1,5 @@
 import { Buffer } from "buffer";
+import { SimpleField } from "./model";
 
 const PLURAL_FORMS = {
   child: 'children'
@@ -55,21 +56,20 @@ export function toPascalCase(s: string): string {
 }
 
 export function btoa(value: any) {
-  return Buffer.from(value).toString('base64');
+  return Buffer.from(value.toString()).toString('base64');
 }
 
-export function atob(value: any) {
+export function atob(value: any, type: string) {
   const string = Buffer.from(value, 'base64').toString();
 
-  const int = parseInt(string, 10);
-  if (!isNaN(int)) {
-    return int;
+  if (/^int/i.test(type)) {
+    return parseInt(string, 10);
+  } else if (/float|double/i.test(type)) {
+    return parseFloat(string);
+  } else if (/^bool/i.test(type)) {
+    return Boolean(string);
+  } else if (/^date/i.test(type)) {
+    return new Date(string);
   }
-
-  const date = new Date(string)
-  if (!isNaN(date.getTime())) {
-    return date;
-  }
-
-  return value;
+  return string;
 }

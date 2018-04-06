@@ -42,7 +42,7 @@ import {
   NONE
 } from './filter';
 
-import { toPascalCase } from './misc';
+import { toPascalCase, atob, btoa } from './misc';
 
 interface ObjectTypeMap {
   [key: string]: GraphQLObjectType;
@@ -82,7 +82,6 @@ const PageInfoType = new GraphQLObjectType({
     startCursor: { type: GraphQLString },
     endCursor: { type: GraphQLString },
     hasNextPage: { type: GraphQLBoolean },
-    hasPreviousPage: { type: GraphQLBoolean },
   }),
 })
 
@@ -370,7 +369,57 @@ export class SchemaBuilder {
           ...ConnectionOptions,
         },
         resolve(_, args, context) {
-          // TODO
+          let orderField, direction;
+          let limit = 50;
+          let newArgs = { where: {}, orderBy: '', limit: limit + 1 };
+
+          if (args.orderBy) {
+            const [fieldName, dir] = args.orderBy.split(' ');
+            direction = dir;
+            orderField = model.field(fieldName);
+            newArgs = { ...newArgs, orderBy: args.orderBy };
+          } else {
+            orderField = model.primaryKey.fields[0];
+            direction = 'ASC';
+            newArgs = { ...newArgs, orderBy: `${orderField} ${direction}` };
+          }
+
+          if (args.after) {
+            const op = direction === 'ASC' ? 'gt' : 'lt';
+            console.log(direction, op);
+            const value = atob(args.after, orderField.column.type);
+            newArgs = { ...newArgs, where: { ...newArgs.where, [`${orderField.name}_${op}`]: value } }
+          }
+
+          if (args.where) {
+            newArgs = { ...newArgs, where: { ...args.where, ...newArgs.where } };
+          }
+
+          if (args.first) {
+            limit = args.first;
+            newArgs = { ...newArgs, limit: limit + 1 };
+          }
+
+          return context.accessor.query(model, newArgs).then((rows) => {
+            const edges = rows.map(row => ({
+              node: row,
+              cursor: btoa(row[orderField.name])
+            }));
+
+            const firstEdge = edges[0];
+            const lastEdge = edges.slice(-1)[0];
+
+            const pageInfo = {
+              startCursor: firstEdge ? firstEdge.cursor : null,
+              endCursor: lastEdge ? lastEdge.cursor : null,
+              hasNextPage: edges.length === limit + 1,
+            }
+
+            return {
+              edges: edges.length > limit ? edges.slice(0, -1) : edges,
+              pageInfo,
+            };
+          });
         }
       }
 
