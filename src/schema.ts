@@ -287,7 +287,9 @@ export class SchemaBuilder {
             resolve(object, args, context) {
               args.where = args.where || {};
               args.where[related.name] = object[related.referencedField.name];
-              return context.accessor.query(related.model, args);
+              return context.accessor
+                .query(related.model, args)
+                .then(rows => (related.isUnique() ? rows[0] : rows));
             }
           };
         }
