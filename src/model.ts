@@ -1,4 +1,5 @@
 import { pluralise, toPascalCase, toCamelCase } from './misc';
+import { Document } from './database';
 
 interface DatabaseInfo {
   name?: string;
@@ -155,7 +156,12 @@ export class Model {
       : null;
   }
 
+  keyValue(row: Document): Document {
+    return row[this.keyField().name] as Document;
+  }
+
   checkUniqueKey(row): UniqueKey {
+    if (!row) return null;
     let uniqueKey = this.primaryKey;
     for (const field of uniqueKey.fields) {
       if (row[field.name] === undefined) {
