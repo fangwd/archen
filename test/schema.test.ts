@@ -5,10 +5,10 @@ import { createSchema } from '../src/schema';
 import { Accessor } from '../src/accessor';
 import { Schema } from '../src/model';
 
-const NAME = 'filter';
+const NAME = 'schema';
 
 beforeAll(() => helper.createDatabase(NAME));
-afterAll(() => helper.dropDatabase(NAME));
+//afterAll(() => helper.dropDatabase(NAME));
 
 const data = helper.getExampleData();
 
@@ -138,6 +138,56 @@ test('set foreign key null', done => {
         done();
       });
     });
+});
+
+const ONE2ONE_CREATE = `
+mutation {
+  createOrder(
+    data: {
+      code: "one2one-001",
+      orderShipping: {
+        create: {
+          status: 1
+        }
+      }
+    }) {
+    id
+    code
+    orderShipping { status }
+  }
+}
+`;
+
+const ONE2ONE_DELETE = `
+mutation {
+  updateOrder(
+    data: {
+      orderShipping: null
+    },
+    where: {
+      code: "one2one-001",
+    }) {
+    id
+    code
+    orderShipping { status }
+  }
+}
+`;
+
+test('one to one - create/disconnect', done => {
+  expect.assertions(2);
+
+  const archen = createArchen();
+
+  graphql.graphql(archen.schema, ONE2ONE_CREATE, null, archen).then(row => {
+    const order = row.data.createOrder;
+    expect(order.orderShipping.status).toBe(1);
+    graphql.graphql(archen.schema, ONE2ONE_DELETE, null, archen).then(row => {
+      const order = row.data.updateOrder;
+      expect(order.orderShipping).toBe(null);
+      done();
+    });
+  });
 });
 
 function createArchen() {
