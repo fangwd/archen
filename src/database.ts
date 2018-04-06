@@ -307,8 +307,16 @@ export class Table {
   ): Promise<void> {
     const promises = [];
     const field = related.referencingField;
-    if (!field) throw Error(related.name + ' the related');
+    if (!field) throw Error(`Bad field ${related.displayName()}`);
     const table = this.db.table(field.model);
+    if (!data || field.model.keyValue(data) === null) {
+      const nullable = field.column.nullable;
+      if (field.column.nullable) {
+        return table.update({ [field.name]: null }, { [field.name]: id });
+      } else {
+        return table.delete({ [field.name]: id });
+      }
+    }
     for (const method in data) {
       const args = data[method] as Document[];
       if (method === 'connect') {
@@ -329,7 +337,7 @@ export class Table {
           continue;
         }
         // create: [{parent: {id: 2}, name: 'Apple'}, ...]
-        const docs = args.map(arg => ({ [field.name]: id, ...arg }));
+        const docs = toArray(args).map(arg => ({ [field.name]: id, ...arg }));
         for (const doc of docs) {
           promises.push(table.create(doc));
         }
@@ -555,4 +563,8 @@ export function toDocument(row: Row, model: Model): Document {
 
 export function rowsToCamel(rows: Row[], model: Model): Row[] {
   return rows.map(row => toDocument(row, model));
+}
+
+function toArray(args): Array<any> {
+  return Array.isArray(args) ? args : [args];
 }
