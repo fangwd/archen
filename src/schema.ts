@@ -68,7 +68,7 @@ interface QueryContext {
 const ConnectionOptions = {
   first: { type: GraphQLInt },
   after: { type: GraphQLString },
-  orderBy: { type: GraphQLString },
+  orderBy: { type: GraphQLString }
 };
 
 const QueryOptions = {
@@ -78,13 +78,13 @@ const QueryOptions = {
 };
 
 const PageInfoType = new GraphQLObjectType({
-  name: "PageInfo",
+  name: 'PageInfo',
   fields: () => ({
     startCursor: { type: GraphQLString },
     endCursor: { type: GraphQLString },
-    hasNextPage: { type: GraphQLBoolean },
-  }),
-})
+    hasNextPage: { type: GraphQLBoolean }
+  })
+});
 
 export class SchemaBuilder {
   private domain: Schema;
@@ -261,8 +261,8 @@ export class SchemaBuilder {
         fields(): GraphQLFieldConfigMap<any, QueryContext> {
           return {
             node: { type: modelTypeMap[model.name] },
-            cursor: { type: GraphQLString },
-          }
+            cursor: { type: GraphQLString }
+          };
         }
       });
 
@@ -272,7 +272,7 @@ export class SchemaBuilder {
           return {
             pageInfo: { type: PageInfoType },
             edges: { type: new GraphQLList(edgeModelTypeMap[model.name]) }
-          }
+          };
         }
       });
 
@@ -315,7 +315,9 @@ export class SchemaBuilder {
         } else {
           const modelDataTypeEx = modelTypeMapEx[model.name][field.name];
           const related = (field as RelatedField).referencingField;
-          const type = related.isUnique() ? modelDataTypeEx : new GraphQLList(modelDataTypeEx);
+          const type = related.isUnique()
+            ? modelDataTypeEx
+            : new GraphQLList(modelDataTypeEx);
           modelDataFields[field.name] = {
             type: type,
             args: {
@@ -369,7 +371,7 @@ export class SchemaBuilder {
         type: this.connectionModelTypeMap[model.name],
         args: {
           where: { type: this.filterInputTypeMap[model.name] },
-          ...ConnectionOptions,
+          ...ConnectionOptions
         },
         resolve(_, args, context) {
           let orderField, direction;
@@ -389,13 +391,18 @@ export class SchemaBuilder {
 
           if (args.after) {
             const op = direction === 'ASC' ? 'gt' : 'lt';
-            console.log(direction, op);
             const value = atob(args.after, orderField.column.type);
-            newArgs = { ...newArgs, where: { ...newArgs.where, [`${orderField.name}_${op}`]: value } }
+            newArgs = {
+              ...newArgs,
+              where: { ...newArgs.where, [`${orderField.name}_${op}`]: value }
+            };
           }
 
           if (args.where) {
-            newArgs = { ...newArgs, where: { ...args.where, ...newArgs.where } };
+            newArgs = {
+              ...newArgs,
+              where: { ...args.where, ...newArgs.where }
+            };
           }
 
           if (args.first) {
@@ -403,7 +410,7 @@ export class SchemaBuilder {
             newArgs = { ...newArgs, limit: limit + 1 };
           }
 
-          return context.accessor.query(model, newArgs).then((rows) => {
+          return context.accessor.query(model, newArgs).then(rows => {
             const edges = rows.map(row => ({
               node: row,
               cursor: btoa(row[orderField.name])
@@ -415,16 +422,16 @@ export class SchemaBuilder {
             const pageInfo = {
               startCursor: firstEdge ? firstEdge.cursor : null,
               endCursor: lastEdge ? lastEdge.cursor : null,
-              hasNextPage: edges.length === limit + 1,
-            }
+              hasNextPage: edges.length === limit + 1
+            };
 
             return {
               edges: edges.length > limit ? edges.slice(0, -1) : edges,
-              pageInfo,
+              pageInfo
             };
           });
         }
-      }
+      };
 
       const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
       queryFields[name] = {
@@ -567,7 +574,20 @@ export class SchemaBuilder {
               };
             }
           });
+
           if (field.referencingField.isUnique()) {
+            inputFieldsCreate[model.name][field.name] = {
+              type: new GraphQLInputObjectType({
+                name: getCreateChildTypeName(field, 'One'),
+                fields() {
+                  return {
+                    connect: { type: connectType },
+                    create: { type: createType }
+                  };
+                }
+              })
+            };
+
             inputFieldsUpdate[model.name][field.name] = {
               type: new GraphQLInputObjectType({
                 name: getUpdateChildTypeName(field, 'One'),
@@ -576,27 +596,25 @@ export class SchemaBuilder {
                     connect: { type: connectType },
                     create: { type: createType },
                     upsert: { type: upsertType },
-                    update: { type: updateType },
-                    delete: { type: connectType },
-                    disconnect: { type: connectType }
-                  };
-                }
-              })
-            };
-
-            inputFieldsCreate[model.name][field.name] = {
-              type: new GraphQLInputObjectType({
-                name: getCreateChildTypeName(field, 'One'),
-                fields() {
-                  return {
-                    connect: { type: connectType },
-                    create: { type: createType },
-                    upsert: { type: upsertType }
+                    update: { type: updateType }
                   };
                 }
               })
             };
           } else {
+            inputFieldsCreate[model.name][field.name] = {
+              type: new GraphQLInputObjectType({
+                name: getCreateManyChildTypeName(field),
+                fields() {
+                  return {
+                    connect: { type: new GraphQLList(connectType) },
+                    create: { type: new GraphQLList(createType) },
+                    upsert: { type: new GraphQLList(upsertType) }
+                  };
+                }
+              })
+            };
+
             inputFieldsUpdate[model.name][field.name] = {
               type: new GraphQLInputObjectType({
                 name: getUpdateManyChildTypeName(field),
@@ -608,19 +626,6 @@ export class SchemaBuilder {
                     update: { type: new GraphQLList(updateType) },
                     delete: { type: new GraphQLList(connectType) },
                     disconnect: { type: new GraphQLList(connectType) }
-                  };
-                }
-              })
-            };
-
-            inputFieldsCreate[model.name][field.name] = {
-              type: new GraphQLInputObjectType({
-                name: getCreateManyChildTypeName(field),
-                fields() {
-                  return {
-                    connect: { type: new GraphQLList(connectType) },
-                    create: { type: new GraphQLList(createType) },
-                    upsert: { type: new GraphQLList(upsertType) }
                   };
                 }
               })
