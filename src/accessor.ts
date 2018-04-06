@@ -102,14 +102,7 @@ export class Accessor {
   }
 
   create(model: Model, args: Document) {
-    return new Promise(resolve => {
-      this.db.transaction(() => {
-        this.db
-          .table(model)
-          .create(args)
-          .then(resolve);
-      });
-    });
+    return this.db.transaction(() => this.db.table(model).create(args));
   }
 
   update(model: Model, data: Document, filter: Filter) {
@@ -117,14 +110,9 @@ export class Accessor {
   }
 
   upsert(model: Model, create: Document, update: Document) {
-    return new Promise(resolve => {
-      this.db.transaction(() => {
-        this.db
-          .table(model)
-          .upsert(create, update)
-          .then(resolve);
-      });
-    });
+    return this.db.transaction(() =>
+      this.db.table(model).upsert(create, update)
+    );
   }
 
   delete(model: Model, filter: Filter) {
