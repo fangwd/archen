@@ -4,6 +4,7 @@ import * as helper from './helper';
 import { createSchema } from '../src/schema';
 import { Accessor } from '../src/accessor';
 import { Schema } from '../src/model';
+import { Database } from '../src/database';
 
 const NAME = 'schema';
 
@@ -140,14 +141,17 @@ test('set foreign key null', done => {
     });
 });
 
-const ONE2ONE_CREATE = `
+test('one to one - create', done => {
+  const ID = '001';
+
+  const DATA = `
 mutation {
   createOrder(
     data: {
-      code: "one2one-001",
+      code: "schema-${ID}",
       orderShipping: {
         create: {
-          status: 1
+          status: 100
         }
       }
     }) {
@@ -158,14 +162,28 @@ mutation {
 }
 `;
 
-const ONE2ONE_DELETE = `
+  const archen = createArchen();
+
+  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+    const order = row.data.createOrder;
+    expect(order.orderShipping.status).toBe(100);
+    done();
+  });
+});
+
+test('one to one - connect', done => {
+  const ID = '002';
+
+  const DATA = `
 mutation {
-  updateOrder(
+  createOrder(
     data: {
-      orderShipping: null
-    },
-    where: {
-      code: "one2one-001",
+      code: "schema-${ID}",
+      orderShipping: {
+        connect: {
+          order: { id: 2 }
+        }
+      }
     }) {
     id
     code
@@ -174,15 +192,125 @@ mutation {
 }
 `;
 
-test('one to one - create/disconnect', done => {
-  expect.assertions(2);
+  const archen = createArchen();
+
+  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+    const order = row.data.createOrder;
+    expect(order.orderShipping.status).toBe(2);
+    done();
+  });
+});
+
+test('one to one - connect #2', done => {
+  const archen = createArchen();
+
+  const CODE_A = 'T003A';
+  const CODE_B = 'T003B';
+  const STATUS_A = 300;
+  const STATUS_B = 500;
+
+  createOrderAndShipping(archen.db, CODE_A, STATUS_A).then(a => {
+    createOrderAndShipping(archen.db, CODE_B, STATUS_B).then(b => {
+      const DATA = `
+mutation {
+  updateOrder(
+    where: {
+      code: "${CODE_A}"
+    }
+    data: {
+      orderShipping: { connect: { order: { id: ${b} } } }
+    }) {
+    id
+    code
+    orderShipping { status }
+  }
+}
+`;
+      graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+        console.log(row);
+        const order = row.data.updateOrder;
+        expect(order.orderShipping.status).toBe(STATUS_B);
+        done();
+      });
+    });
+  });
+});
+
+test('one to one - update', done => {
+  const CODE = 'T004';
+  const STATUS = 3;
+
+  const DATA = `
+mutation {
+  updateOrder(
+    where: {
+      code: "${CODE}"
+    }
+    data: {
+      orderShipping: { update: { status: ${STATUS + 1} } }
+    }) {
+    id
+    code
+    orderShipping { status }
+  }
+}
+`;
 
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, ONE2ONE_CREATE, null, archen).then(row => {
+  createOrderAndShipping(archen.db, CODE, STATUS).then(id => {
+    graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+      const order = row.data.updateOrder;
+      expect(order.orderShipping.status).toBe(STATUS + 1);
+      done();
+    });
+  });
+});
+
+test('one to one - delete', done => {
+  expect.assertions(2);
+
+  const ID = '005';
+
+  const DATA = `
+mutation {
+  createOrder(
+    data: {
+      code: "schema-${ID}",
+      orderShipping: {
+        create: {
+          status: 100
+        }
+      }
+    }) {
+    id
+    code
+    orderShipping { status }
+  }
+}
+`;
+
+  const archen = createArchen();
+
+  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
     const order = row.data.createOrder;
-    expect(order.orderShipping.status).toBe(1);
-    graphql.graphql(archen.schema, ONE2ONE_DELETE, null, archen).then(row => {
+    expect(order.orderShipping.status).toBe(100);
+    const DATA = `
+mutation {
+  updateOrder(
+    where: {
+      code: "schema-${ID}"
+    }
+    data: {
+      orderShipping: null
+    }) {
+    id
+    code
+    orderShipping { status }
+  }
+}
+`;
+    graphql.graphql(archen.schema, DATA, null, archen).then(row => {
       const order = row.data.updateOrder;
       expect(order.orderShipping).toBe(null);
       done();
@@ -197,4 +325,25 @@ function createArchen() {
   const schema = createSchema(domain);
 
   return { domain, db, accessor, schema };
+}
+
+/**
+ * Creates a new order and a related shipping with the given code and status
+ * @param code
+ * @param status
+ */
+function createOrderAndShipping(
+  db: Database,
+  code: string,
+  status: number
+): Promise<any> {
+  return db
+    .table('order')
+    .insert({ code })
+    .then(order => {
+      return db
+        .table('order_shipping')
+        .insert({ order, status })
+        .then(() => order);
+    });
 }
