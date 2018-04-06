@@ -1,5 +1,4 @@
 import { Buffer } from "buffer";
-import { SimpleField } from "./model";
 
 const PLURAL_FORMS = {
   child: 'children'
@@ -55,13 +54,31 @@ export function toPascalCase(s: string): string {
   return s[0].toUpperCase() + s.substr(1);
 }
 
-export function btoa(value: any) {
-  return Buffer.from(value.toString()).toString('base64');
+export function btoa(node: any, orders) {
+  const cursorObject = orders.reduce((acc, order) => {
+    const string = node[order.field.name];
+    return { ...acc, [order.field.name]: string };
+  }, {});
+
+  console.log(cursorObject);
+
+  return Buffer.from(JSON.stringify(cursorObject)).toString('base64');
 }
 
-export function atob(value: any, type: string) {
-  const string = Buffer.from(value, 'base64').toString();
+export function atob(cursor: any, orders) {
+  const values = JSON.parse(Buffer.from(cursor, 'base64').toString());
 
+  return orders.reduce((acc, order) => {
+    const value = convertStringToType(values[order.field.name], order.field.column.type);
+    return { ...acc, [order.field.name]: value };
+  }, {});
+}
+
+function convertTypeToString(value, type) {
+  return value.toString();
+}
+
+function convertStringToType(string, type) {
   if (/^int/i.test(type)) {
     return parseInt(string, 10);
   } else if (/float|double/i.test(type)) {

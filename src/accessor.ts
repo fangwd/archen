@@ -4,6 +4,7 @@ import { Schema, Model, SimpleField, ForeignKeyField, Field } from './model';
 import { Database, Value, Document, rowsToCamel, Filter, SelectOptions } from './database';
 import { Row, Connection } from './engine';
 import { encodeFilter } from './filter';
+import { atob, btoa } from './misc';
 
 interface FieldLoader {
   field: SimpleField;
@@ -14,6 +15,13 @@ interface FieldLoaderMap {
   [key: string]: {
     [key: string]: FieldLoader;
   };
+}
+
+interface ConnectionSelectOptions {
+  orderBy?: [string],
+  after?: string,
+  first?: number,
+  where?: Filter
 }
 
 export class Accessor {
@@ -98,6 +106,63 @@ export class Accessor {
         }
       }
       return rows;
+    });
+  }
+
+  cursorQuery(model: Model, args: ConnectionSelectOptions) {
+    let limit = 50;
+    let where = {}
+    let orderBy = model.primaryKey.fields.map(field => ({ field: field as Field, direction: 'ASC' }));
+
+    if (args.orderBy) {
+      const argOrderBy = args.orderBy.map((order) => {
+        const [fieldName, direction] = order.split(' ');
+        const field = model.field(fieldName);
+
+        return { field, direction };
+      });
+
+      orderBy = [...argOrderBy, ...orderBy];
+    }
+
+    if (args.after) {
+      const values = atob(args.after, orderBy);
+      where = orderBy.reduce((acc, order) => {
+        const op = order.direction === 'ASC' ? 'gt' : 'lt';
+        const value = values[order.field.name];
+        return { ...acc, [`${order.field.name}_${op}`]: value }
+      }, {});
+    }
+
+    if (args.where) {
+      where = { ...args.where, ...where };
+    }
+
+    if (args.first) {
+      limit = args.first;
+    }
+
+    const orderByArgs = orderBy.map(order => `${order.field.name} ${order.direction}`);
+
+    return this.query(model, { where, orderBy: orderByArgs, limit }).then((rows) => {
+      const edges = rows.map(row => ({
+        node: row,
+        cursor: btoa(row, orderBy)
+      }));
+
+      const firstEdge = edges[0];
+      const lastEdge = edges.slice(-1)[0];
+
+      const pageInfo = {
+        startCursor: firstEdge ? firstEdge.cursor : null,
+        endCursor: lastEdge ? lastEdge.cursor : null,
+        hasNextPage: edges.length === limit + 1,
+      }
+
+      return {
+        edges: edges.length > limit ? edges.slice(0, -1) : edges,
+        pageInfo,
+      };
     });
   }
 
