@@ -73,7 +73,7 @@ const ConnectionOptions = {
 const QueryOptions = {
   limit: { type: GraphQLInt },
   offset: { type: GraphQLInt },
-  orderBy: { type: GraphQLString }
+  orderBy: { type: new GraphQLList(GraphQLString) }
 };
 
 const PageInfoType = new GraphQLObjectType({

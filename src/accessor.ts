@@ -1,7 +1,7 @@
 import DataLoader = require('dataloader');
 
-import { Schema, Model, SimpleField, ForeignKeyField } from './model';
-import { Database, Value, Document, rowsToCamel, Filter } from './database';
+import { Schema, Model, SimpleField, ForeignKeyField, Field } from './model';
+import { Database, Value, Document, rowsToCamel, Filter, SelectOptions } from './database';
 import { Row, Connection } from './engine';
 import { encodeFilter } from './filter';
 
@@ -58,7 +58,7 @@ export class Accessor {
   }
 
   // args: { where, limit, offset, orderBy }
-  query(model: Model, args: Document) {
+  query(model: Model, args: SelectOptions) {
     let sql = `select * from ${this.db.engine.escapeId(model.table.name)}`;
 
     const where = encodeFilter(args.where as Filter, model, this.db.engine);
@@ -67,15 +67,20 @@ export class Accessor {
     }
 
     if (args.orderBy !== undefined) {
-      const [fieldName, direction] = args.orderBy.toString().split(' ');
-      const field = model.field(fieldName);
+      const orderBy = args.orderBy.map((order) => {
+        console.log(order);
+        const [fieldName, direction] = order.split(' ');
+        const field = model.field(fieldName);
 
-      if (field instanceof SimpleField || field instanceof ForeignKeyField) {
-        const dbName = field.column.name;
-        sql += ` order by ${dbName} ${direction}`;
-      } else {
+        if (field instanceof SimpleField || field instanceof ForeignKeyField) {
+          const dbName = field.column.name;
+          return `${dbName} ${direction}`;
+        }
+
         throw new Error(`Invalid sort column ${fieldName}`);
-      }
+      });
+
+      sql += ` order by ${orderBy.join(', ')}`;
     }
 
     sql += ` limit ${args.limit || 50}`;
@@ -83,7 +88,6 @@ export class Accessor {
     if (args.offset !== undefined) {
       sql += ` offset ${args.offset}`;
     }
-
 
     const loaders = this.loaders[model.name];
     return this.queryLoader.load(sql).then(rows => {
