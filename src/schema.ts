@@ -43,7 +43,7 @@ import {
   NONE
 } from './filter';
 
-import { toPascalCase } from './misc';
+import { toPascalCase, atob, btoa } from './misc';
 
 interface ObjectTypeMap {
   [key: string]: GraphQLObjectType;
@@ -65,17 +65,33 @@ interface QueryContext {
   accessor: Accessor;
 }
 
+const ConnectionOptions = {
+  first: { type: GraphQLInt },
+  after: { type: GraphQLString },
+  orderBy: { type: GraphQLString },
+};
+
 const QueryOptions = {
   limit: { type: GraphQLInt },
   offset: { type: GraphQLInt },
   orderBy: { type: GraphQLString }
 };
 
+const PageInfoType = new GraphQLObjectType({
+  name: "PageInfo",
+  fields: () => ({
+    startCursor: { type: GraphQLString },
+    endCursor: { type: GraphQLString },
+    hasNextPage: { type: GraphQLBoolean },
+  }),
+})
+
 export class SchemaBuilder {
   private domain: Schema;
   private schema: GraphQLSchema;
 
   private modelTypeMap: ObjectTypeMap = {};
+  private connectionModelTypeMap: ObjectTypeMap = {};
 
   private filterInputTypeMap: InputTypeMap = {};
   private filterInputTypeMapEx = {};
@@ -230,6 +246,8 @@ export class SchemaBuilder {
     const modelFieldsMap: ObjectFieldsMap = {};
     const modelFieldsMapEx = {};
 
+    const edgeModelTypeMap: ObjectTypeMap = {};
+
     for (const model of this.domain.models) {
       this.modelTypeMap[model.name] = new GraphQLObjectType({
         name: getTypeName(model),
@@ -237,6 +255,27 @@ export class SchemaBuilder {
           return modelFieldsMap[model.name];
         }
       });
+
+      edgeModelTypeMap[model.name] = new GraphQLObjectType({
+        name: `${getTypeName(model)}Edge`,
+        fields(): GraphQLFieldConfigMap<any, QueryContext> {
+          return {
+            node: { type: modelTypeMap[model.name] },
+            cursor: { type: GraphQLString },
+          }
+        }
+      });
+
+      this.connectionModelTypeMap[model.name] = new GraphQLObjectType({
+        name: `${getTypeName(model)}Connection`,
+        fields(): GraphQLFieldConfigMap<any, QueryContext> {
+          return {
+            pageInfo: { type: PageInfoType },
+            edges: { type: new GraphQLList(edgeModelTypeMap[model.name]) }
+          }
+        }
+      });
+
       modelFieldsMap[model.name] = {};
     }
 
@@ -276,10 +315,9 @@ export class SchemaBuilder {
         } else {
           const modelDataTypeEx = modelTypeMapEx[model.name][field.name];
           const related = (field as RelatedField).referencingField;
+          const type = related.isUnique() ? modelDataTypeEx : new GraphQLList(modelDataTypeEx);
           modelDataFields[field.name] = {
-            type: related.isUnique()
-              ? modelDataTypeEx
-              : new GraphQLList(modelDataTypeEx),
+            type: type,
             args: {
               where: { type: filterInputTypeMapEx[model.name][field.name] },
               ...QueryOptions
@@ -326,6 +364,67 @@ export class SchemaBuilder {
           return context.accessor.query(model, args);
         }
       };
+
+      queryFields[`${model.pluralName}Connection`] = {
+        type: this.connectionModelTypeMap[model.name],
+        args: {
+          where: { type: this.filterInputTypeMap[model.name] },
+          ...ConnectionOptions,
+        },
+        resolve(_, args, context) {
+          let orderField, direction;
+          let limit = 50;
+          let newArgs = { where: {}, orderBy: '', limit: limit + 1 };
+
+          if (args.orderBy) {
+            const [fieldName, dir] = args.orderBy.split(' ');
+            direction = dir;
+            orderField = model.field(fieldName);
+            newArgs = { ...newArgs, orderBy: args.orderBy };
+          } else {
+            orderField = model.primaryKey.fields[0];
+            direction = 'ASC';
+            newArgs = { ...newArgs, orderBy: `${orderField} ${direction}` };
+          }
+
+          if (args.after) {
+            const op = direction === 'ASC' ? 'gt' : 'lt';
+            console.log(direction, op);
+            const value = atob(args.after, orderField.column.type);
+            newArgs = { ...newArgs, where: { ...newArgs.where, [`${orderField.name}_${op}`]: value } }
+          }
+
+          if (args.where) {
+            newArgs = { ...newArgs, where: { ...args.where, ...newArgs.where } };
+          }
+
+          if (args.first) {
+            limit = args.first;
+            newArgs = { ...newArgs, limit: limit + 1 };
+          }
+
+          return context.accessor.query(model, newArgs).then((rows) => {
+            const edges = rows.map(row => ({
+              node: row,
+              cursor: btoa(row[orderField.name])
+            }));
+
+            const firstEdge = edges[0];
+            const lastEdge = edges.slice(-1)[0];
+
+            const pageInfo = {
+              startCursor: firstEdge ? firstEdge.cursor : null,
+              endCursor: lastEdge ? lastEdge.cursor : null,
+              hasNextPage: edges.length === limit + 1,
+            }
+
+            return {
+              edges: edges.length > limit ? edges.slice(0, -1) : edges,
+              pageInfo,
+            };
+          });
+        }
+      }
 
       const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
       queryFields[name] = {

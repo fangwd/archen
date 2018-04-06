@@ -1,4 +1,4 @@
-import { Filter, Value } from './database';
+import { Filter, Value, _toSnake } from './database';
 import { Model, SimpleField, ForeignKeyField, RelatedField } from './model';
 import { Escape } from './engine';
 
@@ -83,7 +83,7 @@ class Builder {
           exprs.push(this._in(field, query));
         }
       } else if (field instanceof SimpleField) {
-        exprs.push(this.expr(field, operator, value as Value));
+        exprs.push(this.expr(field, operator, _toSnake(value, field) as Value));
       } else if (field instanceof RelatedField) {
         exprs.push(this.exists(field, operator, value as Filter));
       } else {

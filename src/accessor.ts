@@ -70,15 +70,24 @@ export class Accessor {
       sql += ` where ${where}`;
     }
 
+    if (args.orderBy !== undefined) {
+      const [fieldName, direction] = args.orderBy.toString().split(' ');
+      const field = model.field(fieldName);
+
+      if (field instanceof SimpleField || field instanceof ForeignKeyField) {
+        const dbName = field.column.name;
+        sql += ` order by ${dbName} ${direction}`;
+      } else {
+        throw new Error(`Invalid sort column ${fieldName}`);
+      }
+    }
+
     sql += ` limit ${args.limit || 50}`;
 
     if (args.offset !== undefined) {
       sql += ` offset ${args.offset}`;
     }
 
-    if (args.orderBy !== undefined) {
-      sql += ` order by ${args.orderBy}`;
-    }
 
     const loaders = this.loaders[model.name];
     return this.queryLoader.load(sql).then(rows => {
