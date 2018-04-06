@@ -126,11 +126,35 @@ export class Accessor {
 
     if (args.after) {
       const values = atob(args.after, orderBy);
-      where = orderBy.reduce((acc, order) => {
-        const op = order.direction === 'ASC' ? 'gt' : 'lt';
-        const value = values[order.field.name];
-        return { ...acc, [`${order.field.name}_${op}`]: value }
-      }, {});
+
+      const multiColumnOrderWhere = (index, orders) => {
+        const level = orders[index];
+        const levelOp = level.direction === 'ASC' ? 'gt' : 'lt';
+        const nextLevel = orders[index + 1];
+        const nextLevelOp = nextLevel.direction === 'ASC' ? 'gt' : 'lt';
+
+        if (index + 2 === orders.length) {
+          return {
+            [`${level.field.name}_${levelOp}e`]: values[level.field.name],
+            AND: {
+              [`${level.field.name}_${levelOp}`]: values[level.field.name],
+              OR: {
+                [`${nextLevel.field.name}_${nextLevelOp}`]: values[nextLevel.field.name]
+              }
+            }
+          }
+        }
+
+        return {
+          [`${level.field.name}_${levelOp}e`]: values[level.field.name],
+          and: {
+            [`${level.field.name}_${levelOp}`]: values[level.field.name],
+            or: multiColumnOrderWhere(index + 1, orderBy)
+          }
+        }
+      }
+
+      where = multiColumnOrderWhere(0, orderBy);
     }
 
     if (args.where) {
