@@ -64,17 +64,34 @@ interface QueryContext {
   accessor: Accessor;
 }
 
+const ConnectionOptions = {
+  first: { type: GraphQLInt },
+  after: { type: GraphQLString },
+  orderBy: { type: GraphQLString },
+};
+
 const QueryOptions = {
   limit: { type: GraphQLInt },
   offset: { type: GraphQLInt },
   orderBy: { type: GraphQLString }
 };
 
+const PageInfoType = new GraphQLObjectType({
+  name: "PageInfo",
+  fields: () => ({
+    startCursor: { type: GraphQLString },
+    endCursor: { type: GraphQLString },
+    hasNextPage: { type: GraphQLBoolean },
+    hasPreviousPage: { type: GraphQLBoolean },
+  }),
+})
+
 export class SchemaBuilder {
   private domain: Schema;
   private schema: GraphQLSchema;
 
   private modelTypeMap: ObjectTypeMap = {};
+  private connectionModelTypeMap: ObjectTypeMap = {};
 
   private filterInputTypeMap: InputTypeMap = {};
   private filterInputTypeMapEx = {};
@@ -229,6 +246,8 @@ export class SchemaBuilder {
     const modelFieldsMap: ObjectFieldsMap = {};
     const modelFieldsMapEx = {};
 
+    const edgeModelTypeMap: ObjectTypeMap = {};
+
     for (const model of this.domain.models) {
       this.modelTypeMap[model.name] = new GraphQLObjectType({
         name: getTypeName(model),
@@ -236,6 +255,27 @@ export class SchemaBuilder {
           return modelFieldsMap[model.name];
         }
       });
+
+      edgeModelTypeMap[model.name] = new GraphQLObjectType({
+        name: `${getTypeName(model)}Edge`,
+        fields(): GraphQLFieldConfigMap<any, QueryContext> {
+          return {
+            node: { type: modelTypeMap[model.name] },
+            cursor: { type: GraphQLString },
+          }
+        }
+      });
+
+      this.connectionModelTypeMap[model.name] = new GraphQLObjectType({
+        name: `${getTypeName(model)}Connection`,
+        fields(): GraphQLFieldConfigMap<any, QueryContext> {
+          return {
+            pageInfo: { type: PageInfoType },
+            edges: { type: new GraphQLList(edgeModelTypeMap[model.name]) }
+          }
+        }
+      });
+
       modelFieldsMap[model.name] = {};
     }
 
@@ -275,10 +315,9 @@ export class SchemaBuilder {
         } else {
           const modelDataTypeEx = modelTypeMapEx[model.name][field.name];
           const related = (field as RelatedField).referencingField;
+          const type = related.isUnique() ? modelDataTypeEx : new GraphQLList(modelDataTypeEx);
           modelDataFields[field.name] = {
-            type: related.isUnique()
-              ? modelDataTypeEx
-              : new GraphQLList(modelDataTypeEx),
+            type: type,
             args: {
               where: { type: filterInputTypeMapEx[model.name][field.name] },
               ...QueryOptions
@@ -323,6 +362,17 @@ export class SchemaBuilder {
           return context.accessor.query(model, args);
         }
       };
+
+      queryFields[`${model.pluralName}Connection`] = {
+        type: this.connectionModelTypeMap[model.name],
+        args: {
+          where: { type: this.filterInputTypeMap[model.name] },
+          ...ConnectionOptions,
+        },
+        resolve(_, args, context) {
+          // TODO
+        }
+      }
 
       const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
       queryFields[name] = {

@@ -1,3 +1,5 @@
+import { Buffer } from "buffer";
+
 const PLURAL_FORMS = {
   child: 'children'
 };
@@ -50,4 +52,24 @@ export function toCamelCase(s: string): string {
 export function toPascalCase(s: string): string {
   s = toCamelCase(s);
   return s[0].toUpperCase() + s.substr(1);
+}
+
+export function btoa(value: any) {
+  return Buffer.from(value).toString('base64');
+}
+
+export function atob(value: any) {
+  const string = Buffer.from(value, 'base64').toString();
+
+  const int = parseInt(string, 10);
+  if (!isNaN(int)) {
+    return int;
+  }
+
+  const date = new Date(string)
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+
+  return value;
 }
