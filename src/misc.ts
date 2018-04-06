@@ -1,3 +1,6 @@
+import { Buffer } from "buffer";
+import { SimpleField } from "./model";
+
 const PLURAL_FORMS = {
   child: 'children'
 };
@@ -50,4 +53,23 @@ export function toCamelCase(s: string): string {
 export function toPascalCase(s: string): string {
   s = toCamelCase(s);
   return s[0].toUpperCase() + s.substr(1);
+}
+
+export function btoa(value: any) {
+  return Buffer.from(value.toString()).toString('base64');
+}
+
+export function atob(value: any, type: string) {
+  const string = Buffer.from(value, 'base64').toString();
+
+  if (/^int/i.test(type)) {
+    return parseInt(string, 10);
+  } else if (/float|double/i.test(type)) {
+    return parseFloat(string);
+  } else if (/^bool/i.test(type)) {
+    return Boolean(string);
+  } else if (/^date/i.test(type)) {
+    return new Date(string);
+  }
+  return string;
 }
