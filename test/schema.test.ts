@@ -9,7 +9,7 @@ import { Database } from '../src/database';
 const NAME = 'schema';
 
 beforeAll(() => helper.createDatabase(NAME));
-//afterAll(() => helper.dropDatabase(NAME));
+afterAll(() => helper.dropDatabase(NAME));
 
 const data = helper.getExampleData();
 
@@ -19,10 +19,13 @@ test('create schema', () => {
   expect(schema).not.toBe(undefined);
 });
 
-const EMAIL = 'user@example.com';
-const STATUS = 200;
+test('create simple object', done => {
+  expect.assertions(6);
 
-const CREATE_USER = `
+  const EMAIL = 'user@example.com';
+  const STATUS = 200;
+
+  const DATA = `
 mutation {
   createUser(data: {email: "${EMAIL}", status: ${STATUS}}) {
     id
@@ -32,12 +35,9 @@ mutation {
 }
 `;
 
-test('create simple object', done => {
-  expect.assertions(6);
-
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, CREATE_USER, null, archen).then(row => {
+  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
     const user = row.data.createUser;
     expect(user.email).toBe(EMAIL);
     expect(user.status).toBe(STATUS);
@@ -55,7 +55,10 @@ test('create simple object', done => {
   });
 });
 
-const CREATE_ORDER = `
+test('create object', done => {
+  expect.assertions(5);
+
+  const DATA = `
 mutation {
   createOrder(data: {
     code: "test-001",
@@ -85,12 +88,9 @@ mutation {
 }
 `;
 
-test('create object', done => {
-  expect.assertions(5);
-
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, CREATE_ORDER, null, archen).then(row => {
+  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
     const order = row.data.createOrder;
     expect(order.code).toBe('test-001');
     expect(order.orderItems.length).toBe(2);
@@ -142,7 +142,7 @@ test('set foreign key null', done => {
 });
 
 test('one to one - create', done => {
-  const ID = '001';
+  const ID = 'T001';
 
   const DATA = `
 mutation {
@@ -168,6 +168,35 @@ mutation {
     const order = row.data.createOrder;
     expect(order.orderShipping.status).toBe(100);
     done();
+  });
+});
+
+test('one to one - create #2', done => {
+  const archen = createArchen();
+
+  const CODE = 'T001A';
+
+  createOrderAndShipping(archen.db, CODE, 100).then(id => {
+    const DATA = `
+mutation {
+  updateOrder(
+    where: {
+      code: "${CODE}"
+    }
+    data: {
+      orderShipping: { create: {  status: 200 } }
+    }) {
+    id
+    code
+    orderShipping { status }
+  }
+}
+`;
+    graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+      const order = row.data.updateOrder;
+      expect(order.orderShipping.status).toBe(200);
+      done();
+    });
   });
 });
 
@@ -227,7 +256,6 @@ mutation {
 }
 `;
       graphql.graphql(archen.schema, DATA, null, archen).then(row => {
-        console.log(row);
         const order = row.data.updateOrder;
         expect(order.orderShipping.status).toBe(STATUS_B);
         done();
@@ -267,10 +295,45 @@ mutation {
   });
 });
 
+test('one to one - upsert', done => {
+  const CODE = 'T005';
+
+  const DATA = `
+mutation {
+  updateOrder(
+    where: {
+      code: "${CODE}"
+    }
+    data: {
+      orderShipping: {
+        upsert: {
+          create: { status: 200 },
+          update: { status: 300 }
+        }
+      }
+    }) {
+    id
+    code
+    orderShipping { status }
+  }
+}
+`;
+
+  const archen = createArchen();
+
+  createOrderAndShipping(archen.db, CODE, 100).then(id => {
+    graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+      const order = row.data.updateOrder;
+      expect(order.orderShipping.status).toBe(300);
+      done();
+    });
+  });
+});
+
 test('one to one - delete', done => {
   expect.assertions(2);
 
-  const ID = '005';
+  const ID = 'T006';
 
   const DATA = `
 mutation {
@@ -327,11 +390,6 @@ function createArchen() {
   return { domain, db, accessor, schema };
 }
 
-/**
- * Creates a new order and a related shipping with the given code and status
- * @param code
- * @param status
- */
 function createOrderAndShipping(
   db: Database,
   code: string,
