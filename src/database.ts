@@ -331,19 +331,12 @@ export class Table {
           }
           let promise;
           if (field.isUnique()) {
-            if (field.column.nullable) {
-              promise = table
-                .update({ [field.name]: null }, { [field.name]: id })
-                .then(() => table.update({ [field.name]: id }, args));
-            } else {
-              promise = table
-                .delete({ [field.name]: id })
-                .then(() => table.update({ [field.name]: id }, args));
-            }
+            promise = this._disconnectUnique(field, id).then(() =>
+              table.update({ [field.name]: id }, args)
+            );
           } else {
             promise = table.update({ [field.name]: id }, args);
           }
-
           promises.push(promise);
         }
       } else if (method === 'create') {
@@ -353,8 +346,14 @@ export class Table {
         }
         // create: [{parent: {id: 2}, name: 'Apple'}, ...]
         const docs = toArray(args).map(arg => ({ [field.name]: id, ...arg }));
-        for (const doc of docs) {
-          promises.push(table.create(doc));
+        if (field.isUnique()) {
+          promises.push(
+            this._disconnectUnique(field, id).then(() => table.create(docs[0]))
+          );
+        } else {
+          for (const doc of docs) {
+            promises.push(table.create(doc));
+          }
         }
       } else if (method === 'upsert') {
         if (related.throughField) {
@@ -362,7 +361,7 @@ export class Table {
           continue;
         }
         const rows = [];
-        for (const arg of args) {
+        for (const arg of toArray(args)) {
           let { create, update } = arg;
           if (!create && !field.isUnique()) {
             throw Error('Bad data');
@@ -413,6 +412,13 @@ export class Table {
     }
 
     return Promise.all(promises).then(() => Promise.resolve());
+  }
+
+  _disconnectUnique(field: SimpleField, id: Value): Promise<any> {
+    const table = this.db.table(field.model);
+    return field.column.nullable
+      ? table.update({ [field.name]: null }, { [field.name]: id })
+      : table.delete({ [field.name]: id });
   }
 
   // Aggregate functions
@@ -541,7 +547,6 @@ export class Table {
     });
   }
 }
-
 function _toCamel(value: Value, field: SimpleField): Value {
   if (/date|time/i.test(field.column.type)) {
     return new Date(value as string).toISOString();
