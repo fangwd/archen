@@ -1,4 +1,4 @@
-import { Buffer } from "buffer";
+import { Buffer } from 'buffer';
 
 const PLURAL_FORMS = {
   child: 'children'
@@ -67,7 +67,10 @@ export function atob(cursor: any, orders) {
   const values = JSON.parse(Buffer.from(cursor, 'base64').toString());
 
   return orders.reduce((acc, order) => {
-    const value = convertStringToType(values[order.field.name], order.field.column.type);
+    const value = convertStringToType(
+      values[order.field.name],
+      order.field.column.type
+    );
     return { ...acc, [order.field.name]: value };
   }, {});
 }
@@ -87,4 +90,8 @@ function convertStringToType(string, type) {
     return new Date(string);
   }
   return string;
+}
+
+export function toArray(args): Array<any> {
+  return Array.isArray(args) ? args : [args];
 }

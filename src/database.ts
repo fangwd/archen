@@ -17,6 +17,7 @@ import {
 
 import { Connection, Row } from './engine';
 import { encodeFilter } from './filter';
+import { toArray } from './misc';
 
 export class Database {
   schema: Schema;
@@ -583,8 +584,4 @@ export function toDocument(row: Row, model: Model): Document {
 
 export function rowsToCamel(rows: Row[], model: Model): Row[] {
   return rows.map(row => toDocument(row, model));
-}
-
-function toArray(args): Array<any> {
-  return Array.isArray(args) ? args : [args];
 }
