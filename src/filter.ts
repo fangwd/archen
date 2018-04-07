@@ -86,6 +86,31 @@ class Builder {
         exprs.push(this.expr(field, operator, _toSnake(value, field) as Value));
       } else if (field instanceof RelatedField) {
         exprs.push(this.exists(field, operator, value as Filter));
+      } else if (key === AND) {
+        // { and: [{name_like: "%Apple%"}, {price_lt: 6}] }
+        exprs.push(value.map(c => this.and(c)).join(' and '));
+      } else if (key === OR) {
+        /*
+         { or: [
+                { name_like: "%Apple%" },
+                { productCategories_some:
+                  { category: { name: 'Banana' } }
+                }
+              ]
+         }
+         */
+        exprs.push(value.map(c => this.and(c)).join(' or '));
+      } else if (key === NOT) {
+        /*
+         { not: [
+                { name_like: "%Apple%" },
+                { productCategories_some:
+                  { category: { name: 'Banana' } }
+                }
+              ]
+         }
+         */
+        exprs.push('not (' + value.map(c => this.and(c)).join(' or ') + ')');
       } else {
         throw Error(`Bad field: ${this.model.name}.${name}`);
       }
