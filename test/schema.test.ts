@@ -98,7 +98,7 @@ mutation {
       .table('OrderItem')
       .select('*', {
         where: { order: { id: order.id } },
-        orderBy: 'product_id'
+        orderBy: ['product_id']
       })
       .then(rows => {
         expect(rows.length).toBe(2);
