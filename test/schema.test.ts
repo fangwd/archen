@@ -109,7 +109,10 @@ mutation {
   });
 });
 
-const SET_NULL = `
+test('set foreign key null', done => {
+  expect.assertions(2);
+
+  const DATA = `
 mutation {
   updateOrder(data: { user: null }, where: { code: "test-002" }) {
     id
@@ -119,9 +122,6 @@ mutation {
   }
 }
 `;
-
-test('set foreign key null', done => {
-  expect.assertions(2);
 
   const archen = createArchen();
 
@@ -133,7 +133,7 @@ test('set foreign key null', done => {
     })
     .then(order => {
       expect(order.user.id).toBe(1);
-      graphql.graphql(archen.schema, SET_NULL, null, archen).then(row => {
+      graphql.graphql(archen.schema, DATA, null, archen).then(row => {
         const order = row.data.updateOrder;
         expect(order.user).toBe(null);
         done();
