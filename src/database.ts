@@ -47,11 +47,11 @@ export class Database {
   }
 }
 
-interface SelectOptions {
+export interface SelectOptions {
   where?: Filter;
   offset?: number;
   limit?: number;
-  orderBy?: string;
+  orderBy?: string[];
 }
 
 export class Table {

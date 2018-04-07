@@ -43,7 +43,7 @@ import {
   NONE
 } from './filter';
 
-import { toPascalCase, atob, btoa } from './misc';
+import { toPascalCase } from './misc';
 
 interface ObjectTypeMap {
   [key: string]: GraphQLObjectType;
@@ -68,13 +68,13 @@ interface QueryContext {
 const ConnectionOptions = {
   first: { type: GraphQLInt },
   after: { type: GraphQLString },
-  orderBy: { type: GraphQLString }
+  orderBy: { type: new GraphQLList(GraphQLString) }
 };
 
 const QueryOptions = {
   limit: { type: GraphQLInt },
   offset: { type: GraphQLInt },
-  orderBy: { type: GraphQLString }
+  orderBy: { type: new GraphQLList(GraphQLString) }
 };
 
 const PageInfoType = new GraphQLObjectType({
@@ -374,62 +374,7 @@ export class SchemaBuilder {
           ...ConnectionOptions
         },
         resolve(_, args, context) {
-          let orderField, direction;
-          let limit = 50;
-          let newArgs = { where: {}, orderBy: '', limit: limit + 1 };
-
-          if (args.orderBy) {
-            const [fieldName, dir] = args.orderBy.split(' ');
-            direction = dir;
-            orderField = model.field(fieldName);
-            newArgs = { ...newArgs, orderBy: args.orderBy };
-          } else {
-            orderField = model.primaryKey.fields[0];
-            direction = 'ASC';
-            newArgs = { ...newArgs, orderBy: `${orderField} ${direction}` };
-          }
-
-          if (args.after) {
-            const op = direction === 'ASC' ? 'gt' : 'lt';
-            const value = atob(args.after, orderField.column.type);
-            newArgs = {
-              ...newArgs,
-              where: { ...newArgs.where, [`${orderField.name}_${op}`]: value }
-            };
-          }
-
-          if (args.where) {
-            newArgs = {
-              ...newArgs,
-              where: { ...args.where, ...newArgs.where }
-            };
-          }
-
-          if (args.first) {
-            limit = args.first;
-            newArgs = { ...newArgs, limit: limit + 1 };
-          }
-
-          return context.accessor.query(model, newArgs).then(rows => {
-            const edges = rows.map(row => ({
-              node: row,
-              cursor: btoa(row[orderField.name])
-            }));
-
-            const firstEdge = edges[0];
-            const lastEdge = edges.slice(-1)[0];
-
-            const pageInfo = {
-              startCursor: firstEdge ? firstEdge.cursor : null,
-              endCursor: lastEdge ? lastEdge.cursor : null,
-              hasNextPage: edges.length === limit + 1
-            };
-
-            return {
-              edges: edges.length > limit ? edges.slice(0, -1) : edges,
-              pageInfo
-            };
-          });
+          return context.accessor.cursorQuery(model, args);
         }
       };
 
