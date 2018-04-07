@@ -36,7 +36,7 @@ test('example query', done => {
   const args = {
     email: 'grace@example.com',
     orders_some: {
-      dateCreated: '2018-3-21',
+      dateCreated: '2018-03-21T00:00:00.000Z',
       orderItems_none: {
         product: {
           name_like: '%Lamb%',
@@ -130,6 +130,73 @@ test('many to many', done => {
     .then(rows => {
       expect(rows.length).toBe(1);
       expect(rows[0].name).toBe('Fruit');
+      done();
+    });
+});
+
+test('and', done => {
+  expect.assertions(2);
+
+  const db = helper.connectToDatabase(NAME);
+  const model = domain.model('user');
+  const args = { and: [{ name_like: '%Apple%' }, { price_lt: 6 }] };
+
+  db
+    .table('product')
+    .select('*', { where: args })
+    .then(rows => {
+      expect(rows.length).toBe(1);
+      expect(rows[0].name).toBe('Australian Apple');
+      done();
+    });
+});
+
+test('or', done => {
+  expect.assertions(1);
+
+  const db = helper.connectToDatabase(NAME);
+  const model = domain.model('user');
+  const args = {
+    or: [
+      { name_like: '%Apple%' },
+      {
+        productCategories_some: { category: { name: 'Banana' } }
+      }
+    ]
+  };
+  db
+    .table('product')
+    .select('*', { where: args })
+    .then(rows => {
+      expect(rows.length).toBe(4);
+      done();
+    });
+});
+
+test('not', done => {
+  expect.assertions(1);
+
+  const db = helper.connectToDatabase(NAME);
+  const model = domain.model('user');
+  const args = {
+    and: [
+      { name_like: '%Australian%' },
+      {
+        not: [
+          { name_like: '%Apple%' },
+          {
+            productCategories_some: { category: { name: 'Banana' } }
+          }
+        ]
+      }
+    ]
+  };
+
+  db
+    .table('product')
+    .select('*', { where: args })
+    .then(rows => {
+      expect(rows.length).toBe(2);
       done();
     });
 });
