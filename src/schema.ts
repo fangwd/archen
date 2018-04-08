@@ -327,9 +327,8 @@ export class SchemaBuilder {
                 args.where = args.where || {};
                 const name = relatedField.throughField.relatedField.name;
                 if (relatedField.throughField.relatedField.throughField) {
-                  const keyField = relatedField.throughField.relatedField.throughField.referencedField.model.keyField();
                   args.where[name] = {
-                    [keyField.name]: obj[keyField.name]
+                    [model.keyField().name]: obj[model.keyField().name]
                   };
                   return req.accessor.query(
                     relatedField.throughField.referencedField.model,
