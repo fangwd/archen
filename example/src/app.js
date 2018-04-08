@@ -12,8 +12,28 @@ const mysql = engine.createConnection('mysql', {
   connectionLimit: 10
 });
 
+const options = {
+  models: [
+    {
+      table: 'product_category',
+      fields: [
+        {
+          column: 'category_id',
+          throughField: 'product_id'
+        },
+        {
+          column: 'product_id',
+          throughField: 'category_id',
+          relatedName: 'categorySet'
+        }
+      ]
+    }
+  ]
+};
+
 const archen = new (require('../../dist')).Archen(
-  fs.readFileSync('example/data/schema.json')
+  fs.readFileSync('example/data/schema.json'),
+  options
 );
 
 const app = express();
