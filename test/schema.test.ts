@@ -3,7 +3,7 @@ import * as helper from './helper';
 
 import { createSchema } from '../src/schema';
 import { Accessor } from '../src/accessor';
-import { Schema } from '../src/model';
+import { Schema, SchemaConfig } from '../src/model';
 import { Database } from '../src/database';
 
 const NAME = 'schema';
@@ -381,8 +381,90 @@ mutation {
   });
 });
 
-function createArchen() {
-  const domain = new Schema(data);
+test('many to many #1', done => {
+  expect.assertions(1);
+
+  const DATA = `
+{
+  products {
+    name
+    categorySet(where: { name: "Apple" }) {
+      id
+      name
+     }
+  }
+}
+`;
+
+  const CONFIG = {
+    models: [
+      {
+        table: 'product_category',
+        fields: [
+          {
+            column: 'product_id',
+            throughField: 'category_id',
+            relatedName: 'categorySet'
+          }
+        ]
+      }
+    ]
+  };
+
+  const archen = createArchen(CONFIG);
+
+  graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+    const products = result.data.products.filter(p => p.categorySet.length > 0);
+    expect(products.length).toBe(2);
+    done();
+  });
+});
+
+test('many to many #2', done => {
+  expect.assertions(1);
+
+  const DATA = `
+{
+  products {
+    name
+    categorySet(where: { name: "Apple" }) {
+      id
+      name
+     }
+  }
+}
+`;
+
+  const CONFIG = {
+    models: [
+      {
+        table: 'product_category',
+        fields: [
+          {
+            column: 'category_id',
+            throughField: 'product_id'
+          },
+          {
+            column: 'product_id',
+            throughField: 'category_id',
+            relatedName: 'categorySet'
+          }
+        ]
+      }
+    ]
+  };
+
+  const archen = createArchen(CONFIG);
+
+  graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+    const products = result.data.products.filter(p => p.categorySet.length > 0);
+    expect(products.length).toBe(2);
+    done();
+  });
+});
+
+function createArchen(config?: SchemaConfig) {
+  const domain = new Schema(data, config);
   const db = helper.connectToDatabase(NAME);
   const accessor = new Accessor(domain, db);
   const schema = createSchema(domain);

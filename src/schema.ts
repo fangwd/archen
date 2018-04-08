@@ -295,10 +295,10 @@ export class SchemaBuilder {
     }
 
     for (const model of this.domain.models) {
-      const modelDataFields = modelFieldsMap[model.name];
+      const modelFields = modelFieldsMap[model.name];
       for (const field of model.fields) {
         if (field instanceof ForeignKeyField) {
-          modelDataFields[field.name] = {
+          modelFields[field.name] = {
             type: modelTypeMap[field.referencedField.model.name],
             resolve(obj, args, req) {
               const key = field.referencedField.model.keyField().name;
@@ -309,29 +309,64 @@ export class SchemaBuilder {
             }
           };
         } else if (field instanceof SimpleField) {
-          modelDataFields[field.name] = {
+          modelFields[field.name] = {
             type: getType(field.column.type)
           };
-        } else {
-          const modelDataTypeEx = modelTypeMapEx[model.name][field.name];
-          const related = (field as RelatedField).referencingField;
-          const type = related.isUnique()
-            ? modelDataTypeEx
-            : new GraphQLList(modelDataTypeEx);
-          modelDataFields[field.name] = {
-            type: type,
-            args: {
-              where: { type: filterInputTypeMapEx[model.name][field.name] },
-              ...QueryOptions
-            },
-            resolve(object, args, context) {
-              args.where = args.where || {};
-              args.where[related.name] = object[related.referencedField.name];
-              return context.accessor
-                .query(related.model, args)
-                .then(rows => (related.isUnique() ? rows[0] : rows));
-            }
-          };
+        } else if (field instanceof RelatedField) {
+          // TODO: Needs loaders -> move to accessor
+          const relatedField = field as RelatedField;
+          if (relatedField.throughField) {
+            const referenced = relatedField.throughField.referencedField;
+            modelFields[field.name] = {
+              type: new GraphQLList(modelTypeMap[referenced.model.name]),
+              args: {
+                where: { type: this.filterInputTypeMap[referenced.model.name] },
+                ...QueryOptions
+              },
+              resolve(obj, args, req) {
+                args.where = args.where || {};
+                const name = relatedField.throughField.relatedField.name;
+                if (relatedField.throughField.relatedField.throughField) {
+                  const keyField = relatedField.throughField.relatedField.throughField.referencedField.model.keyField();
+                  args.where[name] = {
+                    [keyField.name]: obj[keyField.name]
+                  };
+                  return req.accessor.query(
+                    relatedField.throughField.referencedField.model,
+                    args
+                  );
+                } else {
+                  args.where[name] = {
+                    [field.referencingField.name]: obj[model.keyField().name]
+                  };
+                  return req.accessor.query(
+                    relatedField.throughField.referencedField.model,
+                    args
+                  );
+                }
+              }
+            };
+          } else {
+            const modelTypeEx = modelTypeMapEx[model.name][field.name];
+            const related = relatedField.referencingField;
+            const type = related.isUnique()
+              ? modelTypeEx
+              : new GraphQLList(modelTypeEx);
+            modelFields[field.name] = {
+              type: type,
+              args: {
+                where: { type: filterInputTypeMapEx[model.name][field.name] },
+                ...QueryOptions
+              },
+              resolve(object, args, context) {
+                args.where = args.where || {};
+                args.where[related.name] = object[related.referencedField.name];
+                return context.accessor
+                  .query(related.model, args)
+                  .then(rows => (related.isUnique() ? rows[0] : rows));
+              }
+            };
+          }
         }
       }
     }
@@ -339,12 +374,17 @@ export class SchemaBuilder {
     for (const model of this.domain.models) {
       for (const field of model.fields) {
         if (field instanceof RelatedField) {
-          modelFieldsMapEx[model.name][field.name] = {};
-          const related = (field as RelatedField).referencingField;
-          for (const name in modelFieldsMap[related.model.name]) {
-            if (name !== related.name) {
-              modelFieldsMapEx[model.name][field.name][name] =
-                modelFieldsMap[related.model.name][name];
+          if (field.throughField) {
+            modelFieldsMapEx[model.name][field.name] =
+              modelFieldsMap[field.throughField.referencedField.model.name];
+          } else {
+            modelFieldsMapEx[model.name][field.name] = {};
+            const related = field.referencingField;
+            for (const name in modelFieldsMap[related.model.name]) {
+              if (name !== related.name) {
+                modelFieldsMapEx[model.name][field.name][name] =
+                  modelFieldsMap[related.model.name][name];
+              }
             }
           }
         }
@@ -381,9 +421,10 @@ export class SchemaBuilder {
       const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
       queryFields[name] = {
         type: this.modelTypeMap[model.name],
-        args: { where: { type: this.inputTypesConnect[model.name] } },
+        // ALWAYS_WHERE: args: { where: { type: this.inputTypesConnect[model.name] } },
+        args: this.inputTypesConnect[model.name].getFields(),
         resolve(_, args, context: QueryContext) {
-          return context.accessor.get(model, args.where);
+          return context.accessor.get(model, args); // ALWAYS_WHERE: args.where
         }
       };
     }
