@@ -360,6 +360,10 @@ export class RelatedField extends Field {
 
   // Example: UserOrder, CategoryCategoryAncestor
   getPascalName(plural?: boolean) {
+    if (this.throughField) {
+      const model = this.throughField.referencedField.model;
+      return `${this.model.name}${pluralise(model.name)}`;
+    }
     const model = this.referencingField.model;
     if (model.getForeignKeyCount(this.model) === 1) {
       return `${this.model.name}${plural ? pluralise(model.name) : model.name}`;
