@@ -177,7 +177,10 @@ export class Table {
     if (value === null) {
       return 'null';
     }
-    return this.db.engine.escape(_toSnake(value, field as SimpleField) + '');
+    if (typeof field === 'string') {
+      field = this.model.field(field) as SimpleField;
+    }
+    return this.db.engine.escape(_toSnake(value, field) + '');
   }
 
   get(key: Value | Filter): Promise<Document> {
