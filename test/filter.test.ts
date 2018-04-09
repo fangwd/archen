@@ -1,5 +1,6 @@
 import { Schema } from '../src/model';
 import { encodeFilter, splitKey } from '../src/filter';
+import { DefaultEscape } from '../src/misc';
 
 import helper = require('./helper');
 
@@ -70,7 +71,7 @@ test('foreign key column filter', () => {
       id: [1, 2, 3]
     }
   };
-  const condition = encodeFilter(args, model);
+  const condition = encodeFilter(args, model, DefaultEscape);
   expect(condition.indexOf('`product_id` in (1, 2, 3)')).not.toBe(-1);
   expect(condition.indexOf('`user_id` > 2')).not.toBe(-1);
 });
