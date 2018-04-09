@@ -133,28 +133,34 @@ export class Accessor {
 
       const multiColumnOrderWhere = (index, orders) => {
         const level = orders[index];
-        const levelOp = level.direction === 'ASC' ? 'gt' : 'lt';
+        const levelOp = level.direction === 'ASC' ? 'g' : 'l';
         const nextLevel = orders[index + 1];
-        const nextLevelOp = nextLevel.direction === 'ASC' ? 'gt' : 'lt';
+        const nextLevelOp = nextLevel.direction === 'ASC' ? 'g' : 'l';
 
         if (index + 2 === orders.length) {
           return {
-            [`${level.field.name}_${levelOp}e`]: values[level.field.name],
-            and: {
-              [`${level.field.name}_${levelOp}`]: values[level.field.name],
-              or: {
-                [`${nextLevel.field.name}_${nextLevelOp}`]: values[nextLevel.field.name]
-              }
-            }
+            and: [{
+              [`${level.field.name}_${levelOp}e`]: values[level.field.name]
+            }, {
+              or: [{
+                [`${level.field.name}_${levelOp}t`]: values[level.field.name]
+              }, {
+                [`${nextLevel.field.name}_${nextLevelOp}t`]: values[nextLevel.field.name]
+              }]
+            }]
           }
         }
 
         return {
-          [`${level.field.name}_${levelOp}e`]: values[level.field.name],
-          and: {
-            [`${level.field.name}_${levelOp}`]: values[level.field.name],
-            or: multiColumnOrderWhere(index + 1, orderBy)
-          }
+          and: [{
+            [`${level.field.name}_${levelOp}e`]: values[level.field.name]
+          }, {
+            or: [{
+              [`${level.field.name}_${levelOp}t`]: values[level.field.name]
+            }, 
+              multiColumnOrderWhere(index + 1, orders) 
+            ]
+          }]
         }
       }
 
