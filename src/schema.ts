@@ -99,7 +99,7 @@ export class SchemaBuilder {
   private inputTypesConnect: InputTypeMap = {};
   private inputFieldsConnectMap: InputFieldsMap = {};
 
-  constructor(domain: Schema) {
+  constructor(domain: Schema | any) {
     this.domain = domain;
 
     this.createFilterInputTypes();
