@@ -1,7 +1,14 @@
 import DataLoader = require('dataloader');
 
 import { Schema, Model, SimpleField, ForeignKeyField, Field } from './model';
-import { Database, Value, Document, rowsToCamel, Filter, SelectOptions } from './database';
+import {
+  Database,
+  Value,
+  Document,
+  rowsToCamel,
+  Filter,
+  SelectOptions
+} from './database';
 import { Row, Connection } from './engine';
 import { encodeFilter } from './filter';
 import { atob, btoa } from './misc';
@@ -18,10 +25,10 @@ interface FieldLoaderMap {
 }
 
 interface ConnectionSelectOptions {
-  orderBy?: [string],
-  after?: string,
-  first?: number,
-  where?: Filter
+  orderBy?: [string];
+  after?: string;
+  first?: number;
+  where?: Filter;
 }
 
 export class Accessor {
@@ -79,13 +86,13 @@ export class Accessor {
     }
 
     if (args.orderBy !== undefined) {
-      const orderBy = args.orderBy.map((order) => {
+      const orderBy = args.orderBy.map(order => {
         const [fieldName, direction] = order.split(' ');
         const field = model.field(fieldName);
 
         if (field instanceof SimpleField || field instanceof ForeignKeyField) {
           const dbName = field.column.name;
-          return `${dbName} ${direction}`;
+          return `${dbName} ${direction || 'ASC'}`;
         }
 
         throw new Error(`Invalid sort column ${fieldName}`);
@@ -114,11 +121,14 @@ export class Accessor {
 
   cursorQuery(model: Model, args: ConnectionSelectOptions) {
     let limit = 50;
-    let where = {}
-    let orderBy = model.primaryKey.fields.map(field => ({ field: field as Field, direction: 'ASC' }));
+    let where = {};
+    let orderBy = model.primaryKey.fields.map(field => ({
+      field: field as Field,
+      direction: 'ASC'
+    }));
 
     if (args.orderBy) {
-      const argOrderBy = args.orderBy.map((order) => {
+      const argOrderBy = args.orderBy.map(order => {
         const [fieldName, direction] = order.split(' ');
         const field = model.field(fieldName);
 
@@ -139,30 +149,44 @@ export class Accessor {
 
         if (index + 2 === orders.length) {
           return {
-            and: [{
-              [`${level.field.name}_${levelOp}e`]: values[level.field.name]
-            }, {
-              or: [{
-                [`${level.field.name}_${levelOp}t`]: values[level.field.name]
-              }, {
-                [`${nextLevel.field.name}_${nextLevelOp}t`]: values[nextLevel.field.name]
-              }]
-            }]
-          }
+            and: [
+              {
+                [`${level.field.name}_${levelOp}e`]: values[level.field.name]
+              },
+              {
+                or: [
+                  {
+                    [`${level.field.name}_${levelOp}t`]: values[
+                      level.field.name
+                    ]
+                  },
+                  {
+                    [`${nextLevel.field.name}_${nextLevelOp}t`]: values[
+                      nextLevel.field.name
+                    ]
+                  }
+                ]
+              }
+            ]
+          };
         }
 
         return {
-          and: [{
-            [`${level.field.name}_${levelOp}e`]: values[level.field.name]
-          }, {
-            or: [{
-              [`${level.field.name}_${levelOp}t`]: values[level.field.name]
-            }, 
-              multiColumnOrderWhere(index + 1, orders) 
-            ]
-          }]
-        }
-      }
+          and: [
+            {
+              [`${level.field.name}_${levelOp}e`]: values[level.field.name]
+            },
+            {
+              or: [
+                {
+                  [`${level.field.name}_${levelOp}t`]: values[level.field.name]
+                },
+                multiColumnOrderWhere(index + 1, orders)
+              ]
+            }
+          ]
+        };
+      };
 
       where = multiColumnOrderWhere(0, orderBy);
     }
@@ -175,28 +199,32 @@ export class Accessor {
       limit = args.first;
     }
 
-    const orderByArgs = orderBy.map(order => `${order.field.name} ${order.direction}`);
+    const orderByArgs = orderBy.map(
+      order => `${order.field.name} ${order.direction}`
+    );
 
-    return this.query(model, { where, orderBy: orderByArgs, limit }).then((rows) => {
-      const edges = rows.map(row => ({
-        node: row,
-        cursor: btoa(row, orderBy)
-      }));
+    return this.query(model, { where, orderBy: orderByArgs, limit }).then(
+      rows => {
+        const edges = rows.map(row => ({
+          node: row,
+          cursor: btoa(row, orderBy)
+        }));
 
-      const firstEdge = edges[0];
-      const lastEdge = edges.slice(-1)[0];
+        const firstEdge = edges[0];
+        const lastEdge = edges.slice(-1)[0];
 
-      const pageInfo = {
-        startCursor: firstEdge ? firstEdge.cursor : null,
-        endCursor: lastEdge ? lastEdge.cursor : null,
-        hasNextPage: edges.length === limit + 1,
+        const pageInfo = {
+          startCursor: firstEdge ? firstEdge.cursor : null,
+          endCursor: lastEdge ? lastEdge.cursor : null,
+          hasNextPage: edges.length === limit + 1
+        };
+
+        return {
+          edges: edges.length > limit ? edges.slice(0, -1) : edges,
+          pageInfo
+        };
       }
-
-      return {
-        edges: edges.length > limit ? edges.slice(0, -1) : edges,
-        pageInfo,
-      };
-    });
+    );
   }
 
   get(model: Model, args: Document) {

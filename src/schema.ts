@@ -420,10 +420,10 @@ export class SchemaBuilder {
       const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
       queryFields[name] = {
         type: this.modelTypeMap[model.name],
-        // ALWAYS_WHERE: args: { where: { type: this.inputTypesConnect[model.name] } },
-        args: this.inputTypesConnect[model.name].getFields(),
+        args: { where: { type: this.inputTypesConnect[model.name] } },
+        // args: this.inputTypesConnect[model.name].getFields(),
         resolve(_, args, context: QueryContext) {
-          return context.accessor.get(model, args); // ALWAYS_WHERE: args.where
+          return context.accessor.get(model, args.where); // ALWAYS_WHERE: args.where
         }
       };
     }

@@ -12,6 +12,7 @@ class MySQL implements Connection {
   }
 
   query(sql: string): Promise<any[] | void> {
+    console.log('--', sql);
     return new Promise((resolve, reject) => {
       this.connection.query(sql, (error, results, fields) => {
         if (error) return reject(error);
