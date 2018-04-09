@@ -95,3 +95,8 @@ function convertStringToType(string, type) {
 export function toArray(args): Array<any> {
   return Array.isArray(args) ? args : [args];
 }
+
+export const DefaultEscape = {
+  escapeId: s => '`' + s + '`',
+  escape: s => "'" + (s + '').replace(/'/g, "\\'") + "'"
+};

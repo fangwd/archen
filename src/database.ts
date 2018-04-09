@@ -69,7 +69,7 @@ export class Table {
   }
 
   private _where(filter: Filter) {
-    return encodeFilter(filter, this.model);
+    return encodeFilter(filter, this.model, this.db.engine);
   }
 
   private _pair(name: string | SimpleField, value: Value): string {
