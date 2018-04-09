@@ -1,10 +1,10 @@
 import { Accessor } from './accessor';
-import { Connection } from './engine';
+import { Connection, createConnection } from './engine';
 import { GraphQLSchema } from 'graphql';
 import { Schema, SchemaConfig } from './model';
 import { SchemaBuilder } from './schema';
 
-export class Archen {
+export class Instance {
   domain: Schema;
   schema: GraphQLSchema;
 
@@ -31,3 +31,5 @@ export class Archen {
     };
   }
 }
+
+export { createConnection };

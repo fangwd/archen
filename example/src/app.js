@@ -1,9 +1,9 @@
 const express = require('express');
 const graphqlHTTP = require('express-graphql');
 const fs = require('fs');
-const engine = require('../../dist/engine');
+const archen = require('../../dist');
 
-const mysql = engine.createConnection('mysql', {
+const mysql = archen.createConnection('mysql', {
   host: 'localhost',
   user: 'root',
   password: 'secret',
@@ -31,7 +31,7 @@ const options = {
   ]
 };
 
-const archen = new (require('../../dist')).Archen(
+const inst = new archen.Instance(
   fs.readFileSync('example/data/schema.json'),
   options
 );
@@ -43,8 +43,8 @@ app.get('/', (req, res) => res.send('Hello World!'));
 app.use(
   '/graphql',
   graphqlHTTP((request, response, params) => ({
-    schema: archen.getSchema(),
-    context: archen.getContext(mysql),
+    schema: inst.getSchema(),
+    context: inst.getContext(mysql),
     pretty: false,
     graphiql: true,
     formatError: error => ({
