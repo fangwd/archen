@@ -300,7 +300,7 @@ export class SchemaBuilder {
         if (field instanceof ForeignKeyField) {
           modelFields[field.name] = {
             type: modelTypeMap[field.referencedField.model.name],
-            resolve(obj, args, req) {
+            resolve(obj, args, req: QueryContext) {
               const key = field.referencedField.model.keyField().name;
               return req.accessor.load(
                 field.referencedField,
@@ -323,7 +323,7 @@ export class SchemaBuilder {
                 where: { type: this.filterInputTypeMap[referenced.model.name] },
                 ...QueryOptions
               },
-              resolve(obj, args, req) {
+              resolve(obj, args, req: QueryContext) {
                 args.where = args.where || {};
                 const name = relatedField.throughField.relatedField.name;
                 if (relatedField.throughField.relatedField.throughField) {
@@ -357,7 +357,7 @@ export class SchemaBuilder {
                 where: { type: filterInputTypeMapEx[model.name][field.name] },
                 ...QueryOptions
               },
-              resolve(object, args, context) {
+              resolve(object, args, context: QueryContext) {
                 args.where = args.where || {};
                 args.where[related.name] = object[related.referencedField.name];
                 return context.accessor
@@ -401,7 +401,7 @@ export class SchemaBuilder {
           where: { type: this.filterInputTypeMap[model.name] },
           ...QueryOptions
         },
-        resolve(_, args, context) {
+        resolve(_, args, context: QueryContext) {
           return context.accessor.query(model, args);
         }
       };
@@ -412,7 +412,7 @@ export class SchemaBuilder {
           where: { type: this.filterInputTypeMap[model.name] },
           ...ConnectionOptions
         },
-        resolve(_, args, context) {
+        resolve(_, args, context: QueryContext) {
           return context.accessor.cursorQuery(model, args);
         }
       };
@@ -654,7 +654,7 @@ export class SchemaBuilder {
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: { data: { type: inputTypesCreate[model.name] } },
-        resolve(_, args, context) {
+        resolve(_, args, context: QueryContext) {
           return context.accessor.create(model, args.data);
         }
       };
@@ -668,7 +668,7 @@ export class SchemaBuilder {
           where: { type: this.inputTypesConnect[model.name] },
           data: { type: inputTypesUpdate[model.name] }
         },
-        resolve(_, args, context) {
+        resolve(_, args, context: QueryContext) {
           return context.accessor.update(model, args.data, args.where);
         }
       };
@@ -679,7 +679,7 @@ export class SchemaBuilder {
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: inputTypesUpsert[model.name].getFields(),
-        resolve(_, args, context) {
+        resolve(_, args, context: QueryContext) {
           return context.accessor.upsert(model, args.create, args.update);
         }
       };
