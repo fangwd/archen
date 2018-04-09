@@ -543,7 +543,24 @@ export class SchemaBuilder {
             }
           });
 
+          const updateFields = new GraphQLInputObjectType({
+            name: getUpdateChildTypeName(field) + 'Fields',
+            fields() {
+              return getFieldsExclude(inputFieldsUpdate, field);
+            }
+          });
+
           const updateType = new GraphQLInputObjectType({
+            name: getUpdateChildTypeName(field),
+            fields() {
+              return {
+                data: { type: updateFields },
+                where: { type: connectType }
+              };
+            }
+          });
+
+          const updateTypeUnique = new GraphQLInputObjectType({
             name: getUpdateChildTypeName(field),
             fields() {
               return getFieldsExclude(inputFieldsUpdate, field);
@@ -555,7 +572,7 @@ export class SchemaBuilder {
             fields() {
               return {
                 create: { type: createType },
-                update: { type: updateType }
+                update: { type: updateFields }
               };
             }
           });
@@ -581,7 +598,7 @@ export class SchemaBuilder {
                     connect: { type: connectType },
                     create: { type: createType },
                     upsert: { type: upsertType },
-                    update: { type: updateType }
+                    update: { type: updateTypeUnique }
                   };
                 }
               })

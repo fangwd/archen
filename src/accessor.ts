@@ -11,7 +11,7 @@ import {
 } from './database';
 import { Row, Connection } from './engine';
 import { encodeFilter } from './filter';
-import { atob, btoa } from './misc';
+import { atob, btoa, toArray } from './misc';
 
 interface FieldLoader {
   field: SimpleField;
@@ -86,7 +86,7 @@ export class Accessor {
     }
 
     if (args.orderBy !== undefined) {
-      const orderBy = args.orderBy.map(order => {
+      const orderBy = toArray(args.orderBy).map(order => {
         const [fieldName, direction] = order.split(' ');
         const field = model.field(fieldName);
 
