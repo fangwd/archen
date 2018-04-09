@@ -524,6 +524,29 @@ mutation {
   });
 });
 
+test('update date', done => {
+  expect.assertions(1);
+
+  const date = '2019-04-06T16:17:27.000Z';
+
+  const DATA = `
+mutation {
+  updateOrder(where: {id: 1}, data: {dateCreated: "${date}"}) {
+    id
+    dateCreated
+  }
+}
+`;
+
+  const archen = createArchen();
+
+  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+    const order = row.data.updateOrder;
+    expect(order.dateCreated).toBe(date);
+    done();
+  });
+});
+
 function createArchen(config?: SchemaConfig) {
   const domain = new Schema(data, config);
   const db = helper.connectToDatabase(NAME);
