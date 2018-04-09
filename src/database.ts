@@ -177,7 +177,7 @@ export class Table {
     if (value === null) {
       return 'null';
     }
-    return this.db.engine.escape(value + '');
+    return this.db.engine.escape(_toSnake(value, field as SimpleField) + '');
   }
 
   get(key: Value | Filter): Promise<Document> {
@@ -548,6 +548,7 @@ export class Table {
     });
   }
 }
+
 function _toCamel(value: Value, field: SimpleField): Value {
   if (/date|time/i.test(field.column.type)) {
     return new Date(value as string).toISOString();
