@@ -463,6 +463,67 @@ test('many to many #2', done => {
   });
 });
 
+test('update child', done => {
+  expect.assertions(2);
+
+  const code = 'test-009';
+
+  const DATA = `
+mutation {
+  updateOrder(where: {
+    code: "${code}"
+  },
+  data: {
+    orderItems: {
+      update: [
+        {
+          data: { quantity: 200 },
+          where: { product: { id: 1 } }
+        }
+      ]
+    }
+  }) {
+    code
+    orderItems {
+      product {
+        id
+      }
+      quantity
+    }
+  }
+}
+`;
+
+  const archen = createArchen();
+
+  function _createItems(): Promise<any> {
+    return archen.db
+      .table('order')
+      .insert({ code })
+      .then(order => {
+        return archen.db
+          .table('order_item')
+          .insert({ order, product: 1, quantity: 10 })
+          .then(() => {
+            archen.db
+              .table('order_item')
+              .insert({ order, product: 2, quantity: 20 });
+          });
+      });
+  }
+
+  _createItems().then(result => {
+    graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+      const order = result.data.updateOrder;
+      const p1 = order.orderItems.find(x => x.product.id === 1);
+      expect(p1.quantity).toBe(200);
+      const p2 = order.orderItems.find(x => x.product.id === 2);
+      expect(p2.quantity).toBe(20);
+      done();
+    });
+  });
+});
+
 function createArchen(config?: SchemaConfig) {
   const domain = new Schema(data, config);
   const db = helper.connectToDatabase(NAME);
