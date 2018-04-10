@@ -16,7 +16,7 @@ import {
 } from './model';
 
 import { Connection, Row } from './engine';
-import { encodeFilter } from './filter';
+import { encodeFilter, QueryBuilder } from './filter';
 import { toArray } from './misc';
 
 export class Database {
@@ -52,7 +52,7 @@ export interface SelectOptions {
   where?: Filter;
   offset?: number;
   limit?: number;
-  orderBy?: string[];
+  orderBy?: string | string[];
 }
 
 export class Table {
@@ -79,19 +79,14 @@ export class Table {
     return this.escapeName(name) + '=' + this.escapeValue(name, value);
   }
 
-  select(
-    fields: string | string[],
-    options?: SelectOptions
-  ): Promise<Document[]> {
-    if (Array.isArray(fields)) {
-      fields = fields.map(name => this.escapeName(name));
-    } else {
-      fields = [this.escapeName(fields)];
-    }
-
-    let sql = `select ${fields.join(', ')} from ${this._name()}`;
+  select(fields: string, options?: SelectOptions): Promise<Document[]> {
+    const sql = new QueryBuilder(this.model, this.db.engine).select(
+      fields,
+      options
+    );
 
     if (options) {
+      /*
       if (options.where) {
         sql += ` where ${this._where(options.where)}`;
       }
@@ -105,6 +100,7 @@ export class Table {
       if (options.offset !== undefined) {
         sql += ` offset ${options.offset}`;
       }
+      */
     }
 
     return new Promise<Document[]>(resolve => {

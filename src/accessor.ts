@@ -10,7 +10,7 @@ import {
   SelectOptions
 } from './database';
 import { Row, Connection } from './engine';
-import { encodeFilter } from './filter';
+import { encodeFilter, QueryBuilder } from './filter';
 import { atob, btoa, toArray } from './misc';
 
 interface FieldLoader {
@@ -78,34 +78,8 @@ export class Accessor {
 
   // args: { where, limit, offset, orderBy }
   query(model: Model, args: SelectOptions) {
-    let sql = `select * from ${this.db.engine.escapeId(model.table.name)}`;
-
-    const where = encodeFilter(args.where as Filter, model, this.db.engine);
-    if (where.length > 0) {
-      sql += ` where ${where}`;
-    }
-
-    if (args.orderBy !== undefined) {
-      const orderBy = toArray(args.orderBy).map(order => {
-        const [fieldName, direction] = order.split(' ');
-        const field = model.field(fieldName);
-
-        if (field instanceof SimpleField || field instanceof ForeignKeyField) {
-          const dbName = field.column.name;
-          return `${dbName} ${direction || 'ASC'}`;
-        }
-
-        throw new Error(`Invalid sort column ${fieldName}`);
-      });
-
-      sql += ` order by ${orderBy.join(', ')}`;
-    }
-
-    sql += ` limit ${args.limit || 50}`;
-
-    if (args.offset !== undefined) {
-      sql += ` offset ${args.offset}`;
-    }
+    const builder = new QueryBuilder(model, this.db.engine);
+    const sql = builder.select('*', args);
 
     const loaders = this.loaders[model.name];
     return this.queryLoader.load(sql).then(rows => {

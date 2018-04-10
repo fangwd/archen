@@ -100,3 +100,5 @@ export const DefaultEscape = {
   escapeId: s => '`' + s + '`',
   escape: s => "'" + (s + '').replace(/'/g, "\\'") + "'"
 };
+
+export const DEFAULT_LIMIT = 50;
