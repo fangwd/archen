@@ -1,5 +1,5 @@
 import { Schema } from '../src/model';
-import { encodeFilter, splitKey } from '../src/filter';
+import { encodeFilter, QueryBuilder, splitKey } from '../src/filter';
 import { DefaultEscape } from '../src/misc';
 
 import helper = require('./helper');
@@ -200,4 +200,16 @@ test('not', done => {
       expect(rows.length).toBe(2);
       done();
     });
+});
+
+test('order by', () => {
+  const model = domain.model('OrderItem');
+  const args = {
+    where: { quantity_gt: 1 },
+    orderBy: ['order.code desc', 'order.user.email', 'quantity']
+  };
+  const builder = new QueryBuilder(model, DefaultEscape);
+  const sql = builder.select('*', args.where, args.orderBy)
+  expect(/t\d\.`email`\s+ASC/i.test(sql)).toBe(true);
+  expect(/t\d\.`code`\s+DESC/i.test(sql)).toBe(true);
 });

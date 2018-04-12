@@ -1,4 +1,4 @@
-import { Filter, Value, _toSnake, SelectOptions } from './database';
+import { Filter, OrderBy, Value, _toSnake, SelectOptions } from './database';
 import {
   Model,
   Field,
@@ -10,9 +10,15 @@ import {
 import { Escape } from './engine';
 import { toArray, DEFAULT_LIMIT } from './misc';
 
+interface AliasEntry {
+  name: string;
+  model: Model;
+}
+
 class Context {
   private counter: number;
-  private aliasMap: { [key: string]: string } = {};
+
+  aliasMap: { [key: string]: AliasEntry } = {};
 
   constructor() {
     this.counter = 0;
@@ -20,13 +26,16 @@ class Context {
 
   getAlias(builder: QueryBuilder): string {
     const model = builder.model;
+    const field = builder.field;
     const names: string[] = [];
     while (builder.parent) {
       names.unshift(builder.field.name);
       builder = builder.parent;
     }
     const alias = 't' + this.counter++;
-    this.aliasMap[names.join('.')] = alias;
+    if (field instanceof ForeignKeyField) {
+      this.aliasMap[names.join('.')] = { name: alias, model: model };
+    }
     return alias;
   }
 }
@@ -39,6 +48,16 @@ export class QueryBuilder {
   dialect: Escape;
   context?: Context;
   alias?: string;
+
+  froms?: string[];
+
+  getFroms() {
+    let builder: QueryBuilder = this;
+    while (builder && builder.field instanceof ForeignKeyField) {
+      builder = builder.parent;
+    }
+    return builder.froms;
+  }
 
   // (model, dialect), or (parent, field)
   constructor(model: Model | QueryBuilder, dialect: Escape | Field) {
@@ -63,15 +82,15 @@ export class QueryBuilder {
   where(args: Filter): string {
     if (!args) return '';
     if (Array.isArray(args)) {
-      return args.length ? this.or(args) : '';
+      return this.or(args);
     } else {
-      return Object.keys(args).length ? this.and(args as Filter) : '';
+      return this.and(args as Filter);
     }
   }
 
   private or(args: Filter[]): string {
     const exprs = args.map(arg => this.and(arg));
-    return `(${exprs.join(' or ')})`;
+    return exprs.length === 0 ? '' : `(${exprs.join(' or ')})`;
   }
 
   private and(args: Filter): string {
@@ -99,7 +118,9 @@ export class QueryBuilder {
             if (expr.length > 0) expr += ' or ';
             expr += this._join(field, filter);
           }
-          exprs.push(`(${expr})`);
+          if (expr.length > 0) {
+            exprs.push(`(${expr})`);
+          }
         } else {
           const keys = Object.keys(query);
           if (keys.length === 1) {
@@ -109,7 +130,10 @@ export class QueryBuilder {
               continue;
             }
           }
-          exprs.push(this._join(field, query));
+          const expr = this._join(field, query);
+          if (expr.length > 0) {
+            exprs.push(`(${expr})`);
+          }
         }
       } else if (field instanceof SimpleField) {
         exprs.push(this.expr(field, operator, value));
@@ -144,7 +168,7 @@ export class QueryBuilder {
         throw Error(`Bad field: ${this.model.name}.${name}`);
       }
     }
-    return `(${exprs.join(' and ')})`;
+    return exprs.length === 0 ? '' : `(${exprs.join(' and ')})`;
   }
 
   private expr(field: SimpleField, operator: string, value: Value | Value[]) {
@@ -178,24 +202,35 @@ export class QueryBuilder {
     return `${lhs} ${operator} ${this.escape(field, value)}`;
   }
 
-  froms?: string[];
-
-  addFrom(item: string) {
-    this.getFroms().push(item);
-  }
-
-  getFroms() {
-    let builder: QueryBuilder = this;
-    while (builder && builder.field instanceof ForeignKeyField) {
-      builder = builder.parent;
+  _extendFilter(filter: Filter, orderBy: OrderBy): Filter {
+    for (const entry of toArray(orderBy)) {
+      const fields = entry.split('.');
+      let result = filter;
+      let model = this.model;
+      for (let i = 0; i < fields.length - 1; i++) {
+        const name = fields[i];
+        if (!result[name]) {
+          result[name] = {};
+        }
+        const field = model.field(name);
+        if (!(field instanceof ForeignKeyField)) {
+          throw Error(`Not a foreign key: ${entry}`);
+        }
+        result = result[name];
+        model = field.referencedField.model;
+      }
     }
-    return builder.froms;
+    return filter;
   }
 
-  select(name: string, args: SelectOptions = {}): string {
-    this.froms =[ `${this.escapeId(this.model.table.name)} ${this.alias || ''}` ]
+  select(name: string, filter?: Filter, orderBy?: OrderBy): string {
+    this.froms = [`${this.escapeId(this.model)} ${this.alias || ''}`];
 
-    const where = this.where(args.where).trim();
+    if (orderBy) {
+      filter = this._extendFilter(filter || {}, orderBy);
+    }
+
+    const where = this.where(filter).trim();
 
     let sql = `select ${this.encodeField(name)} from ${this.froms.join(
       ' join '
@@ -205,28 +240,33 @@ export class QueryBuilder {
       sql += ` where ${where}`;
     }
 
-    if (args.orderBy !== undefined) {
-      const orderBy = toArray(args.orderBy).map(order => {
-        const [fieldName, direction] = order.split(' ');
-        const field = this.model.field(fieldName);
+    if (orderBy) {
+      const aliasMap = this.context.aliasMap;
+
+      orderBy = toArray(orderBy).map(order => {
+        let [path, direction] = order.split(' ');
+        let alias: string, field: Field;
+
+        const match = /^(.+)\.([^\.]+)/.exec(path);
+
+        if (match) {
+          const entry = aliasMap[match[1]];
+          alias = entry.name;
+          field = entry.model.field(match[2]);
+        } else {
+          alias = this.alias || this.model.table.name;
+          field = this.model.field(path);
+        }
+        direction = /^desc$/i.test(direction || '') ? 'DESC' : 'ASC';
 
         if (field instanceof SimpleField || field instanceof ForeignKeyField) {
-          const dbName = field.column.name;
-          return `${dbName} ${direction || 'ASC'}`;
+          return `${alias}.${this.escapeId(field)} ${direction}`;
         }
 
-        throw new Error(`Invalid sort column ${fieldName}`);
+        throw new Error(`Invalid sort column: ${path}`);
       });
 
       sql += ` order by ${orderBy.join(', ')}`;
-    }
-
-    if (args.limit !== undefined) {
-      sql += ` limit ${parseInt(args.limit + '')}`;
-    }
-
-    if (args.offset !== undefined) {
-      sql += ` offset ${parseInt(args.offset + '')}`;
     }
 
     return sql;
@@ -234,11 +274,6 @@ export class QueryBuilder {
 
   column(): string {
     return this.encodeField(this.model.keyField().column.name);
-  }
-
-  encodeTable() {
-    const name = this.escapeId(this.model.table.name);
-    return this.alias ? `${name} ${this.alias}` : name;
   }
 
   encodeField(name: string | SimpleField): string {
@@ -269,7 +304,7 @@ export class QueryBuilder {
     const lhs = this.encodeField(field);
     const rhs = builder.encodeField(model.keyField());
 
-    this.addFrom(`${name} on ${lhs}=${rhs}`);
+    this.getFroms().push(`${name} on ${lhs}=${rhs}`);
 
     return builder.where(args);
   }
@@ -282,7 +317,7 @@ export class QueryBuilder {
       return this.expr(field, null, args[keys[0]]);
     }
     const lhs = this.encodeField(field.column.name);
-    const rhs = builder.select(model.keyField().column.name, { where: args });
+    const rhs = builder.select(model.keyField().column.name, args);
     return `${lhs} in (${rhs})`;
   }
 
@@ -316,13 +351,15 @@ export class QueryBuilder {
         return value + '';
       }
     }
-    if (value instanceof QueryBuilder) {
-      return value.column();
-    }
     return this.dialect.escape(value + '');
   }
 
-  private escapeId(name: string): string {
+  private escapeId(name: string | SimpleField | Model): string {
+    if (name instanceof SimpleField) {
+      name = name.column.name;
+    } else if (name instanceof Model) {
+      name = name.table.name;
+    }
     return this.dialect.escapeId(name);
   }
 }

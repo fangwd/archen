@@ -48,11 +48,13 @@ export class Database {
   }
 }
 
+export type OrderBy = string | string[];
+
 export interface SelectOptions {
   where?: Filter;
   offset?: number;
   limit?: number;
-  orderBy?: string | string[];
+  orderBy?: OrderBy;
 }
 
 export class Table {
@@ -79,11 +81,21 @@ export class Table {
     return this.escapeName(name) + '=' + this.escapeValue(name, value);
   }
 
-  select(fields: string, options?: SelectOptions): Promise<Document[]> {
-    const sql = new QueryBuilder(this.model, this.db.engine).select(
+  select(fields: string, options: SelectOptions = {}): Promise<Document[]> {
+    let sql = new QueryBuilder(this.model, this.db.engine).select(
       fields,
-      options
+      options.where,
+      options.orderBy
     );
+
+    if (options.limit !== undefined) {
+      sql += ` limit ${parseInt(options.limit + '')}`;
+    }
+
+    if (options.offset !== undefined) {
+      sql += ` offset ${parseInt(options.offset + '')}`;
+    }
+
     return new Promise<Document[]>(resolve => {
       this.db.engine.query(sql).then(rows => {
         resolve(rows.map(row => toDocument(row, this.model)));

@@ -79,7 +79,7 @@ export class Accessor {
   // args: { where, limit, offset, orderBy }
   query(model: Model, args: SelectOptions) {
     const builder = new QueryBuilder(model, this.db.engine);
-    const sql = builder.select('*', args);
+    const sql = builder.select('*', args.where, args.orderBy);
 
     const loaders = this.loaders[model.name];
     return this.queryLoader.load(sql).then(rows => {

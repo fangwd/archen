@@ -547,6 +547,47 @@ mutation {
   });
 });
 
+test('order by', done => {
+  expect.assertions(1);
+
+  const archen = createArchen();
+
+  const DATA = `
+{
+  orderItems(
+      where: { quantity_gt: 1 },
+      orderBy: ["order.code desc", "order.user.email", "quantity"]
+  ) {
+    order {
+      code
+      user {
+        email
+      }
+    }
+    product {
+      name
+    }
+    quantity
+  }
+}
+`;
+
+  graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+    const orderItems = result.data.orderItems;
+    let ordered = true;
+    for (let i = 1; i < orderItems.length; i++) {
+      const code = orderItems[i].order.code;
+      const prev = orderItems[i - 1].order.code;
+      if (prev < code) {
+        ordered = false;
+        break;
+      }
+    }
+    expect(ordered).toBe(true);
+    done();
+  });
+});
+
 function createArchen(config?: SchemaConfig) {
   const domain = new Schema(data, config);
   const db = helper.connectToDatabase(NAME);
