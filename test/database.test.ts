@@ -611,7 +611,7 @@ test('many to many - delete', async done => {
   const categoryTable = db.table('category');
   const mappingTable = db.table('product_category');
 
-  const alian = await productTable.create({
+  let alien = await productTable.create({
     sku: `alien-${test}`,
     name: `Alien - ${test}`
   });
@@ -655,7 +655,7 @@ test('many to many - delete', async done => {
           {
             sku: `butter-${test}`
           },
-          alian.id
+          alien.id
         ]
       }
     }
@@ -665,7 +665,8 @@ test('many to many - delete', async done => {
 
   let butter = await productTable.get({ sku: `butter-${test}` });
   let cream = await productTable.get({ sku: `cream-${test}` });
-  let alien = await productTable.get({ sku: `alien-${test}` });
+
+  alien = await productTable.get({ sku: `alien-${test}` });
 
   expect(butter).toBe(undefined);
   expect(cream).toBe(undefined);
