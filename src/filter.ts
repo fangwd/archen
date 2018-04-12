@@ -6,25 +6,36 @@ import {
   ForeignKeyField,
   RelatedField
 } from './model';
+
 import { Escape } from './engine';
 import { toArray, DEFAULT_LIMIT } from './misc';
 
 class Context {
   private counter: number;
+  private aliasMap: { [key: string]: string } = {};
 
   constructor() {
-    this.counter = 1;
+    this.counter = 0;
   }
 
-  getAlias(): string {
-    return 't' + this.counter++;
+  getAlias(builder: QueryBuilder): string {
+    const model = builder.model;
+    const names: string[] = [];
+    while (builder.parent) {
+      names.unshift(builder.field.name);
+      builder = builder.parent;
+    }
+    const alias = 't' + this.counter++;
+    this.aliasMap[names.join('.')] = alias;
+    return alias;
   }
 }
 
 export class QueryBuilder {
   model: Model;
-  parent?: QueryBuilder;
   field?: Field;
+  parent?: QueryBuilder;
+
   dialect: Escape;
   context?: Context;
   alias?: string;
@@ -35,18 +46,17 @@ export class QueryBuilder {
       this.model = model;
       this.dialect = dialect as Escape;
       this.context = new Context();
-      this.alias = '';
     } else {
       this.parent = model;
       this.field = dialect as Field;
       this.dialect = this.parent.dialect;
       this.context = this.parent.context;
-      this.alias = this.context.getAlias();
-      if (this.field instanceof ForeignKeyField) {
-        this.model = this.field.referencedField.model;
-      } else if (this.field instanceof RelatedField) {
-        this.model = this.field.referencingField.model;
+      if (dialect instanceof ForeignKeyField) {
+        this.model = dialect.referencedField.model;
+      } else if (dialect instanceof RelatedField) {
+        this.model = dialect.referencingField.model;
       }
+      this.alias = this.context.getAlias(this);
     }
   }
 
@@ -87,11 +97,10 @@ export class QueryBuilder {
           let expr = values.length > 0 ? this.expr(field, 'in', values) : '';
           if (filter.length > 0) {
             if (expr.length > 0) expr += ' or ';
-            expr += this._in(field, filter);
+            expr += this._join(field, filter);
           }
           exprs.push(`(${expr})`);
         } else {
-          // TODO: Check if the following duplicates some logic in _in()
           const keys = Object.keys(query);
           if (keys.length === 1) {
             const [name, operator] = splitKey(keys[0] as string);
@@ -100,10 +109,10 @@ export class QueryBuilder {
               continue;
             }
           }
-          exprs.push(this._in(field, query));
+          exprs.push(this._join(field, query));
         }
       } else if (field instanceof SimpleField) {
-        exprs.push(this.expr(field, operator, _toSnake(value, field) as Value));
+        exprs.push(this.expr(field, operator, value));
       } else if (field instanceof RelatedField) {
         exprs.push(this.exists(field, operator, value as Filter));
       } else if (key === AND) {
@@ -139,7 +148,7 @@ export class QueryBuilder {
   }
 
   private expr(field: SimpleField, operator: string, value: Value | Value[]) {
-    const lhs = this._prefix(field.column.name);
+    const lhs = this.encodeField(field.column.name);
 
     if (Array.isArray(value)) {
       if (!operator || operator === 'in') {
@@ -169,18 +178,28 @@ export class QueryBuilder {
     return `${lhs} ${operator} ${this.escape(field, value)}`;
   }
 
-  select(name: string | number, args: SelectOptions = {}): string {
-    if (typeof name !== 'number' && name !== '*') {
-      name = this.escapeId(name);
-    }
+  froms?: string[];
 
-    let sql = `select ${name} from ${this.escapeId(this.model.table.name)}`;
+  addFrom(item: string) {
+    this.getFroms().push(item);
+  }
 
-    if (this.alias) {
-      sql += ` ${this.alias}`;
+  getFroms() {
+    let builder: QueryBuilder = this;
+    while (builder && builder.field instanceof ForeignKeyField) {
+      builder = builder.parent;
     }
+    return builder.froms;
+  }
+
+  select(name: string, args: SelectOptions = {}): string {
+    this.froms =[ `${this.escapeId(this.model.table.name)} ${this.alias || ''}` ]
 
     const where = this.where(args.where).trim();
+
+    let sql = `select ${this.encodeField(name)} from ${this.froms.join(
+      ' join '
+    )}`;
 
     if (where.length > 0) {
       sql += ` where ${where}`;
@@ -204,8 +223,6 @@ export class QueryBuilder {
 
     if (args.limit !== undefined) {
       sql += ` limit ${parseInt(args.limit + '')}`;
-    } else if (!this.parent) {
-      sql += ` limit ${DEFAULT_LIMIT}`;
     }
 
     if (args.offset !== undefined) {
@@ -216,24 +233,45 @@ export class QueryBuilder {
   }
 
   column(): string {
-    return this._prefix(this.model.keyField().column.name);
+    return this.encodeField(this.model.keyField().column.name);
   }
 
-  private _select(name: string | number): string {
-    return `select ${this._prefix(name)}`;
+  encodeTable() {
+    const name = this.escapeId(this.model.table.name);
+    return this.alias ? `${name} ${this.alias}` : name;
   }
 
-  private _prefix(name: string | number): string {
-    if (typeof name === 'number') {
-      return name + '';
+  encodeField(name: string | SimpleField): string {
+    if (name instanceof SimpleField) {
+      name = name.column.name;
     }
-    name = this.escapeId(name);
-    return `${this.alias || this.escapeId(this.model.table.name)}.${name}`;
+
+    if (name !== '*') {
+      name = this.escapeId(name);
+    }
+
+    const alias = this.alias || this.escapeId(this.model.table.name);
+
+    return `${alias}.${name}`;
   }
 
-  private _from(): string {
-    const from = `from ${this.escapeId(this.model.table.name)}`;
-    return this.alias ? `${from} ${this.alias}` : from;
+  private _join(field: ForeignKeyField, args: Filter) {
+    if (!this.getFroms()) return this._in(field, args);
+
+    const builder = new QueryBuilder(this, field);
+    const model = field.referencedField.model;
+    const keys = Object.keys(args);
+    if (keys.length === 1 && keys[0] === model.keyField().name) {
+      return this.expr(field, null, args[keys[0]]);
+    }
+
+    const name = `${this.escapeId(model.table.name)} ${builder.alias}`;
+    const lhs = this.encodeField(field);
+    const rhs = builder.encodeField(model.keyField());
+
+    this.addFrom(`${name} on ${lhs}=${rhs}`);
+
+    return builder.where(args);
   }
 
   private _in(field: ForeignKeyField, args: Filter) {
@@ -243,26 +281,26 @@ export class QueryBuilder {
     if (keys.length === 1 && keys[0] === model.keyField().name) {
       return this.expr(field, null, args[keys[0]]);
     }
-    const lhs = this._prefix(field.column.name);
+    const lhs = this.encodeField(field.column.name);
     const rhs = builder.select(model.keyField().column.name, { where: args });
     return `${lhs} in (${rhs})`;
   }
 
   private exists(field: RelatedField, operator: string, args: Filter) {
     const builder = new QueryBuilder(this, field);
-    const model = field.referencingField.model;
-    const scope =
-      builder.select(1) +
-      ' where ' +
-      builder._prefix(field.referencingField.column.name) +
-      '=' +
-      this._prefix(this.model.keyField().name);
-
-    const exists = operator === 'none' ? 'not exists' : 'exists';
 
     const where = field.throughField
       ? builder._in(field.throughField, args)
       : builder.where(args);
+
+    const scope =
+      builder.select('*') +
+      ' where ' +
+      builder.encodeField(field.referencingField.column.name) +
+      '=' +
+      this.encodeField(this.model.keyField().name);
+
+    const exists = operator === 'none' ? 'not exists' : 'exists';
 
     return where.length > 0
       ? `${exists} (${scope} and ${where})`
