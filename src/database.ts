@@ -84,25 +84,6 @@ export class Table {
       fields,
       options
     );
-
-    if (options) {
-      /*
-      if (options.where) {
-        sql += ` where ${this._where(options.where)}`;
-      }
-      if (options.orderBy) {
-        // FIXME: name mapping/escaping
-        sql += ` order by ${options.orderBy}`;
-      }
-      if (options.limit !== undefined) {
-        sql += ` limit ${options.limit}`;
-      }
-      if (options.offset !== undefined) {
-        sql += ` offset ${options.offset}`;
-      }
-      */
-    }
-
     return new Promise<Document[]>(resolve => {
       this.db.engine.query(sql).then(rows => {
         resolve(rows.map(row => toDocument(row, this.model)));
@@ -149,7 +130,6 @@ export class Table {
     if (filter) {
       sql += ` where ${this._where(filter)}`;
     }
-
     return this.db.engine.query(sql);
   }
 
