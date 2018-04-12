@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "Archen - Add GraphQL API to your existing database",
   "main": "./dist/index.js",
   "files": [
@@ -20,7 +20,8 @@
   "license": "MIT",
   "dependencies": {
     "dataloader": "^1.4.0",
-    "graphql": "^0.13.1"
+    "graphql": "^0.13.1",
+    "typescript": "^2.8.1"
   },
   "repository": {
     "type": "git",
@@ -35,20 +36,17 @@
     "jest": "^22.4.1",
     "sqlite3": "^3.1.13",
     "ts-jest": "^22.4.1",
-    "typescript": "*",
-    "babel-cli": "^6.26.0",
-    "babel-plugin-transform-object-rest-spread": "^6.26.0",
-    "babel-preset-env": "^1.6.1"
+    "typescript": "*"
   },
   "scripts": {
     "test": "jest",
-    "build": "tsc && babel dist -d dist"
+    "build": "tsc"
   },
   "jest": {
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "/test/schema\\.test.ts",
+    "testRegex": "/test/.+\\.test.ts",
     "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
     "collectCoverage": false,
     "collectCoverageFrom": ["src/**/*.ts"],
