@@ -49,7 +49,7 @@ export class Accessor {
     for (const model of this.domain.models) {
       const loaders = {};
       for (const field of model.fields) {
-        if (field.isUnique()) {
+        if (field.isUnique() || field instanceof ForeignKeyField) {
           loaders[field.name] = this._createLoader(field as SimpleField);
         }
       }
@@ -70,7 +70,11 @@ export class Accessor {
             }
           }
         }
-        return keys.map(k => rows.find(r => r[field.name] === k));
+        if (field.isUnique()) {
+          return keys.map(k => rows.find(r => r[field.name] === k));
+        } else {
+          return keys.map(k => rows.filter(r => r[field.name] === k));
+        }
       });
     });
     return { field, loader };
