@@ -46,6 +46,16 @@ export class Database {
   transaction(callback): Promise<Database> {
     return this.engine.transaction(callback);
   }
+
+  append(name: string, data: { [key: string]: any }): Record {
+    return this.table(name).append(data);
+  }
+
+  clear() {
+    for (const name in this.tables) {
+      this.tables[name].recordList = [];
+    }
+  }
 }
 
 export type OrderBy = string | string[];
@@ -60,6 +70,8 @@ export interface SelectOptions {
 export class Table {
   db: Database;
   model: Model;
+
+  recordList: Record[] = [];
 
   constructor(db: Database, model: Model) {
     this.db = db;
@@ -538,6 +550,17 @@ export class Table {
       [related.throughField.name]: args
     });
   }
+
+  append(data?: { [key: string]: any }): Record {
+    const record = new Record(this);
+    this.recordList.push(record);
+    Object.assign(record, data);
+    return record;
+  }
+
+  __json(filterType) {
+    return this.recordList.map(rec => rec.__json(filterType));
+  }
 }
 
 function _toCamel(value: Value, field: SimpleField): Value {
@@ -576,4 +599,46 @@ export function toDocument(row: Row, model: Model): Document {
 
 export function rowsToCamel(rows: Row[], model: Model): Row[] {
   return rows.map(row => toDocument(row, model));
+}
+
+class Record {
+  __table: Table;
+
+  constructor(table: Table) {
+    this.__table = table;
+  }
+
+  __primaryKey(): Value {
+    const name = this.__table.model.primaryKey.fields[0].name;
+    return this[name];
+  }
+
+  __setPrimaryKey(value: Value) {
+    const name = this.__table.model.primaryKey.fields[0].name;
+    this[name] = value;
+  }
+
+  // filterType: 0 - fields only, 1 - incl. meta fields, 2 - everything
+  __json(filterType) {
+    let row: { [key: string]: any } = {};
+    for (let key in this) {
+      let field = this[key];
+      if (/^__/.exec(key)) {
+        if (filterType >= 1) {
+          row[key] = field.toString();
+        }
+      } else if (field instanceof Record) {
+        row[key] =
+          `Record(${this[key].__table.name})` +
+          JSON.stringify(this[key].__json());
+      } else if (typeof field === 'function') {
+        if (filterType === 2) {
+          row[key] = 'function';
+        }
+      } else {
+        row[key] = this[key];
+      }
+    }
+    return row;
+  }
 }
