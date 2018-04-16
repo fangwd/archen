@@ -19,7 +19,7 @@ import { Connection, Row } from './engine';
 import { encodeFilter, QueryBuilder } from './filter';
 import { toArray } from './misc';
 
-import { RecordProxy, FlushState } from './flush';
+import { RecordProxy, FlushState, FlushMethod } from './flush';
 
 export class Database {
   schema: Schema;
@@ -33,6 +33,7 @@ export class Database {
       const table = new Table(this, model);
       this.tables[model.name] = table;
       this.tables[model.table.name] = table;
+      this[model.name] = data => this.table(model.name).append(data);
     }
   }
 
@@ -49,7 +50,7 @@ export class Database {
     return this.engine.transaction(callback);
   }
 
-  append(name: string, data: { [key: string]: any }): Record {
+  append(name: string, data: { [key: string]: any }): any {
     return this.table(name).append(data);
   }
 
@@ -584,7 +585,7 @@ export class Table {
     return record;
   }
 
-  __json(filterType) {
+  json(filterType) {
     return this.recordList.map(rec => rec.__json(filterType));
   }
 }
@@ -641,31 +642,39 @@ function flushable(value: Value | Record | any) {
 
 export class Record {
   __table: Table;
+  __data: Row;
   __state: FlushState;
 
   constructor(table: Table) {
     this.__table = table;
+    this.__data = {};
     this.__state = new FlushState();
   }
 
-  dirty(): boolean {
+  __dirty(): boolean {
     return this.__state.dirty.size > 0;
   }
 
-  flushable(): boolean {
+  __flushable(): boolean {
     return this.__table.model.checkUniqueKey(this, flushable) !== null;
   }
 
-  flush(): Promise<any> {
+  get(name: string): Value | undefined {
+    return this.__data[name];
+  }
+
+  delete(): Promise<any> {
+    const filter = this.__table.model.getUniqueFields(this.__data);
+    return this.__table.delete(filter);
+  }
+
+  save(): Promise<any> {
     const dirty = new Set();
     const row: Row = {};
 
-    for (const key in this) {
-      if (/^__/.test(key)) {
-        continue;
-      }
+    for (const key in this.__data) {
       if (flushable(this[key])) {
-        row[key] = this.__get(key);
+        row[key] = this.__getValue(key);
       } else {
         dirty.add(key);
       }
@@ -673,10 +682,19 @@ export class Record {
 
     this.__state.dirty = dirty;
 
-    return this.__table.insert(row).then(id => {});
+    return this.__table.insert(row).then(id => {
+      // NOTE: Assuming auto increment id; otherwise need get
+      this.__setPrimaryKey(id);
+      return this;
+    });
   }
 
-  __get(name: string): Value {
+  update(row: Row): Promise<any> {
+    const filter = this.__table.model.getUniqueFields(this.__data);
+    return this.__table.update(row, filter);
+  }
+
+  __getValue(name: string): Value {
     if (this[name] instanceof Record) {
       return this[name].__primaryKey();
     }

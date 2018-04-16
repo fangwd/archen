@@ -13,18 +13,29 @@ export class FlushState {
 
 export const RecordProxy = {
   set: function(record: Record, name: string, value: any) {
-    const model = record.__table.model;
-    const field = model.field(name);
-
-    if (!field) {
-      throw Error(`Invalid field: ${model.name}.${name}`);
+    if (!/^__/.test(name)) {
+      const model = record.__table.model;
+      const field = model.field(name);
+      if (!field) {
+        throw Error(`Invalid field: ${model.name}.${name}`);
+      }
+      // throw TypeError(), RangeError(), etc
+      record.__data[name] = value;
+      record.__state.dirty.add(name);
+    } else {
+      record[name] = value;
     }
-
-    // throw TypeError(), RangeError(), etc
-
-    record[name] = value;
-    record.__state.dirty.add(name);
-
     return true;
+  },
+
+  get: function(record: Record, name: string) {
+    if (typeof name === 'string' && !/^__/.test(name)) {
+      if (typeof record[name] !== 'function') {
+        const model = record.__table.model;
+        const field = model.field(name);
+        return record.__data[name];
+      }
+    }
+    return record[name];
   }
 };
