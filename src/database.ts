@@ -19,7 +19,7 @@ import { Connection, Row } from './engine';
 import { encodeFilter, QueryBuilder } from './filter';
 import { toArray } from './misc';
 
-import { RecordProxy, FlushState, FlushMethod } from './flush';
+import { RecordProxy, FlushState, FlushMethod, persistRecord } from './flush';
 
 export class Database {
   schema: Schema;
@@ -628,18 +628,6 @@ export function rowsToCamel(rows: Row[], model: Model): Row[] {
   return rows.map(row => toDocument(row, model));
 }
 
-function flushable(value: Value | Record | any) {
-  if (value === undefined) {
-    return false;
-  }
-
-  if (value instanceof Record) {
-    return flushable(value.__primaryKey());
-  }
-
-  return true;
-}
-
 export class Record {
   __table: Table;
   __data: Row;
@@ -669,24 +657,7 @@ export class Record {
   }
 
   save(): Promise<any> {
-    const dirty = new Set();
-    const row: Row = {};
-
-    for (const key in this.__data) {
-      if (flushable(this[key])) {
-        row[key] = this.__getValue(key);
-      } else {
-        dirty.add(key);
-      }
-    }
-
-    this.__state.dirty = dirty;
-
-    return this.__table.insert(row).then(id => {
-      // NOTE: Assuming auto increment id; otherwise need get
-      this.__setPrimaryKey(id);
-      return this;
-    });
+    return persistRecord(this);
   }
 
   update(row: Row): Promise<any> {

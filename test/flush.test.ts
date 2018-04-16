@@ -83,3 +83,16 @@ test('save #2', async done => {
   expect(saved2.user.id).toBe(saved.id);
   done();
 });
+
+test('save #3', async done => {
+  const schema = new Schema(helper.getExampleData());
+  const db = helper.connectToDatabase(NAME, schema);
+  const user = db.User({ email: 'saved03@example.com' });
+  const order = db.Order({ code: 'saved03' });
+  order.user = user;
+  await order.save();
+  const saved1 = await db.table('user').get({ email: 'saved03@example.com' });
+  const saved2 = await db.table('order').get({ code: 'saved03' });
+  expect(saved2.user.id).toBe(saved1.id);
+  done();
+});
