@@ -117,12 +117,9 @@ export class Table {
     });
   }
 
-  update(data: Document, filter?: Filter|string): Promise<any> {
-    if (Object.keys(data).length === 0) {
-      return Promise.resolve();
-    }
-
+  update(data: Document, filter?: Filter): Promise<any> {
     let sql = `update ${this._name()} set`;
+    let cnt = 0;
 
     const keys = Object.keys(data);
     for (let i = 0; i < keys.length; i++) {
@@ -132,14 +129,18 @@ export class Table {
           sql += ',';
         }
         sql += this._pair(field, data[keys[i]] as Value);
+        cnt++;
       }
+    }
+
+    if (cnt === 0) {
+      return Promise.resolve();
     }
 
     if (filter) {
       if (typeof filter === 'string') {
-        sql += ` where ${filter}`
-      }
-      else {
+        sql += ` where ${filter}`;
+      } else {
         sql += ` where ${this._where(filter)}`;
       }
     }
@@ -214,7 +215,7 @@ export class Table {
       const table = self.db.table(field.referencedField.model);
       const method = Object.keys(data)[0];
       let promise;
-      switch(method) {
+      switch (method) {
         case 'connect':
           promise = table.get(data[method] as Document);
           break;
@@ -223,24 +224,21 @@ export class Table {
           break;
         case 'update':
           {
-            const builder = new QueryBuilder(self.model, self.db.engine);
-            const select = builder.select(field, filter);
-            const name = self.db.engine.escapeId(field.referencedField.column.name);
-            const where = `${name}=(${select})`;
-            promise = table.update(data[method] as Document, where)
+            const where = { [field.relatedField.name]: filter };
+            promise = table.modify(data[method] as Document, where);
           }
           break;
         default:
-          throw Error(`Unsuported method '${method}'`)
-        }
-      
+          throw Error(`Unsuported method '${method}'`);
+      }
+
       if (method !== 'update') {
-      promise.then(row => {
-        result[field.name] = row
-          ? row[field.referencedField.model.keyField().name]
-          : null;
-        return row;
-      });
+        promise.then(row => {
+          result[field.name] = row
+            ? row[field.referencedField.model.keyField().name]
+            : null;
+          return row;
+        });
       }
 
       promises.push(promise);
