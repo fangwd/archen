@@ -223,7 +223,7 @@ export class QueryBuilder {
     return filter;
   }
 
-  select(name: string, filter?: Filter, orderBy?: OrderBy): string {
+  select(name: string|SimpleField, filter?: Filter, orderBy?: OrderBy): string {
     this.froms = [`${this.escapeId(this.model)} ${this.alias || ''}`];
 
     if (orderBy) {

@@ -160,21 +160,27 @@ export class Model {
     return row[this.keyField().name] as Document;
   }
 
-  checkUniqueKey(row): UniqueKey {
+  checkUniqueKey(row, accept?): UniqueKey {
     if (!row) return null;
+
+    if (!accept) {
+      accept = value => value !== undefined;
+    }
+
     let uniqueKey = this.primaryKey;
     for (const field of uniqueKey.fields) {
-      if (row[field.name] === undefined) {
+      if (!accept(row[field.name])) {
         uniqueKey = null;
         break;
       }
     }
+
     if (!uniqueKey) {
       for (const key of this.uniqueKeys) {
         if (!key.primary) {
           let missing;
           for (const field of key.fields) {
-            if (row[field.name] === undefined) {
+            if (!accept(row[field.name])) {
               missing = field;
               break;
             }

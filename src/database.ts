@@ -19,12 +19,14 @@ import { Connection, Row } from './engine';
 import { encodeFilter, QueryBuilder } from './filter';
 import { toArray } from './misc';
 
+import { RecordProxy, FlushState } from './flush';
+
 export class Database {
   schema: Schema;
   engine: Connection;
   tables: { [key: string]: Table } = {};
 
-  constructor(schema: Schema, connection: Connection) {
+  constructor(schema: Schema, connection?: Connection) {
     this.schema = schema;
     this.engine = connection;
     for (const model of schema.models) {
@@ -115,7 +117,7 @@ export class Table {
     });
   }
 
-  update(data: Document, filter?: Filter): Promise<any> {
+  update(data: Document, filter?: Filter|string): Promise<any> {
     if (Object.keys(data).length === 0) {
       return Promise.resolve();
     }
@@ -134,7 +136,12 @@ export class Table {
     }
 
     if (filter) {
-      sql += ` where ${this._where(filter)}`;
+      if (typeof filter === 'string') {
+        sql += ` where ${filter}`
+      }
+      else {
+        sql += ` where ${this._where(filter)}`;
+      }
     }
 
     return this.db.engine.query(sql);
@@ -198,7 +205,7 @@ export class Table {
   }
 
   // GraphQL mutations
-  resolveParentFields(input: Document): Promise<Row> {
+  resolveParentFields(input: Document, filter?: Filter): Promise<Row> {
     const result: Row = {};
     const promises = [];
     const self = this;
@@ -206,15 +213,36 @@ export class Table {
     function _createPromise(field: ForeignKeyField, data: Document): void {
       const table = self.db.table(field.referencedField.model);
       const method = Object.keys(data)[0];
-      let promise = (method === 'connect'
-        ? table.get(data[method] as Document)
-        : table.create(data[method] as Document)
-      ).then(row => {
+      let promise;
+      switch(method) {
+        case 'connect':
+          promise = table.get(data[method] as Document);
+          break;
+        case 'create':
+          promise = table.create(data[method] as Document);
+          break;
+        case 'update':
+          {
+            const builder = new QueryBuilder(self.model, self.db.engine);
+            const select = builder.select(field, filter);
+            const name = self.db.engine.escapeId(field.referencedField.column.name);
+            const where = `${name}=(${select})`;
+            promise = table.update(data[method] as Document, where)
+          }
+          break;
+        default:
+          throw Error(`Unsuported method '${method}'`)
+        }
+      
+      if (method !== 'update') {
+      promise.then(row => {
         result[field.name] = row
           ? row[field.referencedField.model.keyField().name]
           : null;
         return row;
       });
+      }
+
       promises.push(promise);
     }
 
@@ -273,7 +301,7 @@ export class Table {
 
     const self = this;
 
-    return this.resolveParentFields(data).then(row =>
+    return this.resolveParentFields(data, filter).then(row =>
       self.update(row, filter).then(() => {
         const where = Object.assign({}, filter);
         for (const key in where) {
@@ -552,7 +580,7 @@ export class Table {
   }
 
   append(data?: { [key: string]: any }): Record {
-    const record = new Record(this);
+    const record = new Proxy(new Record(this), RecordProxy);
     this.recordList.push(record);
     Object.assign(record, data);
     return record;
@@ -601,11 +629,60 @@ export function rowsToCamel(rows: Row[], model: Model): Row[] {
   return rows.map(row => toDocument(row, model));
 }
 
-class Record {
+function flushable(value: Value | Record | any) {
+  if (value === undefined) {
+    return false;
+  }
+
+  if (value instanceof Record) {
+    return flushable(value.__primaryKey());
+  }
+
+  return true;
+}
+
+export class Record {
   __table: Table;
+  __state: FlushState;
 
   constructor(table: Table) {
     this.__table = table;
+    this.__state = new FlushState();
+  }
+
+  dirty(): boolean {
+    return this.__state.dirty.size > 0;
+  }
+
+  flushable(): boolean {
+    return this.__table.model.checkUniqueKey(this, flushable) !== null;
+  }
+
+  flush(): Promise<any> {
+    const dirty = new Set();
+    const row: Row = {};
+
+    for (const key in this) {
+      if (/^__/.test(key)) {
+        continue;
+      }
+      if (flushable(this[key])) {
+        row[key] = this.__get(key);
+      } else {
+        dirty.add(key);
+      }
+    }
+
+    this.__state.dirty = dirty;
+
+    return this.__table.insert(row).then(id => {});
+  }
+
+  __get(name: string): Value {
+    if (this[name] instanceof Record) {
+      return this[name].__primaryKey();
+    }
+    return this[name] as Value;
   }
 
   __primaryKey(): Value {
