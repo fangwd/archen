@@ -47,7 +47,7 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "/test/schema\\.test.ts",
+    "testRegex": "/test/.+\\.test.ts",
     "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
     "collectCoverage": false,
     "collectCoverageFrom": ["src/**/*.ts"],
