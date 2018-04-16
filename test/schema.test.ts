@@ -588,6 +588,52 @@ test('order by', done => {
   });
 });
 
+test('update parent', done => {
+  expect.assertions(1);
+
+  const DATA = `
+mutation{
+  updateOrder(where: {id: 1}, data: {
+    user: {
+      update: {
+        lastName: "updated-last-name"
+      }
+    }
+  }) {
+    code
+    user {
+      id
+      lastName
+    }
+  }
+}
+`;
+
+  const archen = createArchen();
+
+  function _createItems(): Promise<any> {
+    return archen.db
+      .table('order')
+      .insert({ code })
+      .then(order => {
+        return archen.db
+          .table('order_item')
+          .insert({ order, product: 1, quantity: 10 })
+          .then(() => {
+            archen.db
+              .table('order_item')
+              .insert({ order, product: 2, quantity: 20 });
+          });
+      });
+  }
+
+  graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+    const order = result.data.updateOrder;
+    expect(order.user.lastName).toBe('updated-last-name');
+    done();
+  });
+});
+
 function createArchen(config?: SchemaConfig) {
   const domain = new Schema(data, config);
   const db = helper.connectToDatabase(NAME);
