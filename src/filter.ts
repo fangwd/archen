@@ -260,7 +260,7 @@ export class QueryBuilder {
         direction = /^desc$/i.test(direction || '') ? 'DESC' : 'ASC';
 
         if (field instanceof SimpleField || field instanceof ForeignKeyField) {
-          return `${alias}.${this.escapeId(field)} ${direction}`;
+          return `${this.escapeId(alias)}.${this.escapeId(field)} ${direction}`;
         }
 
         throw new Error(`Invalid sort column: ${path}`);
