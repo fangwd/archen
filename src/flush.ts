@@ -1,6 +1,7 @@
 import { Record, Value } from './database';
 import { Row } from './engine';
-import { resolve } from 'dns';
+
+import DataLoader = require('dataloader');
 
 export enum FlushMethod {
   INSERT,
@@ -54,11 +55,7 @@ function flushable(value: Value | Record | any) {
   return true;
 }
 
-class PersistContext {
-  visited: Set<Record> = new Set();
-}
-
-function _persistRecord(record: Record): Promise<any> {
+function _persistRecord(record: Record): Promise<Record> {
   const dirty = new Set();
   const row: Row = {};
 
@@ -78,9 +75,20 @@ function _persistRecord(record: Record): Promise<any> {
   });
 }
 
+class RecordManager {
+  visited: Set<Record> = new Set();
+  inserter: DataLoader<Record, Record>;
+
+  constructor() {
+    this.inserter = new DataLoader<Record, Record>((records: Record[]) =>
+      Promise.all(records.map(record => _persistRecord(record)))
+    );
+  }
+}
+
 function resolveParentFields(
   record: Record,
-  context: PersistContext
+  context: RecordManager
 ): Promise<any> {
   const promises: Promise<any>[] = [];
   for (const key in record.__data) {
@@ -97,12 +105,12 @@ function resolveParentFields(
     }
   }
   return Promise.all(promises).then(
-    () => (record.__dirty() ? _persistRecord(record) : record)
+    () => (record.__dirty() ? context.inserter.load(record) : record)
   );
 }
 
 export function persistRecord(record: Record): Promise<any> {
-  const context = new PersistContext();
+  const context = new RecordManager();
   const promises: Promise<any>[] = [];
   for (const key in record.__data) {
     const value = record.__data[key];
