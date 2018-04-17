@@ -1,8 +1,9 @@
 create table user (
   id integer primary key auto_increment,
-  email varchar(200) unique,
+  email varchar(100) unique,
   first_name varchar(30),
   last_name varchar(100),
+  last_post_id integer,
   status int
 );
 
@@ -15,6 +16,8 @@ create table `post` (
   foreign key (user_id) references user(id),
   unique (user_id, title)
 );
+
+alter table user add constraint foreign key (last_post_id) references post(id);
 
 create table `comment`(
   id integer primary key auto_increment,
