@@ -210,6 +210,7 @@ test('order by', () => {
   };
   const builder = new QueryBuilder(model, DefaultEscape);
   const sql = builder.select('*', args.where, args.orderBy)
-  expect(/t\d\.`email`\s+ASC/i.test(sql)).toBe(true);
-  expect(/t\d\.`code`\s+DESC/i.test(sql)).toBe(true);
+  console.log(sql)
+  expect(/`t\d\`.`email`\s+ASC/i.test(sql)).toBe(true);
+  expect(/`t\d\`.`code`\s+DESC/i.test(sql)).toBe(true);
 });
