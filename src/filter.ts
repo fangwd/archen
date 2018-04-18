@@ -233,7 +233,7 @@ export class QueryBuilder {
     const where = this.where(filter).trim();
 
     let sql = `select ${this.encodeField(name)} from ${this.froms.join(
-      ' join '
+      ' left join '
     )}`;
 
     if (where.length > 0) {
