@@ -19,7 +19,7 @@ import { Connection, Row } from './engine';
 import { encodeFilter, QueryBuilder } from './filter';
 import { toArray } from './misc';
 
-import { RecordProxy, FlushState, FlushMethod, persistRecord } from './flush';
+import { RecordProxy, FlushState, FlushMethod, flushRecord } from './flush';
 
 export class Database {
   schema: Schema;
@@ -628,6 +628,18 @@ export function rowsToCamel(rows: Row[], model: Model): Row[] {
   return rows.map(row => toDocument(row, model));
 }
 
+function isEmpty(value: Value | Record | any) {
+  if (value === undefined) {
+    return true;
+  }
+
+  if (value instanceof Record) {
+    return isEmpty(value.__primaryKey());
+  }
+
+  return false;
+}
+
 export class Record {
   __table: Table;
   __data: Row;
@@ -637,14 +649,6 @@ export class Record {
     this.__table = table;
     this.__data = {};
     this.__state = new FlushState();
-  }
-
-  __dirty(): boolean {
-    return this.__state.dirty.size > 0;
-  }
-
-  __flushable(): boolean {
-    return this.__table.model.checkUniqueKey(this, flushable) !== null;
   }
 
   get(name: string): Value | undefined {
@@ -657,52 +661,72 @@ export class Record {
   }
 
   save(): Promise<any> {
-    return persistRecord(this);
+    return flushRecord(this);
   }
 
-  update(row: Row): Promise<any> {
-    const filter = this.__table.model.getUniqueFields(this.__data);
-    return this.__table.update(row, filter);
+  update(data: Row = {}): Promise<any> {
+    for (const key in data) {
+      this[key] = data[key];
+    }
+    this.__state.method = FlushMethod.UPDATE;
+    return this.save();
+  }
+
+  __dirty(): boolean {
+    return this.__state.dirty.size > 0;
+  }
+
+  __flushable(perfect?: boolean): boolean {
+    const data = this.__data;
+
+    if (!this.__table.model.checkUniqueKey(data, isEmpty)) {
+      return false;
+    }
+
+    if (this.__state.method === FlushMethod.DELETE) {
+      return true;
+    }
+
+    let flushable = 0;
+
+    this.__state.dirty.forEach(key => {
+      if (!isEmpty(data[key])) {
+        flushable++;
+      }
+    });
+    return perfect ? flushable === this.__state.dirty.size : flushable > 0;
+  }
+
+  __fields(): Row {
+    const fields = {};
+    this.__state.dirty.forEach(key => {
+      if (!isEmpty(this.__data[key])) {
+        fields[key] = this.__getValue(key);
+      }
+    });
+    return fields;
+  }
+
+  __remove_dirty(keys: string[]) {
+    for (const key of keys) {
+      this.__state.dirty.delete(key);
+    }
   }
 
   __getValue(name: string): Value {
-    if (this[name] instanceof Record) {
-      return this[name].__primaryKey();
+    if (this.__data[name] instanceof Record) {
+      return this.__data[name].__primaryKey();
     }
-    return this[name] as Value;
+    return this.__data[name] as Value;
   }
 
   __primaryKey(): Value {
     const name = this.__table.model.primaryKey.fields[0].name;
-    return this[name];
+    return this.__data[name];
   }
 
   __setPrimaryKey(value: Value) {
     const name = this.__table.model.primaryKey.fields[0].name;
-    this[name] = value;
-  }
-
-  // filterType: 0 - fields only, 1 - incl. meta fields, 2 - everything
-  __json(filterType) {
-    let row: { [key: string]: any } = {};
-    for (let key in this) {
-      let field = this[key];
-      if (/^__/.exec(key)) {
-        if (filterType >= 1) {
-          row[key] = field.toString();
-        }
-      } else if (field instanceof Record) {
-        row[key] =
-          `Record(${this[key].__table.name})` +
-          JSON.stringify(this[key].__json());
-      } else if (typeof field === 'function') {
-        if (filterType === 2) {
-          row[key] = 'function';
-        }
-      } else {
-        row[key] = this[key];
-      }
-    }
-    return row;
+    this.__data[name] = value;
   }
 }

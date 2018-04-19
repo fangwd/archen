@@ -160,16 +160,16 @@ export class Model {
     return row[this.keyField().name] as Document;
   }
 
-  checkUniqueKey(row, accept?): UniqueKey {
+  checkUniqueKey(row, reject?): UniqueKey {
     if (!row) return null;
 
-    if (!accept) {
-      accept = value => value !== undefined;
+    if (!reject) {
+      reject = value => value === undefined;
     }
 
     let uniqueKey = this.primaryKey;
     for (const field of uniqueKey.fields) {
-      if (!accept(row[field.name])) {
+      if (reject(row[field.name])) {
         uniqueKey = null;
         break;
       }
@@ -180,7 +180,7 @@ export class Model {
         if (!key.primary) {
           let missing;
           for (const field of key.fields) {
-            if (!accept(row[field.name])) {
+            if (reject(row[field.name])) {
               missing = field;
               break;
             }

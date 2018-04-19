@@ -9,7 +9,6 @@ const NAME = 'flush';
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
-/*
 test('append', () => {
   const schema = new Schema(helper.getExampleData());
   const db = new Database(schema);
@@ -84,7 +83,6 @@ test('save #2', async done => {
   expect(saved2.user.id).toBe(saved.id);
   done();
 });
-*/
 
 test('save #3', async done => {
   const schema = new Schema(helper.getExampleData());
@@ -99,5 +97,23 @@ test('save #3', async done => {
   const saved_2 = await db.table('order').get({ code: 'saved03-1' });
   expect(saved_1.user.id).toBe(saved_0.id);
   expect(saved_2.user.id).toBe(saved_0.id);
+  done();
+});
+
+test('save #4', async done => {
+  const schema = new Schema(helper.getExampleData());
+  const db = helper.connectToDatabase(NAME, schema);
+  const user = db.User({ email: 'saved04@example.com' });
+  const order_1 = db.Order({ code: 'saved04-1', user });
+  const order_2 = db.Order({ code: 'saved04-2', user });
+  user.status = order_2;
+  await order_1.save();
+  await user.save();
+  const saved_0 = await db.table('user').get({ email: 'saved04@example.com' });
+  const saved_1 = await db.table('order').get({ code: 'saved04-1' });
+  const saved_2 = await db.table('order').get({ code: 'saved04-2' });
+  expect(saved_1.user.id).toBe(saved_0.id);
+  expect(saved_2.user.id).toBe(saved_0.id);
+  expect(saved_0.status).toBe(saved_2.id);
   done();
 });

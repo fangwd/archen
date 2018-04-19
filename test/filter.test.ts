@@ -209,8 +209,7 @@ test('order by', () => {
     orderBy: ['order.code desc', 'order.user.email', 'quantity']
   };
   const builder = new QueryBuilder(model, DefaultEscape);
-  const sql = builder.select('*', args.where, args.orderBy)
-  console.log(sql)
+  const sql = builder.select('*', args.where, args.orderBy);
   expect(/`t\d\`.`email`\s+ASC/i.test(sql)).toBe(true);
   expect(/`t\d\`.`code`\s+DESC/i.test(sql)).toBe(true);
 });
