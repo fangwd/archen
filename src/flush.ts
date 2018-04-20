@@ -1,7 +1,9 @@
-import { Record, Value } from './database';
+import { Record, Value, Database } from './database';
+import { Accessor } from './accessor';
 import { Row } from './engine';
 
 import DataLoader = require('dataloader');
+import { SimpleField } from './model';
 
 export enum FlushMethod {
   INSERT,
@@ -58,13 +60,15 @@ class FlushContext {
 }
 
 export class RecordStore {
+  accessor: Accessor;
   inserter: DataLoader<Record, Record>;
   counter: number = 0;
 
-  constructor() {
+  constructor(db: Database) {
     this.inserter = new DataLoader<Record, Record>((records: Record[]) =>
-      Promise.all(records.map(record => _persist(record)))
+      Promise.all(records.map(record => _persist(this, record)))
     );
+    this.accessor = new Accessor(db.schema, db.engine);
   }
 }
 
@@ -94,7 +98,7 @@ function collectParentFields(
 }
 
 export function flushRecord(record: Record): Promise<any> {
-  const store = new RecordStore();
+  const store = new RecordStore(record.__table.db);
 
   return new Promise((resolve, reject) => {
     function __resolve() {
@@ -104,7 +108,7 @@ export function flushRecord(record: Record): Promise<any> {
         Promise.all(context.promises).then(() => __resolve());
       } else {
         if (record.__flushable(false)) {
-          _persist(record).then(() => {
+          _persist(store, record).then(() => {
             if (!record.__dirty()) {
               resolve(record);
             } else {
@@ -133,22 +137,9 @@ export function flushRecord(record: Record): Promise<any> {
  *
  * @param record Record to be flushed to disk
  */
-function _persist(record: Record): Promise<Record> {
+function _persist(store: RecordStore, record: Record): Promise<Record> {
   const method = record.__state.method;
   const model = record.__table.model;
-  const fields = record.__fields();
-
-  if (method === FlushMethod.INSERT) {
-    return record.__table.insert(fields).then(id => {
-      if (record.__primaryKey() === undefined) {
-        record.__setPrimaryKey(id);
-      }
-      record.__remove_dirty(Object.keys(fields));
-      record.__state.method = FlushMethod.UPDATE;
-      return record;
-    });
-  }
-
   const filter = model.getUniqueFields(record.__data);
 
   if (method === FlushMethod.DELETE) {
@@ -158,8 +149,52 @@ function _persist(record: Record): Promise<Record> {
     });
   }
 
-  return record.__table.update(fields, filter).then(() => {
-    record.__remove_dirty(Object.keys(fields));
-    return record;
+  const fields = record.__fields();
+
+  if (method === FlushMethod.UPDATE) {
+    return record.__table.update(fields, filter).then(affected => {
+      if (affected > 0) {
+        record.__remove_dirty(Object.keys(fields));
+        return record;
+      }
+      throw Error(`Row does not exist`);
+    });
+  }
+
+  return new Promise(resolve => {
+    function _insert() {
+      store.accessor.get(record.__table.model, filter).then(row => {
+        if (row) {
+          record.__remove_dirty(Object.keys(filter));
+          if (!record.__dirty()) {
+            resolve(record);
+          } else {
+            record.__table.update(fields, filter).then(() => {
+              record.__remove_dirty(Object.keys(fields));
+              if (record.__primaryKey() === undefined) {
+                const value = row[model.primaryKey.fields[0].name];
+                record.__setPrimaryKey(value as Value);
+              }
+              resolve(record);
+            });
+          }
+        } else {
+          record.__table
+            .insert(fields)
+            .then(id => {
+              if (record.__primaryKey() === undefined) {
+                record.__setPrimaryKey(id);
+              }
+              record.__remove_dirty(Object.keys(fields));
+              record.__state.method = FlushMethod.UPDATE;
+              resolve(record);
+            })
+            .catch(error => {
+              _insert();
+            });
+        }
+      });
+    }
+    _insert();
   });
 }

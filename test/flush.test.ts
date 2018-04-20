@@ -117,3 +117,18 @@ test('save #4', async done => {
   expect(saved_0.status).toBe(saved_2.id);
   done();
 });
+
+test('save #5', async done => {
+  const schema = new Schema(helper.getExampleData());
+  const db = helper.connectToDatabase(NAME, schema);
+  const email = 'saved05@example.com';
+  const promises = [];
+  for (let i = 0; i < 5; i++) {
+    promises.push(db.User({ email }).save());
+  }
+  Promise.all(promises).then(async () => {
+    const user = await db.table('user').get({ email });
+    expect(user.email).toBe(email);
+    done();
+  });
+});
