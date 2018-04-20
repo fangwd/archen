@@ -584,10 +584,6 @@ export class Table {
     Object.assign(record, data);
     return record;
   }
-
-  json(filterType) {
-    return this.recordList.map(rec => rec.__json(filterType));
-  }
 }
 
 function _toCamel(value: Value, field: SimpleField): Value {
