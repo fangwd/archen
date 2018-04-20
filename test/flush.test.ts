@@ -9,6 +9,7 @@ const NAME = 'flush';
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
+/*
 test('append', () => {
   const schema = new Schema(helper.getExampleData());
   const db = new Database(schema);
@@ -129,6 +130,28 @@ test('save #5', async done => {
   Promise.all(promises).then(async () => {
     const user = await db.table('user').get({ email });
     expect(user.email).toBe(email);
+    done();
+  });
+});
+*/
+
+test('flush #1', async done => {
+  const schema = new Schema(helper.getExampleData());
+  const db = helper.connectToDatabase(NAME, schema);
+  const table = db.table('category');
+  const parent = table.append({ id: 1 });
+
+  await table.insert({ name: 'Child 0', parent: 1 });
+
+  for (let i = 0; i < 5; i++) {
+    table.append({
+      name: `Child ${i % 3}`,
+      parent
+    });
+  }
+
+  table.flush().then(rows => {
+    console.log(rows);
     done();
   });
 });

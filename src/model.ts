@@ -1,5 +1,5 @@
 import { pluralise, toPascalCase, toCamelCase } from './misc';
-import { Document } from './database';
+import { Document, Value } from './database';
 
 interface DatabaseInfo {
   name?: string;
@@ -12,7 +12,7 @@ interface TableInfo {
   indexes?: IndexInfo[];
 }
 
-interface ColumnInfo {
+export interface ColumnInfo {
   name: string;
   type: string;
   size?: number;
@@ -158,6 +158,14 @@ export class Model {
 
   keyValue(row: Document): Document {
     return row[this.keyField().name] as Document;
+  }
+
+  valueOf(value: Value | Document, name: string): Value {
+    if (value === null || typeof value !== 'object') {
+      return value as Value;
+    }
+    const field = this.field(name) as ForeignKeyField;
+    return value[field.model.primaryKey.fields[0].name];
   }
 
   checkUniqueKey(row, reject?): UniqueKey {
@@ -393,13 +401,17 @@ export class RelatedField extends Field {
   }
 }
 
-class UniqueKey {
+export class UniqueKey {
   fields: SimpleField[];
   primary: boolean;
 
   constructor(fields: Field[], primary: boolean = false) {
     this.fields = fields as SimpleField[];
     this.primary = primary;
+  }
+
+  name() {
+    return this.fields.map(field => field.name).join('-');
   }
 }
 

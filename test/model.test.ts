@@ -191,3 +191,14 @@ test('pascal name of related field', () => {
     .field('categoryTreesAncestor') as RelatedField;
   expect(category.getPascalName()).toBe('CategoryCategoryTreeAncestor');
 });
+
+test('Model.getValue()', () => {
+  const domain = new Schema(data);
+  const model = domain.model('order');
+  const d1 = { user: 1 };
+  const d2 = { user: { id: 2 } };
+  const d3 = { user: null };
+  expect(model.valueOf(d1.user, 'user')).toBe(1);
+  expect(model.valueOf(d2.user, 'user')).toBe(2);
+  expect(model.valueOf(d3.user, 'user')).toBe(null);
+});

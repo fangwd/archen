@@ -12,14 +12,22 @@ import {
   Field,
   SimpleField,
   ForeignKeyField,
-  RelatedField
+  RelatedField,
+  ColumnInfo,
+  UniqueKey
 } from './model';
 
 import { Connection, Row } from './engine';
 import { encodeFilter, QueryBuilder } from './filter';
 import { toArray } from './misc';
 
-import { RecordProxy, FlushState, FlushMethod, flushRecord } from './flush';
+import {
+  RecordProxy,
+  FlushState,
+  FlushMethod,
+  flushTable,
+  flushRecord
+} from './flush';
 
 export class Database {
   schema: Schema;
@@ -83,6 +91,11 @@ export class Table {
   constructor(db: Database, model: Model) {
     this.db = db;
     this.model = model;
+  }
+
+  column(name: string): ColumnInfo {
+    const field = this.model.field(name) as SimpleField;
+    return field.column;
   }
 
   private _name(): string {
@@ -187,7 +200,7 @@ export class Table {
     if (typeof value === 'boolean') {
       return value ? 'true' : 'false';
     }
-    if (value === null) {
+    if (value === null || value === undefined) {
       return 'null';
     }
     if (typeof field === 'string') {
@@ -589,7 +602,9 @@ export class Table {
     return record;
   }
 
-  flush() {}
+  flush() {
+    return flushTable(this);
+  }
 }
 
 function _toCamel(value: Value, field: SimpleField): Value {
@@ -679,6 +694,10 @@ export class Record {
   }
 
   __flushable(perfect?: boolean): boolean {
+    if (this.__state.merged) {
+      return false;
+    }
+
     const data = this.__data;
 
     if (!this.__table.model.checkUniqueKey(data, isEmpty)) {
@@ -696,6 +715,7 @@ export class Record {
         flushable++;
       }
     });
+
     return perfect ? flushable === this.__state.dirty.size : flushable > 0;
   }
 
@@ -730,5 +750,47 @@ export class Record {
   __setPrimaryKey(value: Value) {
     const name = this.__table.model.primaryKey.fields[0].name;
     this.__data[name] = value;
+  }
+
+  __uniqueFields(): Row {
+    const self = this;
+    const data = Object.keys(this.__data).reduce(function(acc, cur, i) {
+      acc[cur] = self.__getValue(cur);
+      return acc;
+    }, {});
+    return this.__table.model.getUniqueFields(data);
+  }
+
+  __match(row: Document): boolean {
+    const model = this.__table.model;
+    const fields = this.__uniqueFields();
+    for (const name in fields) {
+      const lhs = model.valueOf(fields[name], name);
+      const rhs = model.valueOf(row[name] as Value, name);
+      if (lhs != rhs) return false;
+    }
+    return true;
+  }
+
+  __valueOf(uk: UniqueKey, separator = '-'): string {
+    const values = [];
+    for (const field of uk.fields) {
+      const value = this.__getValue(field.name);
+      if (value === undefined) return undefined;
+      values.push(value);
+    }
+    return values.join(separator);
+  }
+
+  __merge() {
+    let root = this.__state.merged;
+    while (root.__state.merged) {
+      root = root.__state.merged;
+    }
+    const self = this;
+    this.__state.dirty.forEach(name => {
+      root.__data[name] = self.__data[name];
+      root.__state.dirty.add(name);
+    });
   }
 }

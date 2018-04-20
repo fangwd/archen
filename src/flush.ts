@@ -1,6 +1,14 @@
-import { Record, Value, Database } from './database';
+import {
+  Database,
+  Table,
+  Record,
+  Value,
+  toDocument,
+  Document
+} from './database';
 import { Accessor } from './accessor';
 import { Row } from './engine';
+import { encodeFilter } from './filter';
 
 import DataLoader = require('dataloader');
 import { SimpleField } from './model';
@@ -15,6 +23,7 @@ export class FlushState {
   method: FlushMethod = FlushMethod.INSERT;
   dirty: Set<string> = new Set();
   deleted: boolean = false;
+  merged?: Record;
 }
 
 export const RecordProxy = {
@@ -197,4 +206,122 @@ function _persist(store: RecordStore, record: Record): Promise<Record> {
     }
     _insert();
   });
+}
+
+const DEFAULT_OPTIONS = {
+  separator: '-'
+};
+
+export function flushTable(table: Table, options?): Promise<any> {
+  options = Object.assign({}, options, DEFAULT_OPTIONS);
+
+  mergeRecords(table, options);
+
+  const filter = [];
+
+  for (const record of table.recordList) {
+    if (record.__dirty() && record.__flushable()) {
+      filter.push(record.__uniqueFields());
+    }
+  }
+
+  if (filter.length === 0) return Promise.resolve();
+
+  const dialect = table.db.engine;
+  const model = table.model;
+
+  function _select() {
+    const fields = model.fields.filter(field => field.uniqueKey);
+    const columns = fields.map(field => (field as SimpleField).column.name);
+    const expression = columns.map(dialect.escapeId).join(',');
+    const from = dialect.escapeId(model.table.name);
+    const where = encodeFilter(filter, table.model, dialect);
+    const sql = `select ${columns.join(',')} from ${from} where ${where}`;
+    return table.db.engine.query(sql).then(rows => {
+      rows = rows.map(row => toDocument(row, table.model));
+      for (const record of table.recordList) {
+        if (!record.__dirty()) continue;
+        for (const row of rows) {
+          if (!record.__match(row)) continue;
+          if (!record.__primaryKey()) {
+            const value = row[model.keyField().name];
+            record.__setPrimaryKey(value);
+          }
+          for (const name in row) {
+            if (!record.__state.dirty.has(name)) continue;
+            const lhs = model.valueOf(record.__data[name], name);
+            const rhs = model.valueOf(row[name] as Value, name);
+            if (lhs === rhs) {
+              record.__state.dirty.delete(name);
+            }
+          }
+          if (record.__dirty()) {
+            if (record.__state.method === FlushMethod.INSERT) {
+              record.__state.method = FlushMethod.UPDATE;
+            }
+          }
+        }
+      }
+      return table.recordList;
+    });
+  }
+
+  function _insert() {
+    const fields = model.fields.filter(field => field instanceof SimpleField);
+    const names = fields.map(field => (field as SimpleField).column.name);
+    const columns = names.map(dialect.escapeId).join(',');
+    const into = dialect.escapeId(model.table.name);
+
+    const values = [];
+    for (const record of table.recordList) {
+      if (!record.__dirty() || !record.__flushable()) continue;
+      if (record.__state.method !== FlushMethod.INSERT) continue;
+      const entry = fields.reduce((values, field) => {
+        const value = record.__getValue(field.name);
+        values.push(table.escapeValue(field as SimpleField, value));
+        return values;
+      }, []);
+      values.push(`(${entry})`);
+    }
+
+    // NOTE: Only works for MySQL which accepts null for auto increment keys
+    const sql = `insert into ${into} (${columns}) values ${values.join(',')}`;
+    return table.db.engine.query(sql);
+  }
+
+  // TODO:
+  // 1. Honour merged when checking parent value
+  // 2. Updated merged records after inserting
+  return _select()
+    .then(() => _insert())
+    .then(() => _select());
+}
+
+function mergeRecords(table: Table, options) {
+  const model = table.model;
+
+  const map = model.uniqueKeys.reduce((map, uk) => {
+    map[uk.name()] = {};
+    return map;
+  }, {});
+
+  for (const record of table.recordList) {
+    for (const uk of model.uniqueKeys) {
+      const value = record.__valueOf(uk, options.separator);
+      if (value === undefined) continue;
+      const existing = map[uk.name()][value];
+      if (existing) {
+        if (!record.__state.merged) {
+          record.__state.merged = existing;
+        } else if (record.__state.merged !== existing) {
+          throw Error(`Could not merge into different records`);
+        }
+      } else {
+        map[uk.name()][value] = record;
+      }
+    }
+    if (record.__state.merged) {
+      record.__merge();
+    }
+  }
 }
