@@ -28,7 +28,7 @@ test('append #2', () => {
   expect(user.email).toBe('user@example.com');
   expect(user.get('email')).toBe('user@example.com');
   expect(user.__table).toBe(db.table('user'));
-  expect(db.table('user').recordList.length).toBe(1);
+  expect(db.table('user').recordList.length).toBe(0);
 });
 
 test('delete', async done => {
