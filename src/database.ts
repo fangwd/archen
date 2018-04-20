@@ -33,7 +33,11 @@ export class Database {
       const table = new Table(this, model);
       this.tables[model.name] = table;
       this.tables[model.table.name] = table;
-      this[model.name] = data => this.table(model.name).append(data);
+      this[model.name] = data => {
+        const record = new Proxy(new Record(table), RecordProxy);
+        Object.assign(record, data);
+        return record;
+      };
     }
   }
 
@@ -584,6 +588,8 @@ export class Table {
     Object.assign(record, data);
     return record;
   }
+
+  flush() {}
 }
 
 function _toCamel(value: Value, field: SimpleField): Value {
