@@ -9,7 +9,6 @@ const NAME = 'flush';
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
-/*
 test('append', () => {
   const schema = new Schema(helper.getExampleData());
   const db = new Database(schema);
@@ -176,7 +175,6 @@ test('flush #1', async done => {
     done();
   });
 });
-*/
 
 test('flush #2', async done => {
   const schema = new Schema(helper.getExampleData());
@@ -190,6 +188,30 @@ test('flush #2', async done => {
   db.flush().then(async () => {
     const user = await db.table('user').get({ email: 'random' });
     const order = await db.table('order').get({ code: 'random' });
+    expect(user.status).toBe(order.id);
+    done();
+  });
+});
+
+test('flush #3', async done => {
+  const schema = new Schema(helper.getExampleData());
+  const db = helper.connectToDatabase(NAME, schema);
+  const email = helper.getId();
+  const user = db.table('user').append({ email });
+
+  const user2 = db.table('user').append();
+  user2.email = email;
+
+  const code = helper.getId();
+
+  const order = db.table('order').append({ code });
+  order.user = user2;
+  user2.status = order;
+
+  db.flush().then(async () => {
+    expect(db.engine.queryCounter.total).toBe(8);
+    const user = await db.table('user').get({ email });
+    const order = await db.table('order').get({ code });
     expect(user.status).toBe(order.id);
     done();
   });
