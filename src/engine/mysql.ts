@@ -1,9 +1,10 @@
-import { Connection, TransactionCallback } from './connection';
+import { Connection, TransactionCallback, QueryCounter } from './connection';
 
 import mysql = require('mysql');
 
 class MySQL implements Connection {
   type: string = 'mysql';
+  queryCounter: QueryCounter = new QueryCounter();
 
   private connection: mysql.Connection;
 
@@ -12,7 +13,7 @@ class MySQL implements Connection {
   }
 
   query(sql: string): Promise<any[] | void> {
-    console.log('-- MySQL:', sql);
+    this.queryCounter.total++;
     return new Promise((resolve, reject) => {
       this.connection.query(sql, (error, results, fields) => {
         if (error) {

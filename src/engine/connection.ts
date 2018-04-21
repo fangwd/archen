@@ -1,3 +1,5 @@
+import { Query } from 'mysql';
+
 export type TransactionCallback = (
   connection: Connection | any
 ) => Promise<any>;
@@ -11,6 +13,10 @@ export type Row = {
   [key: string]: any;
 };
 
+export class QueryCounter {
+  total: number = 0;
+}
+
 export interface Connection extends Escape {
   type: string;
   query(sql: string): Promise<any>;
@@ -19,4 +25,5 @@ export interface Connection extends Escape {
   rollback(): Promise<void>;
   escape(s: string): string;
   escapeId(name: string): string;
+  queryCounter: QueryCounter;
 }
