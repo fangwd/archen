@@ -179,3 +179,9 @@ export function connectToDatabase(name: string, schema?: Schema): Database {
   const conn = createTestConnection(name);
   return new Database(schema, conn);
 }
+
+export function getId(length: number = 8) {
+  return Math.random()
+    .toString(36)
+    .substring(length);
+}
