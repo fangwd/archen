@@ -85,6 +85,15 @@ class MySQL implements Connection {
     });
   }
 
+  disconnect(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.connection.end(function(err) {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+
   escape(value: string): string {
     return mysql.escape(value);
   }

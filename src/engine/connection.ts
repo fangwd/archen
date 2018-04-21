@@ -26,4 +26,5 @@ export interface Connection extends Escape {
   escape(s: string): string;
   escapeId(name: string): string;
   queryCounter: QueryCounter;
+  disconnect(): Promise<any>;
 }
