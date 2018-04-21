@@ -1,12 +1,12 @@
 import { pluralise, toPascalCase, toCamelCase } from './misc';
 import { Document, Value } from './database';
 
-interface DatabaseInfo {
+export interface DatabaseInfo {
   name?: string;
   tables: TableInfo[];
 }
 
-interface TableInfo {
+export interface TableInfo {
   name: string;
   columns: ColumnInfo[];
   indexes?: IndexInfo[];
@@ -20,7 +20,8 @@ export interface ColumnInfo {
   autoIncrement?: boolean;
 }
 
-interface IndexInfo {
+export interface IndexInfo {
+  name?: string;
   table?: string;
   columns: string[];
   primaryKey?: boolean;
