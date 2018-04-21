@@ -25,6 +25,7 @@ export class FlushState {
   dirty: Set<string> = new Set();
   deleted: boolean = false;
   merged?: Record;
+  selected?: boolean;
 }
 
 export const RecordProxy = {
@@ -215,27 +216,26 @@ export function flushTable(table: Table): Promise<number> {
   const filter = [];
 
   for (const record of table.recordList) {
-    if (record.__dirty() && record.__flushable()) {
+    if (record.__dirty() && record.__flushable() && !record.__state.selected) {
       filter.push(record.__filter());
     }
   }
 
-  if (filter.length === 0) return Promise.resolve(0);
-
   const dialect = table.db.engine;
   const model = table.model;
 
-  function _select() {
+  function _select(): Promise<any> {
+    if (filter.length === 0) return Promise.resolve();
     const fields = model.fields.filter(field => field.uniqueKey);
     const columns = fields.map(field => (field as SimpleField).column.name);
     const expression = columns.map(dialect.escapeId).join(',');
     const from = dialect.escapeId(model.table.name);
     const where = encodeFilter(filter, table.model, dialect);
-    const sql = `select ${columns.join(',')} from ${from} where ${where}`;
-    return table.db.engine.query(sql).then(rows => {
+    const query = `select ${columns.join(',')} from ${from} where ${where}`;
+    return table.db.engine.query(query).then(rows => {
       rows = rows.map(row => toDocument(row, table.model));
       for (const record of table.recordList) {
-        if (!record.__dirty()) continue;
+        if (!record.__dirty() && record.__primaryKey()) continue;
         for (const row of rows) {
           if (!record.__match(row)) continue;
           if (!record.__primaryKey()) {
@@ -255,6 +255,7 @@ export function flushTable(table: Table): Promise<number> {
               record.__state.method = FlushMethod.UPDATE;
             }
           }
+          record.__state.selected = true;
         }
       }
       return table.recordList;
@@ -306,9 +307,6 @@ export function flushTable(table: Table): Promise<number> {
     }
   }
 
-  // TODO:
-  // 1. Honour merged when checking parent value
-  // 2. Updated merged records after inserting
   return _select()
     .then(() => _insert())
     .then(() => _update())
@@ -333,6 +331,7 @@ function mergeRecords(table: Table) {
   const separator = table.db.options.fieldSeparator;
 
   for (const record of table.recordList) {
+    if (record.__state.merged) continue;
     for (const uc of model.uniqueKeys) {
       const value = record.__valueOf(uc, separator);
       if (value === undefined) continue;
@@ -341,7 +340,7 @@ function mergeRecords(table: Table) {
         if (!record.__state.merged) {
           record.__state.merged = existing;
         } else if (record.__state.merged !== existing) {
-          throw Error(`Could not merge into different records`);
+          throw Error(`Inconsistent`);
         }
       } else {
         map[uc.name()][value] = record;
@@ -358,7 +357,7 @@ export function flushDatabase(db: Database) {
     let dirtyCount = 0;
     for (const table of db.tableList) {
       for (const record of table.recordList) {
-        if (record.__dirty()) {
+        if (record.__dirty() && !record.__state.merged) {
           dirtyCount++;
         }
       }
@@ -373,9 +372,8 @@ export function flushDatabase(db: Database) {
       Promise.all(promises).then(results => {
         const count = results.reduce((a, b) => a + b, 0);
         if (count === 0) {
-          throw Error('Loop in data');
+          throw Error('Circular references');
         }
-        console.log(`${count} updates`);
         if (getDirtyCount() > 0) {
           _flush();
         } else {
