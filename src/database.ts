@@ -25,7 +25,7 @@ import {
   RecordProxy,
   FlushState,
   FlushMethod,
-  flushTable,
+  flushDatabase,
   flushRecord
 } from './flush';
 
@@ -40,7 +40,8 @@ const DEFAULT_OPTIONS = {
 export class Database {
   schema: Schema;
   engine: Connection;
-  tables: { [key: string]: Table } = {};
+  tableMap: { [key: string]: Table } = {};
+  tableList: Table[] = [];
   options: Options;
 
   constructor(schema: Schema, connection?: Connection, options?: Options) {
@@ -48,8 +49,9 @@ export class Database {
     this.engine = connection;
     for (const model of schema.models) {
       const table = new Table(this, model);
-      this.tables[model.name] = table;
-      this.tables[model.table.name] = table;
+      this.tableMap[model.name] = table;
+      this.tableMap[model.table.name] = table;
+      this.tableList.push(table);
       this[model.name] = data => {
         const record = new Proxy(new Record(table), RecordProxy);
         Object.assign(record, data);
@@ -65,7 +67,7 @@ export class Database {
     } else if (name instanceof Model) {
       name = name.name;
     }
-    return this.tables[name];
+    return this.tableMap[name];
   }
 
   transaction(callback): Promise<Database> {
@@ -76,9 +78,13 @@ export class Database {
     return this.table(name).append(data);
   }
 
+  flush() {
+    return flushDatabase(this);
+  }
+
   clear() {
-    for (const name in this.tables) {
-      this.tables[name].clear();
+    for (const name in this.tableMap) {
+      this.tableMap[name].clear();
     }
   }
 }
@@ -624,10 +630,6 @@ export class Table {
     this._initMap();
   }
 
-  flush() {
-    return flushTable(this);
-  }
-
   _mapGet(record: Record): Record {
     let existing: Record;
     for (const uc of this.model.uniqueKeys) {
@@ -782,9 +784,13 @@ export class Record {
     return fields;
   }
 
-  __remove_dirty(keys: string[]) {
-    for (const key of keys) {
-      this.__state.dirty.delete(key);
+  __remove_dirty(keys: string | string[]) {
+    if (typeof keys === 'string') {
+      this.__state.dirty.delete(keys);
+    } else {
+      for (const key of keys) {
+        this.__state.dirty.delete(key);
+      }
     }
   }
 
@@ -805,7 +811,7 @@ export class Record {
     this.__data[name] = value;
   }
 
-  __uniqueFields(): Row {
+  __filter(): Row {
     const self = this;
     const data = Object.keys(this.__data).reduce(function(acc, cur, i) {
       acc[cur] = self.__getValue(cur);
@@ -816,7 +822,7 @@ export class Record {
 
   __match(row: Document): boolean {
     const model = this.__table.model;
-    const fields = this.__uniqueFields();
+    const fields = this.__filter();
     for (const name in fields) {
       const lhs = model.valueOf(fields[name], name);
       const rhs = model.valueOf(row[name] as Value, name);

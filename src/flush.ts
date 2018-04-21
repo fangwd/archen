@@ -3,9 +3,10 @@ import {
   Table,
   Record,
   Value,
-  toDocument,
-  Document
+  Document,
+  toDocument
 } from './database';
+
 import { Accessor } from './accessor';
 import { Row } from './engine';
 import { encodeFilter } from './filter';
@@ -208,24 +209,18 @@ function _persist(store: RecordStore, record: Record): Promise<Record> {
   });
 }
 
-const DEFAULT_OPTIONS = {
-  separator: '-'
-};
-
-export function flushTable(table: Table, options?): Promise<any> {
-  options = Object.assign({}, options, DEFAULT_OPTIONS);
-
-  mergeRecords(table, options);
+export function flushTable(table: Table): Promise<number> {
+  mergeRecords(table);
 
   const filter = [];
 
   for (const record of table.recordList) {
     if (record.__dirty() && record.__flushable()) {
-      filter.push(record.__uniqueFields());
+      filter.push(record.__filter());
     }
   }
 
-  if (filter.length === 0) return Promise.resolve();
+  if (filter.length === 0) return Promise.resolve(0);
 
   const dialect = table.db.engine;
   const model = table.model;
@@ -266,27 +261,49 @@ export function flushTable(table: Table, options?): Promise<any> {
     });
   }
 
+  let insertCount;
+  let updateCount;
+
   function _insert() {
     const fields = model.fields.filter(field => field instanceof SimpleField);
     const names = fields.map(field => (field as SimpleField).column.name);
     const columns = names.map(dialect.escapeId).join(',');
     const into = dialect.escapeId(model.table.name);
-
     const values = [];
     for (const record of table.recordList) {
       if (!record.__dirty() || !record.__flushable()) continue;
       if (record.__state.method !== FlushMethod.INSERT) continue;
+      // NOTE: Only works for MySQL which accepts null for auto increment keys
       const entry = fields.reduce((values, field) => {
         const value = record.__getValue(field.name);
         values.push(table.escapeValue(field as SimpleField, value));
+        if (value !== undefined) {
+          record.__remove_dirty(field.name);
+        }
         return values;
       }, []);
       values.push(`(${entry})`);
     }
 
-    // NOTE: Only works for MySQL which accepts null for auto increment keys
-    const sql = `insert into ${into} (${columns}) values ${values.join(', ')}`;
-    return table.db.engine.query(sql);
+    if ((insertCount = values.length) > 0) {
+      const joined = values.join(', ');
+      const query = `insert into ${into} (${columns}) values ${joined}`;
+      return table.db.engine.query(query);
+    }
+  }
+
+  function _update() {
+    const promises = [];
+    for (const record of table.recordList) {
+      if (!record.__dirty() || !record.__flushable()) continue;
+      if (record.__state.method !== FlushMethod.UPDATE) continue;
+      const fields = record.__fields();
+      record.__remove_dirty(Object.keys(fields));
+      promises.push(table.update(fields, record.__filter()));
+    }
+    if ((updateCount = promises.length) > 0) {
+      return Promise.all(promises);
+    }
   }
 
   // TODO:
@@ -294,10 +311,18 @@ export function flushTable(table: Table, options?): Promise<any> {
   // 2. Updated merged records after inserting
   return _select()
     .then(() => _insert())
-    .then(() => _select());
+    .then(() => _update())
+    .then(() => {
+      const total = insertCount + updateCount;
+      if (!insertCount || !model.primaryKey.fields[0].column.autoIncrement) {
+        return total;
+      } else {
+        return _select().then(() => total);
+      }
+    });
 }
 
-function mergeRecords(table: Table, options) {
+function mergeRecords(table: Table) {
   const model = table.model;
 
   const map = model.uniqueKeys.reduce((map, uc) => {
@@ -305,9 +330,11 @@ function mergeRecords(table: Table, options) {
     return map;
   }, {});
 
+  const separator = table.db.options.fieldSeparator;
+
   for (const record of table.recordList) {
     for (const uc of model.uniqueKeys) {
-      const value = record.__valueOf(uc, options.separator);
+      const value = record.__valueOf(uc, separator);
       if (value === undefined) continue;
       const existing = map[uc.name()][value];
       if (existing) {
@@ -324,4 +351,38 @@ function mergeRecords(table: Table, options) {
       record.__merge();
     }
   }
+}
+
+export function flushDatabase(db: Database) {
+  function getDirtyCount() {
+    let dirtyCount = 0;
+    for (const table of db.tableList) {
+      for (const record of table.recordList) {
+        if (record.__dirty()) {
+          dirtyCount++;
+        }
+      }
+    }
+    return dirtyCount;
+  }
+
+  return new Promise((resolve, reject) => {
+    let lastDirtyCount = 0;
+    function _flush() {
+      const promises = db.tableList.map(table => flushTable(table));
+      Promise.all(promises).then(results => {
+        const count = results.reduce((a, b) => a + b, 0);
+        if (count === 0) {
+          throw Error('Loop in data');
+        }
+        console.log(`${count} updates`);
+        if (getDirtyCount() > 0) {
+          _flush();
+        } else {
+          resolve();
+        }
+      });
+    }
+    _flush();
+  });
 }

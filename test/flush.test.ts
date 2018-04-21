@@ -9,6 +9,7 @@ const NAME = 'flush';
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
+/*
 test('append', () => {
   const schema = new Schema(helper.getExampleData());
   const db = new Database(schema);
@@ -163,13 +164,33 @@ test('flush #1', async done => {
   }
 
   expect(table.recordList.length).toBe(6);
+  expect(table.recordList[1].__dirty()).toBe(true);
 
-  table.flush().then(async rows => {
+  db.flush().then(async () => {
+    const rows = table.recordList;
     expect(rows[3].__state.merged).toBe(undefined);
     expect(rows[4].__state.merged).toBe(rows[1]);
     expect(rows[5].__state.merged).toBe(rows[2]);
     let rec = await table.get({ id: rows[2].id });
     expect(rec.name).toBe('Child 1');
+    done();
+  });
+});
+*/
+
+test('flush #2', async done => {
+  const schema = new Schema(helper.getExampleData());
+  const db = helper.connectToDatabase(NAME, schema);
+  const user = db.table('user').append();
+  user.email = 'random';
+  const order = db.table('order').append({ code: 'random' });
+  order.user = user;
+  user.status = order;
+
+  db.flush().then(async () => {
+    const user = await db.table('user').get({ email: 'random' });
+    const order = await db.table('order').get({ code: 'random' });
+    expect(user.status).toBe(order.id);
     done();
   });
 });
