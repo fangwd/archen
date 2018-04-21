@@ -29,12 +29,21 @@ import {
   flushRecord
 } from './flush';
 
+interface Options {
+  fieldSeparator: string;
+}
+
+const DEFAULT_OPTIONS = {
+  fieldSeparator: '-'
+};
+
 export class Database {
   schema: Schema;
   engine: Connection;
   tables: { [key: string]: Table } = {};
+  options: Options;
 
-  constructor(schema: Schema, connection?: Connection) {
+  constructor(schema: Schema, connection?: Connection, options?: Options) {
     this.schema = schema;
     this.engine = connection;
     for (const model of schema.models) {
@@ -47,6 +56,7 @@ export class Database {
         return record;
       };
     }
+    this.options = Object.assign({}, options, DEFAULT_OPTIONS);
   }
 
   table(name: string | Field | Model): Table {
@@ -68,7 +78,7 @@ export class Database {
 
   clear() {
     for (const name in this.tables) {
-      this.tables[name].recordList = [];
+      this.tables[name].clear();
     }
   }
 }
@@ -87,10 +97,12 @@ export class Table {
   model: Model;
 
   recordList: Record[] = [];
+  recordMap: { [key: string]: { [key: string]: Record } };
 
   constructor(db: Database, model: Model) {
     this.db = db;
     this.model = model;
+    this._initMap();
   }
 
   column(name: string): ColumnInfo {
@@ -597,13 +609,54 @@ export class Table {
 
   append(data?: { [key: string]: any }): Record {
     const record = new Proxy(new Record(this), RecordProxy);
-    this.recordList.push(record);
     Object.assign(record, data);
-    return record;
+    const existing = this._mapGet(record);
+    if (!existing) {
+      this.recordList.push(record);
+      this._mapPut(record);
+      return record;
+    }
+    return existing;
+  }
+
+  clear() {
+    this.recordList = [];
+    this._initMap();
   }
 
   flush() {
     return flushTable(this);
+  }
+
+  _mapGet(record: Record): Record {
+    let existing: Record;
+    for (const uc of this.model.uniqueKeys) {
+      const value = record.__valueOf(uc, this.db.options.fieldSeparator);
+      if (value !== undefined) {
+        const record = this.recordMap[uc.name()][value];
+        if (existing !== record) {
+          if (existing) throw Error(`Inconsistent unique constraint values`);
+          existing = record;
+        }
+      }
+    }
+    return existing;
+  }
+
+  _mapPut(record: Record) {
+    for (const uc of this.model.uniqueKeys) {
+      const value = record.__valueOf(uc, this.db.options.fieldSeparator);
+      if (value !== undefined) {
+        this.recordMap[uc.name()][value] = record;
+      }
+    }
+  }
+
+  _initMap() {
+    this.recordMap = this.model.uniqueKeys.reduce((map, uc) => {
+      map[uc.name()] = {};
+      return map;
+    }, {});
   }
 }
 
@@ -772,9 +825,9 @@ export class Record {
     return true;
   }
 
-  __valueOf(uk: UniqueKey, separator = '-'): string {
+  __valueOf(uc: UniqueKey, separator = '-'): string {
     const values = [];
-    for (const field of uk.fields) {
+    for (const field of uc.fields) {
       const value = this.__getValue(field.name);
       if (value === undefined) return undefined;
       values.push(value);

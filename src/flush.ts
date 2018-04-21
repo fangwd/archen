@@ -285,7 +285,7 @@ export function flushTable(table: Table, options?): Promise<any> {
     }
 
     // NOTE: Only works for MySQL which accepts null for auto increment keys
-    const sql = `insert into ${into} (${columns}) values ${values.join(',')}`;
+    const sql = `insert into ${into} (${columns}) values ${values.join(', ')}`;
     return table.db.engine.query(sql);
   }
 
@@ -300,16 +300,16 @@ export function flushTable(table: Table, options?): Promise<any> {
 function mergeRecords(table: Table, options) {
   const model = table.model;
 
-  const map = model.uniqueKeys.reduce((map, uk) => {
-    map[uk.name()] = {};
+  const map = model.uniqueKeys.reduce((map, uc) => {
+    map[uc.name()] = {};
     return map;
   }, {});
 
   for (const record of table.recordList) {
-    for (const uk of model.uniqueKeys) {
-      const value = record.__valueOf(uk, options.separator);
+    for (const uc of model.uniqueKeys) {
+      const value = record.__valueOf(uc, options.separator);
       if (value === undefined) continue;
-      const existing = map[uk.name()][value];
+      const existing = map[uc.name()][value];
       if (existing) {
         if (!record.__state.merged) {
           record.__state.merged = existing;
@@ -317,7 +317,7 @@ function mergeRecords(table: Table, options) {
           throw Error(`Could not merge into different records`);
         }
       } else {
-        map[uk.name()][value] = record;
+        map[uc.name()][value] = record;
       }
     }
     if (record.__state.merged) {

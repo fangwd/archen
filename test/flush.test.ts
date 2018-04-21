@@ -9,11 +9,12 @@ const NAME = 'flush';
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
-/*
 test('append', () => {
   const schema = new Schema(helper.getExampleData());
   const db = new Database(schema);
   const user = db.append('user', { email: 'user@example.com' });
+  const user2 = db.append('user', { email: 'user@example.com' });
+  expect(user).toBe(user2);
   expect(user instanceof Record).toBe(true);
   expect(db.table('user').recordList.length).toBe(1);
   user.status = 200;
@@ -133,13 +134,12 @@ test('save #5', async done => {
     done();
   });
 });
-*/
 
 test('flush #1', async done => {
   const schema = new Schema(helper.getExampleData());
   const db = helper.connectToDatabase(NAME, schema);
   const table = db.table('category');
-  const parent = table.append({ id: 1 });
+  let parent = table.append({ id: 1 });
 
   await table.insert({ name: 'Child 0', parent: 1 });
 
@@ -150,8 +150,26 @@ test('flush #1', async done => {
     });
   }
 
-  table.flush().then(rows => {
-    console.log(rows);
+  expect(table.recordList.length).toBe(4);
+
+  table.clear();
+
+  parent = table.append({ id: 1 });
+
+  for (let i = 0; i < 5; i++) {
+    const rec = table.append();
+    rec.name = `Child ${i % 3}`;
+    rec.parent = parent;
+  }
+
+  expect(table.recordList.length).toBe(6);
+
+  table.flush().then(async rows => {
+    expect(rows[3].__state.merged).toBe(undefined);
+    expect(rows[4].__state.merged).toBe(rows[1]);
+    expect(rows[5].__state.merged).toBe(rows[2]);
+    let rec = await table.get({ id: rows[2].id });
+    expect(rec.name).toBe('Child 1');
     done();
   });
 });
