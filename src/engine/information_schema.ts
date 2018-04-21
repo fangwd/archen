@@ -1,6 +1,5 @@
 import { Connection } from './connection';
 import { DatabaseInfo, TableInfo, ColumnInfo, IndexInfo } from '../model';
-import { Table } from '../database';
 
 export function getInformationSchema(
   connection: Connection,
