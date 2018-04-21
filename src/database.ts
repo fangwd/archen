@@ -796,7 +796,11 @@ export class Record {
 
   __getValue(name: string): Value {
     if (this.__data[name] instanceof Record) {
-      return this.__data[name].__primaryKey();
+      let parent = this.__data[name];
+      while (parent.__state.merged) {
+        parent = parent.__state.merged;
+      }
+      return parent.__primaryKey();
     }
     return this.__data[name] as Value;
   }
