@@ -7,8 +7,8 @@ import { FlushMethod } from '../src/flush';
 const NAME = 'flush';
 
 beforeAll(() => helper.createDatabase(NAME));
-afterAll(() => helper.dropDatabase(NAME));
-
+//afterAll(() => helper.dropDatabase(NAME));
+/*
 test('append', () => {
   const schema = new Schema(helper.getExampleData());
   const db = new Database(schema);
@@ -227,6 +227,37 @@ test('flush #3', async done => {
     const order2 = await db.table('order').get({ code: code2 });
     expect(user3.status).toBe(order2.id);
     expect(order2.user.id).toBe(user.id);
+    done();
+  });
+});
+*/
+
+test('flush #4', async done => {
+  const schema = new Schema(helper.getExampleData());
+
+  // 5 emails
+  const emails = [...Array(5).keys()].map(x => helper.getId());
+
+  // 3 connections
+  const dbs = [...Array(3).keys()].map(x =>
+    helper.connectToDatabase(NAME, schema)
+  );
+
+  dbs.forEach((db, index) => {
+    for (let i = 0; i < 3; i++) {
+      const email = emails[(2 * index + i) % emails.length];
+      db.table('user').append({ email });
+    }
+  });
+
+  const count = (await dbs[0].table('user').select('*')).length;
+
+  const promises = dbs.map(db => db.flush());
+
+  Promise.all(promises).then(async () => {
+    const db = helper.connectToDatabase(NAME, schema);
+    const rows = await db.table('user').select('*');
+    expect(rows.length).toBe(count + 5);
     done();
   });
 });
