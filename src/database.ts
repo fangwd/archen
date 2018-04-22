@@ -706,6 +706,9 @@ function isEmpty(value: Value | Record | any) {
   }
 
   if (value instanceof Record) {
+    while (value.__state.merged) {
+      value = value.__state.merged;
+    }
     return isEmpty(value.__primaryKey());
   }
 
