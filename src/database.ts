@@ -192,7 +192,7 @@ export class Table {
     return this.db.engine.query(sql);
   }
 
-  delete(filter: Filter): Promise<any> {
+  delete(filter?: Filter): Promise<any> {
     let sql = `delete from ${this._name()}`;
 
     if (filter) {
