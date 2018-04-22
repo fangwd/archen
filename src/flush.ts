@@ -26,6 +26,15 @@ export class FlushState {
   deleted: boolean = false;
   merged?: Record;
   selected?: boolean;
+  clone(): FlushState {
+    const state = new FlushState();
+    state.method = this.method;
+    state.dirty = new Set(this.dirty);
+    state.deleted = this.deleted;
+    state.merged = undefined;
+    state.selected = undefined;
+    return state;
+  }
 }
 
 export const RecordProxy = {
@@ -211,6 +220,41 @@ function _persist(store: RecordStore, record: Record): Promise<Record> {
 }
 
 export function flushTable(table: Table): Promise<number> {
+  const states = [];
+
+  for (let i = 0; i < table.recordList.length; i++) {
+    const record = table.recordList[i];
+    states.push({
+      data: { ...record.__data },
+      state: record.__state.clone()
+    });
+  }
+
+  const db = table.db;
+
+  return new Promise((resolve, reject) => {
+    function __try() {
+      db.transaction(() => {
+        return _flushTable(table)
+          .then(number => resolve(number))
+          .catch(reason => {
+            for (let i = 0; i < table.recordList.length; i++) {
+              const record = table.recordList[i];
+              const state = states[i];
+              record.__data = { ...state.data };
+              record.__state = state.state.clone();
+            }
+            db.engine.rollback().then(() => {
+              __try();
+            });
+          });
+      });
+    }
+    __try();
+  });
+}
+
+function _flushTable(table: Table): Promise<number> {
   mergeRecords(table);
 
   const filter = [];
