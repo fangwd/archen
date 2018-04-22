@@ -235,7 +235,7 @@ export function flushTable(table: Table): Promise<number> {
     return table.db.engine.query(query).then(rows => {
       rows = rows.map(row => toDocument(row, table.model));
       for (const record of table.recordList) {
-        if (!record.__dirty() && record.__primaryKey()) continue;
+        if (!record.__dirty()) continue;
         for (const row of rows) {
           if (!record.__match(row)) continue;
           if (!record.__primaryKey()) {
@@ -266,30 +266,45 @@ export function flushTable(table: Table): Promise<number> {
   let updateCount;
 
   function _insert() {
-    const fields = model.fields.filter(field => field instanceof SimpleField);
+    const fields = model.fields.filter(
+      field => field instanceof SimpleField && !field.column.autoIncrement
+    );
     const names = fields.map(field => (field as SimpleField).column.name);
     const columns = names.map(dialect.escapeId).join(',');
     const into = dialect.escapeId(model.table.name);
     const values = [];
+    const records: Record[] = [];
     for (const record of table.recordList) {
       if (!record.__dirty() || !record.__flushable()) continue;
       if (record.__state.method !== FlushMethod.INSERT) continue;
-      // NOTE: Only works for MySQL which accepts null for auto increment keys
       const entry = fields.reduce((values, field) => {
-        const value = record.__getValue(field.name);
-        values.push(table.escapeValue(field as SimpleField, value));
-        if (value !== undefined) {
-          record.__remove_dirty(field.name);
+        if (!(field as SimpleField).column.autoIncrement) {
+          const value = record.__getValue(field.name);
+          values.push(table.escapeValue(field as SimpleField, value));
+          if (value !== undefined) {
+            record.__remove_dirty(field.name);
+          }
         }
         return values;
       }, []);
       values.push(`(${entry})`);
+      records.push(record);
     }
 
     if ((insertCount = values.length) > 0) {
       const joined = values.join(', ');
       const query = `insert into ${into} (${columns}) values ${joined}`;
-      return table.db.engine.query(query);
+      return table.db.engine.query(query).then(id => {
+        for (const record of records) {
+          if (model.primaryKey.autoIncrement()) {
+            record.__setPrimaryKey(id++);
+          }
+          record.__state.selected = true;
+          //record.__clearDirty();
+          record.__state.method = FlushMethod.UPDATE;
+        }
+        return records;
+      });
     }
   }
 
@@ -311,12 +326,7 @@ export function flushTable(table: Table): Promise<number> {
     .then(() => _insert())
     .then(() => _update())
     .then(() => {
-      const total = insertCount + updateCount;
-      if (!insertCount || !model.primaryKey.fields[0].column.autoIncrement) {
-        return total;
-      } else {
-        return _select().then(() => total);
-      }
+      return insertCount + updateCount;
     });
 }
 
