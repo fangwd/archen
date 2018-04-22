@@ -202,17 +202,31 @@ test('flush #3', async done => {
   const user2 = db.table('user').append();
   user2.email = email;
 
+  const email2 = helper.getId();
+  const user3 = db.table('user').append({ email: email2 });
+
   const code = helper.getId();
 
   const order = db.table('order').append({ code });
   order.user = user2;
   user2.status = order;
 
+  const code2 = helper.getId();
+
+  const order2 = db.table('order').append({ code: code2 });
+  order2.user = user2;
+  user3.status = order2;
+
   db.flush().then(async () => {
     expect(db.engine.queryCounter.total).toBe(8);
     const user = await db.table('user').get({ email });
     const order = await db.table('order').get({ code });
+    expect(order.user.id).toBe(user.id);
     expect(user.status).toBe(order.id);
+    const user3 = await db.table('user').get({ email: email2 });
+    const order2 = await db.table('order').get({ code: code2 });
+    expect(user3.status).toBe(order2.id);
+    expect(order2.user.id).toBe(user.id);
     done();
   });
 });
