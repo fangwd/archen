@@ -414,6 +414,10 @@ export class UniqueKey {
   name() {
     return this.fields.map(field => field.name).join('-');
   }
+
+  autoIncrement() {
+    return this.fields.length === 1 && this.fields[0].column.autoIncrement;
+  }
 }
 
 function lcfirst(s: string): string {
