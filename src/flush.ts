@@ -344,7 +344,6 @@ function _flushTable(table: Table): Promise<number> {
             record.__setPrimaryKey(id++);
           }
           record.__state.selected = true;
-          //record.__clearDirty();
           record.__state.method = FlushMethod.UPDATE;
         }
         return records;
@@ -420,13 +419,17 @@ export function flushDatabase(db: Database) {
   }
 
   return new Promise((resolve, reject) => {
-    let lastDirtyCount = 0;
+    let waiting = 0;
     function _flush() {
       const promises = db.tableList.map(table => flushTable(table));
       Promise.all(promises).then(results => {
         const count = results.reduce((a, b) => a + b, 0);
-        if (count === 0) {
-          throw Error('Circular references');
+        if (count === 0 && getDirtyCount() > 0) {
+          if (waiting++) {
+            throw Error('Circular references');
+          }
+        } else {
+          waiting = 0;
         }
         if (getDirtyCount() > 0) {
           _flush();

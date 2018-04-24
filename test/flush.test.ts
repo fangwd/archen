@@ -7,8 +7,8 @@ import { FlushMethod } from '../src/flush';
 const NAME = 'flush';
 
 beforeAll(() => helper.createDatabase(NAME));
-//afterAll(() => helper.dropDatabase(NAME));
-/*
+afterAll(() => helper.dropDatabase(NAME));
+
 test('append', () => {
   const schema = new Schema(helper.getExampleData());
   const db = new Database(schema);
@@ -230,34 +230,65 @@ test('flush #3', async done => {
     done();
   });
 });
-*/
 
 test('flush #4', async done => {
   const schema = new Schema(helper.getExampleData());
-
-  // 5 emails
-  const emails = [...Array(5).keys()].map(x => helper.getId());
 
   // 3 connections
   const dbs = [...Array(3).keys()].map(x =>
     helper.connectToDatabase(NAME, schema)
   );
 
+  // 5 users
+  const emails = [...Array(5).keys()].map(x => helper.getId());
+
+  // 10 orders
+  const codes = [...Array(10).keys()].map(x => helper.getId());
+
+  // Each user has a number of orders
+  const map: { [key: string]: string[] } = {};
+  emails.forEach((email, i) => {
+    map[email] = [codes[2 * i], codes[2 * i + 1]];
+  });
+
   dbs.forEach((db, index) => {
     for (let i = 0; i < 3; i++) {
-      const email = emails[(2 * index + i) % emails.length];
-      db.table('user').append({ email });
+      for (const email of emails) {
+        const user = db.table('user').append({ email });
+        let order;
+        for (const code of map[email]) {
+          order = db.table('order').append({
+            code,
+            user
+          });
+        }
+        user.status = order;
+      }
     }
   });
 
-  const count = (await dbs[0].table('user').select('*')).length;
+  const userCount = (await dbs[0].table('user').select('*')).length;
+  const orderCount = (await dbs[0].table('order').select('*')).length;
 
   const promises = dbs.map(db => db.flush());
 
   Promise.all(promises).then(async () => {
     const db = helper.connectToDatabase(NAME, schema);
-    const rows = await db.table('user').select('*');
-    expect(rows.length).toBe(count + 5);
+    const users = await db.table('user').select('*');
+    const orders = await db.table('order').select('*');
+    expect(users.length).toBe(userCount + 5);
+    expect(orders.length).toBe(orderCount + 10);
+    let ok = true;
+    for (const email in map) {
+      const user = users.find(x => x.email === email);
+      let order;
+      for (const code of map[email]) {
+        order = orders.find(x => x.code === code);
+        ok = ok && order.user.id === user.id;
+      }
+      ok = ok && user.status === order.id;
+    }
+    expect(ok).toBe(true);
     done();
   });
 });
