@@ -7,7 +7,6 @@ import {
   toDocument
 } from './database';
 
-import { Accessor } from './accessor';
 import { Row } from './engine';
 import { encodeFilter } from './filter';
 
@@ -80,7 +79,6 @@ class FlushContext {
 }
 
 export class RecordStore {
-  accessor: Accessor;
   inserter: DataLoader<Record, Record>;
   counter: number = 0;
 
@@ -88,7 +86,6 @@ export class RecordStore {
     this.inserter = new DataLoader<Record, Record>((records: Record[]) =>
       Promise.all(records.map(record => _persist(this, record)))
     );
-    this.accessor = new Accessor(db.schema, db.engine);
   }
 }
 
@@ -183,7 +180,7 @@ function _persist(store: RecordStore, record: Record): Promise<Record> {
 
   return new Promise(resolve => {
     function _insert() {
-      store.accessor.get(record.__table.model, filter).then(row => {
+      record.__table.get(filter).then(row => {
         if (row) {
           record.__remove_dirty(Object.keys(filter));
           if (!record.__dirty()) {
