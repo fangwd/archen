@@ -61,7 +61,13 @@ app.use(
     context: archen.createGraphQLContext(schema, mysql, { buildError }),
     pretty: false,
     graphiql: true,
-    formatError: error => JSON.parse(error.message)
+    formatError: error => {
+      try {
+        return JSON.parse(error.message);
+      } catch (e) {
+        return error;
+      }
+    }
   }))
 );
 
