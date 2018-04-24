@@ -33,20 +33,14 @@ interface ConnectionSelectOptions {
 
 export class Accessor {
   db: Database;
-  domain: Schema;
   loaders: FieldLoaderMap;
   queryLoader: DataLoader<string, Row[]>;
 
-  constructor(schema: Schema, connection: Connection | Database) {
-    if (connection instanceof Database) {
-      this.db = connection;
-    } else {
-      this.db = new Database(schema, connection);
-    }
-    this.domain = this.db.schema;
+  constructor(db: Database) {
+    this.db = db;
     this.queryLoader = createQueryLoader(this.db.engine);
     this.loaders = {};
-    for (const model of this.domain.models) {
+    for (const model of this.db.schema.models) {
       const loaders = {};
       for (const field of model.fields) {
         if (field.isUnique() || field instanceof ForeignKeyField) {
