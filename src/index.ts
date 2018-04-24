@@ -1,35 +1,32 @@
 import { Accessor } from './accessor';
 import { Connection, createConnection } from './engine';
 import { GraphQLSchema } from 'graphql';
-import { Schema, SchemaConfig } from './model';
+import { Schema } from './model';
 import { SchemaBuilder } from './schema';
+import { Database, DatabaseOptions } from './database';
 
-export class Instance {
-  domain: Schema;
-  schema: GraphQLSchema;
-
-  constructor(data: string | Buffer | any, config?: SchemaConfig) {
-    if (data instanceof Buffer) {
-      data = data.toString();
-    }
-
-    if (typeof data === 'string') {
-      data = JSON.parse(data);
-    }
-
-    this.domain = new Schema(data, config);
-    this.schema = new SchemaBuilder(this.domain).getSchema();
-  }
-
-  getSchema() {
-    return this.schema;
-  }
-
-  getContext(db: Connection) {
-    return {
-      accessor: new Accessor(this.domain, db)
-    };
-  }
+function createGraphQLSchema(schema: Schema): GraphQLSchema {
+  return new SchemaBuilder(schema).getSchema();
 }
 
-export { createConnection };
+function createGraphQLContext(
+  db: Database | Schema,
+  connection?: Connection,
+  options?: DatabaseOptions
+) {
+  if (db instanceof Schema) {
+    db = new Database(db, connection, options);
+  }
+
+  return {
+    accessor: new Accessor(db)
+  };
+}
+
+export {
+  Schema,
+  Database,
+  createGraphQLSchema,
+  createConnection,
+  createGraphQLContext
+};
