@@ -637,7 +637,7 @@ mutation{
 function createArchen(config?: SchemaConfig) {
   const domain = new Schema(data, config);
   const db = helper.connectToDatabase(NAME);
-  const accessor = new Accessor(domain, db);
+  const accessor = new Accessor(db);
   const schema = createSchema(domain);
 
   return { domain, db, accessor, schema };
