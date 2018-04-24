@@ -186,7 +186,12 @@ export class Table {
       }
     }
 
-    return this.db.engine.query(sql);
+    return this.db.engine.query(sql).catch(error => {
+      if (typeof this.db.options.buildError === 'function') {
+        error = this.db.options.buildError(this, 'UPDATE', data, error);
+      }
+      throw Error(error);
+    });
   }
 
   insert(data: Row): Promise<any> {
