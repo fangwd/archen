@@ -234,7 +234,8 @@ export function flushTable(table: Table): Promise<number> {
       db.transaction(() => {
         return _flushTable(table)
           .then(number => resolve(number))
-          .catch(reason => {
+          .catch(error => {
+            if (!isIntegrityError(error)) return reject(error);
             for (let i = 0; i < table.recordList.length; i++) {
               const record = table.recordList[i];
               const state = states[i];
@@ -419,22 +420,28 @@ export function flushDatabase(db: Database) {
     let waiting = 0;
     function _flush() {
       const promises = db.tableList.map(table => flushTable(table));
-      Promise.all(promises).then(results => {
-        const count = results.reduce((a, b) => a + b, 0);
-        if (count === 0 && getDirtyCount() > 0) {
-          if (waiting++) {
-            throw Error('Circular references');
+      Promise.all(promises)
+        .then(results => {
+          const count = results.reduce((a, b) => a + b, 0);
+          if (count === 0 && getDirtyCount() > 0) {
+            if (waiting++) {
+              throw Error('Circular references');
+            }
+          } else {
+            waiting = 0;
           }
-        } else {
-          waiting = 0;
-        }
-        if (getDirtyCount() > 0) {
-          _flush();
-        } else {
-          resolve();
-        }
-      });
+          if (getDirtyCount() > 0) {
+            _flush();
+          } else {
+            resolve();
+          }
+        })
+        .catch(error => reject(error));
     }
     _flush();
   });
+}
+
+function isIntegrityError(error) {
+  return /\bDuplicate\b/i.test(error.message);
 }
