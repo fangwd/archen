@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Archen - Add GraphQL API to your existing database",
   "main": "./dist/index.js",
   "files": [
@@ -49,7 +49,7 @@
     },
     "testRegex": "/test/.+\\.test.ts",
     "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
-    "collectCoverage": true,
+    "collectCoverage": false,
     "collectCoverageFrom": ["src/**/*.ts"],
     "verbose": true
   }
