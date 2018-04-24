@@ -29,8 +29,9 @@ import {
   flushRecord
 } from './flush';
 
-interface Options {
+export interface DatabaseOptions {
   fieldSeparator: string;
+  buildError: (table: Table, action: string, data: any, error: any) => string;
 }
 
 const DEFAULT_OPTIONS = {
@@ -42,9 +43,13 @@ export class Database {
   engine: Connection;
   tableMap: { [key: string]: Table } = {};
   tableList: Table[] = [];
-  options: Options;
+  options: DatabaseOptions;
 
-  constructor(schema: Schema, connection?: Connection, options?: Options) {
+  constructor(
+    schema: Schema,
+    connection?: Connection,
+    options?: DatabaseOptions
+  ) {
     this.schema = schema;
     this.engine = connection;
     for (const model of schema.models) {
@@ -189,7 +194,12 @@ export class Table {
     const name = keys.map(key => this.escapeName(key)).join(', ');
     const value = keys.map(key => this.escapeValue(key, data[key])).join(', ');
     const sql = `insert into ${this._name()} (${name}) values (${value})`;
-    return this.db.engine.query(sql);
+    return this.db.engine.query(sql).catch(error => {
+      if (typeof this.db.options.buildError === 'function') {
+        error = this.db.options.buildError(this, 'INSERT', data, error);
+      }
+      throw Error(error);
+    });
   }
 
   delete(filter?: Filter): Promise<any> {
