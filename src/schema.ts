@@ -822,33 +822,3 @@ function getFieldsExclude(
 
   return fields;
 }
-
-/*
-mutation {
-  updateOrder(where: { id: 2 }, data: {
-    user: {
-      update: {
-        userGroups: {
-          update: {
-            data: {
-              group: {
-                update: {
-                	name: "Bob"
-                }
-              }
-            },
-            where: { group: { id: 2 } }
-          }
-        }
-      }
-    }
-  }) {
-    code
-    user {
-      id
-      lastName
-    }
-  }
-}
-*/
-
