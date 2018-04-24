@@ -31,28 +31,37 @@ const options = {
   ]
 };
 
-const inst = new archen.Instance(
-  fs.readFileSync('example/data/schema.json'),
+const schema = new archen.Schema(
+  JSON.parse(fs.readFileSync('example/data/schema.json')),
   options
 );
 
 const app = express();
+
+function buildError(table, action, data, error) {
+  const fields = Object.keys(data);
+  const value = fields.map(name => data[name]);
+  return JSON.stringify({
+    code: error.code,
+    data: {
+      table: table.model.table.name,
+      action,
+      fields,
+      value
+    }
+  });
+}
 
 app.get('/', (req, res) => res.send('Hello World!'));
 
 app.use(
   '/graphql',
   graphqlHTTP((request, response, params) => ({
-    schema: inst.getSchema(),
-    context: inst.getContext(mysql),
+    schema: archen.createGraphQLSchema(schema),
+    context: archen.createGraphQLContext(schema, mysql, { buildError }),
     pretty: false,
     graphiql: true,
-    formatError: error => ({
-      message: error.message,
-      locations: error.locations,
-      stack: error.stack ? error.stack.split('\n') : [],
-      path: error.path
-    })
+    formatError: error => JSON.parse(error.message)
   }))
 );
 
