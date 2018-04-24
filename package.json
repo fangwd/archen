@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Archen - Add GraphQL API to your existing database",
   "main": "./dist/index.js",
   "files": [
