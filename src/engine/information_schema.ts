@@ -1,5 +1,5 @@
 import { Connection } from './connection';
-import { DatabaseInfo, TableInfo, ColumnInfo, IndexInfo } from '../model';
+import { DatabaseInfo, TableInfo, ColumnInfo, ConstraintInfo } from '../model';
 
 export function getInformationSchema(
   connection: Connection,
@@ -41,7 +41,7 @@ class Builder {
           tables.push({
             name: row.TABLE_NAME,
             columns: [],
-            indexes: []
+            constraints: []
           });
         }
         return tables;
@@ -83,30 +83,30 @@ class Builder {
       .then(rows => {
         const promises = [];
         for (const row of rows) {
-          const index: IndexInfo = {
+          const constraint: ConstraintInfo = {
             name: row.CONSTRAINT_NAME,
             columns: []
           };
           switch (row.CONSTRAINT_TYPE) {
             case 'PRIMARY KEY':
-              index.primaryKey = true;
-              promises.push(this.getConstraintsColumns(table.name, index));
+              constraint.primaryKey = true;
+              promises.push(this.getConstraintsColumns(table.name, constraint));
               break;
             case 'UNIQUE':
-              index.unique = true;
-              promises.push(this.getConstraintsColumns(table.name, index));
+              constraint.unique = true;
+              promises.push(this.getConstraintsColumns(table.name, constraint));
               break;
             case 'FOREIGN KEY':
-              promises.push(this.getConstraintsColumns(table.name, index));
+              promises.push(this.getConstraintsColumns(table.name, constraint));
               break;
           }
-          table.indexes.push(index);
+          table.constraints.push(constraint);
         }
         return Promise.all(promises).then(() => {
           const promises = [];
           for (const row of rows) {
             if (row.CONSTRAINT_TYPE === 'FOREIGN KEY') {
-              const index = table.indexes.find(
+              const index = table.constraints.find(
                 index => index.name === row.CONSTRAINT_NAME
               );
               promises.push(this.getReferentialConstraints(table, index));
@@ -117,7 +117,7 @@ class Builder {
       });
   }
 
-  getConstraintsColumns(tableName: string, index: IndexInfo) {
+  getConstraintsColumns(tableName: string, index: ConstraintInfo) {
     const query = `SELECT * FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA='${
       this.schemaName
     }' AND TABLE_NAME='${tableName}' AND  CONSTRAINT_NAME='${
@@ -130,7 +130,7 @@ class Builder {
     });
   }
 
-  getReferentialConstraints(table: TableInfo, index: IndexInfo) {
+  getReferentialConstraints(table: TableInfo, index: ConstraintInfo) {
     const query = `SELECT * FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = '${
       this.schemaName
     }' AND TABLE_NAME='${table.name}' AND CONSTRAINT_NAME='${index.name}'`;

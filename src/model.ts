@@ -9,7 +9,7 @@ export interface DatabaseInfo {
 export interface TableInfo {
   name: string;
   columns: ColumnInfo[];
-  indexes?: IndexInfo[];
+  constraints?: ConstraintInfo[];
 }
 
 export interface ColumnInfo {
@@ -20,13 +20,13 @@ export interface ColumnInfo {
   autoIncrement?: boolean;
 }
 
-export interface IndexInfo {
+export interface ConstraintInfo {
   name?: string;
   table?: string;
   columns: string[];
   primaryKey?: boolean;
   unique?: boolean;
-  references?: IndexInfo;
+  references?: ConstraintInfo;
 }
 
 export interface SchemaConfig {
@@ -128,8 +128,8 @@ export class Model {
     this.pluralName =
       this.config.pluralName || toCamelCase(pluralise(table.name));
 
-    const references: { [key: string]: IndexInfo } = {};
-    for (const index of table.indexes) {
+    const references: { [key: string]: ConstraintInfo } = {};
+    for (const index of table.constraints) {
       if (index.references) {
         if (index.columns.length > 1) {
           throw Error('Composite foreign keys are not supported');
@@ -242,7 +242,7 @@ export class Model {
   }
 
   resolveForeignKeyFields() {
-    for (const index of this.table.indexes) {
+    for (const index of this.table.constraints) {
       if (index.primaryKey || index.unique) {
         const fields = index.columns.map(name => this.field(name));
         const uniqueKey = new UniqueKey(fields, index.primaryKey);
