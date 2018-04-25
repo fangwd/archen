@@ -1,8 +1,8 @@
-node_modules/
-coverage/
-archen_test
 *~
 *.swp
 *.swo
 *.log
+.vscode
+node_modules/
+coverage/
 dist/
