@@ -34,7 +34,7 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
+            "constraints": [
                 {
                     "primaryKey": true,
                     "columns": [
@@ -65,7 +65,7 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
+            "constraints": [
                 {
                     "primaryKey": true,
                     "columns": [
@@ -107,20 +107,7 @@
                     "default_quotable": false
                 }
             ],
-            "indexes": [
-                {
-                    "primaryKey": true,
-                    "columns": [
-                        "id"
-                    ]
-                },
-                {
-                    "unique": true,
-                    "columns": [
-                        "user_id",
-                        "group_id"
-                    ]
-                },
+            "constraints": [
                 {
                     "columns": [
                         "user_id"
@@ -142,6 +129,19 @@
                             "id"
                         ]
                     }
+                },
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "user_id",
+                        "group_id"
+                    ]
                 }
             ]
         },
@@ -166,13 +166,7 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
-                {
-                    "primaryKey": true,
-                    "columns": [
-                        "id"
-                    ]
-                },
+            "constraints": [
                 {
                     "columns": [
                         "parent_id"
@@ -183,6 +177,12 @@
                             "id"
                         ]
                     }
+                },
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
                 },
                 {
                     "unique": true,
@@ -218,13 +218,7 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
-                {
-                    "primaryKey": true,
-                    "columns": [
-                        "id"
-                    ]
-                },
+            "constraints": [
                 {
                     "columns": [
                         "ancestor_id"
@@ -246,6 +240,12 @@
                             "id"
                         ]
                     }
+                },
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
                 },
                 {
                     "unique": true,
@@ -293,7 +293,7 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
+            "constraints": [
                 {
                     "primaryKey": true,
                     "columns": [
@@ -328,13 +328,7 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
-                {
-                    "primaryKey": true,
-                    "columns": [
-                        "id"
-                    ]
-                },
+            "constraints": [
                 {
                     "columns": [
                         "product_id"
@@ -356,6 +350,12 @@
                             "id"
                         ]
                     }
+                },
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
                 },
                 {
                     "unique": true,
@@ -406,7 +406,7 @@
                     "nullable": false
                 }
             ],
-            "indexes": [
+            "constraints": [
                 {
                     "primaryKey": true,
                     "columns": [
@@ -462,19 +462,7 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
-                {
-                    "primaryKey": true,
-                    "columns": [
-                        "id"
-                    ]
-                },
-                {
-                    "unique": true,
-                    "columns": [
-                        "code"
-                    ]
-                },
+            "constraints": [
                 {
                     "columns": [
                         "delivery_address_id"
@@ -496,6 +484,18 @@
                             "id"
                         ]
                     }
+                },
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "code"
+                    ]
                 }
             ]
         },
@@ -524,21 +524,7 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
-                {
-                    "primaryKey": true,
-                    "columns": [
-                        "id"
-                    ]
-                },
-                {
-                    "name": "order_product",
-                    "unique": true,
-                    "columns": [
-                        "order_id",
-                        "product_id"
-                    ]
-                },
+            "constraints": [
                 {
                     "columns": [
                         "order_id"
@@ -560,6 +546,20 @@
                             "id"
                         ]
                     }
+                },
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "order_product",
+                    "unique": true,
+                    "columns": [
+                        "order_id",
+                        "product_id"
+                    ]
                 }
             ]
         },
@@ -577,9 +577,8 @@
                     "nullable": true
                 }
             ],
-            "indexes": [
+            "constraints": [
                 {
-                    "primaryKey": true,
                     "columns": [
                         "order_id"
                     ],
@@ -588,7 +587,8 @@
                         "columns": [
                             "id"
                         ]
-                    }
+                    },
+                    "primaryKey": true
                 }
             ]
         }
