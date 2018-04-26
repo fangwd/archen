@@ -162,11 +162,13 @@ export class Model {
   }
 
   valueOf(value: Value | Document, name: string): Value {
-    if (value === null || typeof value !== 'object') {
-      return value as Value;
+    if (value !== null && typeof value === 'object') {
+      const field = this.field(name);
+      if (field instanceof ForeignKeyField) {
+        return value[field.model.primaryKey.fields[0].name];
+      }
     }
-    const field = this.field(name) as ForeignKeyField;
-    return value[field.model.primaryKey.fields[0].name];
+    return value as Value;
   }
 
   checkUniqueKey(row, reject?): UniqueKey {

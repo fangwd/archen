@@ -92,6 +92,13 @@ export class Database {
       this.tableMap[name].clear();
     }
   }
+
+  json() {
+    return this.tableList.reduce((result, table) => {
+      result[table.model.name] = table.json();
+      return result;
+    }, {});
+  }
 }
 
 export type OrderBy = string | string[];
@@ -645,6 +652,10 @@ export class Table {
     this._initMap();
   }
 
+  json() {
+    return this.recordList.map(record => record.__json());
+  }
+
   _mapGet(record: Record): Record {
     let existing: Record;
     for (const uc of this.model.uniqueKeys) {
@@ -685,7 +696,7 @@ function _toCamel(value: Value, field: SimpleField): Value {
 }
 
 export function _toSnake(value: Value, field: SimpleField): Value {
-  if (/date|time/i.test(field.column.type)) {
+  if (value && /date|time/i.test(field.column.type)) {
     return new Date(value as any)
       .toISOString()
       .slice(0, 19)
@@ -848,7 +859,10 @@ export class Record {
     for (const name in fields) {
       const lhs = model.valueOf(fields[name], name);
       const rhs = model.valueOf(row[name] as Value, name);
-      if (lhs != rhs) return false;
+      const field = model.field(name) as SimpleField;
+      if (_toSnake(lhs, field) !== _toSnake(rhs, field)) {
+        return false;
+      }
     }
     return true;
   }
@@ -873,5 +887,13 @@ export class Record {
       root.__data[name] = self.__data[name];
       root.__state.dirty.add(name);
     });
+  }
+
+  __json() {
+    const result = {};
+    for (const field of this.__table.model.fields) {
+      result[field.name] = this.__getValue(field.name);
+    }
+    return result;
   }
 }

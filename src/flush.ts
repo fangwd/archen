@@ -367,7 +367,7 @@ function _flushTable(table: Table): Promise<number> {
     .then(() => _insert())
     .then(() => _update())
     .then(() => {
-      return insertCount + updateCount;
+      return filter.length + insertCount + updateCount;
     });
 }
 

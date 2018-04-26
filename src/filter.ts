@@ -223,7 +223,11 @@ export class QueryBuilder {
     return filter;
   }
 
-  select(name: string|SimpleField, filter?: Filter, orderBy?: OrderBy): string {
+  select(
+    name: string | SimpleField,
+    filter?: Filter,
+    orderBy?: OrderBy
+  ): string {
     this.froms = [`${this.escapeId(this.model)} ${this.alias || ''}`];
 
     if (orderBy) {
@@ -351,7 +355,7 @@ export class QueryBuilder {
         return value + '';
       }
     }
-    return this.dialect.escape(value + '');
+    return this.dialect.escape(_toSnake(value, field) + '');
   }
 
   private escapeId(name: string | SimpleField | Model): string {
