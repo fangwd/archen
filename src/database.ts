@@ -860,7 +860,7 @@ export class Record {
       const lhs = model.valueOf(fields[name], name);
       const rhs = model.valueOf(row[name] as Value, name);
       const field = model.field(name) as SimpleField;
-      if (_toSnake(lhs, field) !== _toSnake(rhs, field)) {
+      if (_toSnake(lhs, field) != _toSnake(rhs, field)) {
         return false;
       }
     }

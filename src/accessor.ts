@@ -64,10 +64,18 @@ export class Accessor {
             }
           }
         }
+        function __equal(row, key) {
+          const value = row[field.name];
+          if (field instanceof ForeignKeyField) {
+            return value[field.referencedField.model.keyField().name] === key;
+          } else {
+            return value === key;
+          }
+        }
         if (field.isUnique()) {
-          return keys.map(k => rows.find(r => r[field.name] === k));
+          return keys.map(k => rows.find(r => __equal(r, k)));
         } else {
-          return keys.map(k => rows.filter(r => r[field.name] === k));
+          return keys.map(k => rows.filter(r => __equal(r, k)));
         }
       });
     });

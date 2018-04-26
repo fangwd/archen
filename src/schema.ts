@@ -359,10 +359,20 @@ export class SchemaBuilder {
               },
               resolve(object, args, context: QueryContext) {
                 args.where = args.where || {};
-                args.where[related.name] = object[related.referencedField.name];
-                return context.accessor
-                  .query(related.model, args)
-                  .then(rows => (related.isUnique() ? rows[0] : rows));
+                let promise;
+                if (Object.keys(args.where).length === 0 && !args.limit) {
+                  promise = context.accessor.load(
+                    related,
+                    object[related.referencedField.name]
+                  );
+                } else {
+                  args.where[related.name] =
+                    object[related.referencedField.name];
+                  promise = context.accessor.query(related.model, args);
+                }
+                return promise.then(
+                  rows => (related.isUnique() ? rows[0] : rows)
+                );
               }
             };
           }
