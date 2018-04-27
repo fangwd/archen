@@ -235,10 +235,9 @@ export class QueryBuilder {
     }
 
     const where = this.where(filter).trim();
+    const fields = [this.encodeField(name)];
 
-    let sql = `select ${this.encodeField(name)} from ${this.froms.join(
-      ' left join '
-    )}`;
+    let sql = `${this.froms.join(' left join ')}`;
 
     if (where.length > 0) {
       sql += ` where ${where}`;
@@ -246,7 +245,6 @@ export class QueryBuilder {
 
     if (orderBy) {
       const aliasMap = this.context.aliasMap;
-
       orderBy = toArray(orderBy).map(order => {
         let [path, direction] = order.split(' ');
         let alias: string, field: Field;
@@ -263,8 +261,11 @@ export class QueryBuilder {
         }
         direction = /^desc$/i.test(direction || '') ? 'DESC' : 'ASC';
 
-        if (field instanceof SimpleField || field instanceof ForeignKeyField) {
-          return `${this.escapeId(alias)}.${this.escapeId(field)} ${direction}`;
+        if (field instanceof SimpleField) {
+          const column = `${this.escapeId(alias)}.${this.escapeId(field)}`;
+          const name = this.escapeId(path.replace(/\./g, '__'));
+          fields.push(`${column} as ${name}`);
+          return `${column} ${direction}`;
         }
 
         throw new Error(`Invalid sort column: ${path}`);
@@ -273,7 +274,7 @@ export class QueryBuilder {
       sql += ` order by ${orderBy.join(', ')}`;
     }
 
-    return sql;
+    return `select ${fields.join(', ')} from ${sql}`;
   }
 
   column(): string {
