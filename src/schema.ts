@@ -370,9 +370,12 @@ export class SchemaBuilder {
                     object[related.referencedField.name];
                   promise = context.accessor.query(related.model, args);
                 }
-                return promise.then(
-                  rows => (related.isUnique() ? rows && rows[0] : rows)
-                );
+                return promise.then(rows => {
+                  if (related.isUnique()) {
+                    return Array.isArray(rows) ? rows[0] : rows;
+                  }
+                  return rows;
+                });
               }
             };
           }
