@@ -371,7 +371,7 @@ export class SchemaBuilder {
                   promise = context.accessor.query(related.model, args);
                 }
                 return promise.then(
-                  rows => (related.isUnique() ? rows[0] : rows)
+                  rows => (related.isUnique() ? rows && rows[0] : rows)
                 );
               }
             };
