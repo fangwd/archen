@@ -373,6 +373,8 @@ mutation {
   }
 }
 `;
+    // To clear data loader which happens in practice
+    const archen = createArchen();
     graphql.graphql(archen.schema, DATA, null, archen).then(row => {
       const order = row.data.updateOrder;
       expect(order.orderShipping).toBe(null);
