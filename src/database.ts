@@ -897,3 +897,14 @@ export class Record {
     return result;
   }
 }
+
+export function isValue(value): boolean {
+  if (value === null) return true;
+
+  const type = typeof value;
+  if (type === 'string' || type === 'number' || type === 'boolean') {
+    return true;
+  }
+
+  return value instanceof Date;
+}
