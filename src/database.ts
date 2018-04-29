@@ -836,7 +836,11 @@ export class Record {
 
   __primaryKey(): Value {
     const name = this.__table.model.primaryKey.fields[0].name;
-    return this.__data[name];
+    const value = this.__data[name];
+    if (value instanceof Record) {
+      return value.__primaryKey();
+    }
+    return value;
   }
 
   __setPrimaryKey(value: Value) {

@@ -264,12 +264,15 @@ export class QueryBuilder {
           alias = this.alias || this.model.table.name;
           field = this.model.field(path);
         }
+
         direction = /^desc$/i.test(direction || '') ? 'DESC' : 'ASC';
 
         if (field instanceof SimpleField) {
           const column = `${this.escapeId(alias)}.${this.escapeId(field)}`;
-          const name = this.escapeId(path.replace(/\./g, '__'));
-          fields.push(`${column} as ${name}`);
+          if (alias !== this.model.table.name || name !== '*') {
+            const name = this.escapeId(path.replace(/\./g, '__'));
+            fields.push(`${column} as ${name}`);
+          }
           return `${column} ${direction}`;
         }
 

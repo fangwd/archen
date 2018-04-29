@@ -68,7 +68,7 @@ function createSQLite3Connection(name: string): Connection {
   return createConnection('sqlite3', { filename });
 }
 
-function createMySQLDatabase(name: string): Promise<any> {
+function createMySQLDatabase(name: string, data = true): Promise<any> {
   const mysql = require('mysql');
   const database = `${DB_NAME}_${name}`;
 
@@ -78,11 +78,13 @@ function createMySQLDatabase(name: string): Promise<any> {
     password: process.env.DB_PASS
   });
 
+  const sql = SCHEMA + (data ? DATA : '');
+
   const lines = [
     `drop database if exists ${database}`,
     `create database ${database}`,
     `use ${database}`
-  ].concat((SCHEMA + DATA).split(';').filter(line => line.trim()));
+  ].concat(sql.split(';').filter(line => line.trim()));
 
   return serialise(line => {
     return new Promise((resolve, reject) => {
@@ -154,9 +156,9 @@ export function getExampleData() {
   return JSON.parse(fs.readFileSync(fileName).toString());
 }
 
-export function createDatabase(name: string): Promise<any> {
+export function createDatabase(name: string, data = true): Promise<any> {
   return process.env.DB_TYPE === 'mysql'
-    ? createMySQLDatabase(name)
+    ? createMySQLDatabase(name, data)
     : createSQLite3Database(name);
 }
 
