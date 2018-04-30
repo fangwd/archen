@@ -93,3 +93,12 @@ create table `order_shipping` (
   status int,
   foreign key (order_id) references `order`(id)
 );
+
+create table `order_shipping_event` (
+  id integer primary key auto_increment,
+  order_shipping_id integer,
+  event_time datetime,
+  event_description char(200),
+  foreign key (order_shipping_id) references order_shipping(order_id),
+  unique (order_shipping_id, event_time)
+);

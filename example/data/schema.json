@@ -591,6 +591,59 @@
                     "primaryKey": true
                 }
             ]
+        },
+        {
+            "name": "order_shipping_event",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "order_shipping_id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "event_time",
+                    "type": "datetime",
+                    "nullable": true
+                },
+                {
+                    "name": "event_description",
+                    "type": "char",
+                    "size": 200,
+                    "nullable": true
+                }
+            ],
+            "constraints": [
+                {
+                    "columns": [
+                        "order_shipping_id"
+                    ],
+                    "references": {
+                        "table": "order_shipping",
+                        "columns": [
+                            "order_id"
+                        ]
+                    }
+                },
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "order_shipping_id",
+                        "event_time"
+                    ]
+                }
+            ]
         }
     ]
 }
