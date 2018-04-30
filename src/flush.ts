@@ -216,7 +216,11 @@ function _persist(store: RecordStore, record: Record): Promise<Record> {
   });
 }
 
-export function flushTable(table: Table): Promise<number> {
+export function flushTable(table: Table, perfect?: boolean): Promise<number> {
+  if (table.recordList.length === 0) {
+    return Promise.resolve(0);
+  }
+
   const states = [];
 
   for (let i = 0; i < table.recordList.length; i++) {
@@ -232,7 +236,7 @@ export function flushTable(table: Table): Promise<number> {
   return new Promise((resolve, reject) => {
     function __try() {
       db.transaction(() => {
-        return _flushTable(table)
+        return _flushTable(table, perfect)
           .then(number => resolve(number))
           .catch(error => {
             if (!isIntegrityError(error)) return reject(error);
@@ -252,13 +256,17 @@ export function flushTable(table: Table): Promise<number> {
   });
 }
 
-function _flushTable(table: Table): Promise<number> {
+function _flushTable(table: Table, perfect: boolean): Promise<number> {
   mergeRecords(table);
 
   const filter = [];
 
   for (const record of table.recordList) {
-    if (record.__dirty() && record.__flushable() && !record.__state.selected) {
+    if (
+      record.__dirty() &&
+      record.__flushable(perfect) &&
+      !record.__state.selected
+    ) {
       filter.push(record.__filter());
     }
   }
@@ -317,7 +325,7 @@ function _flushTable(table: Table): Promise<number> {
     const values = [];
     const records: Record[] = [];
     for (const record of table.recordList) {
-      if (!record.__dirty() || !record.__flushable()) continue;
+      if (!record.__dirty() || !record.__flushable(perfect)) continue;
       if (record.__state.method !== FlushMethod.INSERT) continue;
       const entry = fields.reduce((values, field) => {
         if (!(field as SimpleField).column.autoIncrement) {
@@ -352,7 +360,7 @@ function _flushTable(table: Table): Promise<number> {
   function _update() {
     const promises = [];
     for (const record of table.recordList) {
-      if (!record.__dirty() || !record.__flushable()) continue;
+      if (!record.__dirty() || !record.__flushable(perfect)) continue;
       if (record.__state.method !== FlushMethod.UPDATE) continue;
       const fields = record.__fields();
       record.__remove_dirty(Object.keys(fields));
@@ -403,19 +411,25 @@ function mergeRecords(table: Table) {
   }
 }
 
-export function flushDatabase(db: Database) {
-  function getDirtyCount() {
-    let dirtyCount = 0;
-    for (const table of db.tableList) {
-      for (const record of table.recordList) {
-        if (record.__dirty() && !record.__state.merged) {
-          dirtyCount++;
-        }
-      }
+function flushDatabaseA(db: Database) {
+  return new Promise((resolve, reject) => {
+    function _flush() {
+      const promises = db.tableList.map(table => flushTable(table, true));
+      Promise.all(promises)
+        .then(results => {
+          if (results.reduce((a, b) => a + b, 0) === 0) {
+            resolve();
+          } else {
+            _flush();
+          }
+        })
+        .catch(error => reject(error));
     }
-    return dirtyCount;
-  }
+    _flush();
+  });
+}
 
+export function flushDatabaseB(db: Database) {
   return new Promise((resolve, reject) => {
     let waiting = 0;
     function _flush() {
@@ -423,14 +437,14 @@ export function flushDatabase(db: Database) {
       Promise.all(promises)
         .then(results => {
           const count = results.reduce((a, b) => a + b, 0);
-          if (count === 0 && getDirtyCount() > 0) {
+          if (count === 0 && db.getDirtyCount() > 0) {
             if (waiting++) {
               throw Error('Circular references');
             }
           } else {
             waiting = 0;
           }
-          if (getDirtyCount() > 0) {
+          if (db.getDirtyCount() > 0) {
             _flush();
           } else {
             resolve();
@@ -440,6 +454,10 @@ export function flushDatabase(db: Database) {
     }
     _flush();
   });
+}
+
+export function flushDatabase(db: Database) {
+  return flushDatabaseA(db).then(() => flushDatabaseB(db));
 }
 
 function isIntegrityError(error) {
