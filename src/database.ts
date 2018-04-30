@@ -83,6 +83,13 @@ export class Database {
     return this.table(name).append(data);
   }
 
+  getDirtyCount(): number {
+    return this.tableList.reduce((count, table) => {
+      count += table.getDirtyCount();
+      return count;
+    }, 0);
+  }
+
   flush() {
     return flushDatabase(this);
   }
@@ -650,6 +657,16 @@ export class Table {
   clear() {
     this.recordList = [];
     this._initMap();
+  }
+
+  getDirtyCount(): number {
+    let dirtyCount = 0;
+    for (const record of this.recordList) {
+      if (record.__dirty() && !record.__state.merged) {
+        dirtyCount++;
+      }
+    }
+    return dirtyCount;
   }
 
   json() {
