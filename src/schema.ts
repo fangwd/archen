@@ -271,7 +271,10 @@ export class SchemaBuilder {
         fields(): GraphQLFieldConfigMap<any, QueryContext> {
           return {
             pageInfo: { type: PageInfoType },
-            edges: { type: new GraphQLList(edgeModelTypeMap[model.name]) }
+            edges: { type: new GraphQLList(edgeModelTypeMap[model.name]) },
+            [model.pluralName]: {
+              type: new GraphQLList(modelTypeMap[model.name])
+            }
           };
         }
       });
@@ -300,7 +303,24 @@ export class SchemaBuilder {
         if (field instanceof ForeignKeyField) {
           modelFields[field.name] = {
             type: modelTypeMap[field.referencedField.model.name],
-            resolve(obj, args, req: QueryContext) {
+            resolve(obj, args, req: QueryContext, info) {
+              const keyField = field.referencedField.model.keyField();
+              let pkOnly = true;
+              for (const fieldNode of info.fieldNodes) {
+                const selections = fieldNode.selectionSet.selections;
+                if (selections.length > 1) {
+                  pkOnly = false;
+                  break;
+                }
+                const name = selections[0].name;
+                if (!name || name.value !== keyField.name) {
+                  pkOnly = false;
+                  break;
+                }
+              }
+              if (pkOnly) {
+                return obj[field.name];
+              }
               const key = field.referencedField.model.keyField().name;
               return req.accessor.load(
                 field.referencedField,
