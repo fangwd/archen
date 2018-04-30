@@ -1,5 +1,5 @@
 import { pluralise, toPascalCase, toCamelCase } from './misc';
-import { Document, Value } from './database';
+import { Document, Value, isValue } from './database';
 
 export interface DatabaseInfo {
   name?: string;
@@ -162,10 +162,12 @@ export class Model {
   }
 
   valueOf(value: Value | Document, name: string): Value {
-    if (value !== null && typeof value === 'object') {
-      const field = this.field(name);
-      if (field instanceof ForeignKeyField) {
-        return value[field.model.primaryKey.fields[0].name];
+    const field = this.field(name);
+    if (field instanceof ForeignKeyField) {
+      let key = field;
+      while (!isValue(value)) {
+        value = value[key.referencedField.name];
+        key = key.referencedField as ForeignKeyField;
       }
     }
     return value as Value;
