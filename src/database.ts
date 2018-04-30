@@ -874,8 +874,15 @@ export class Record {
   __valueOf(uc: UniqueKey, separator = '-'): string {
     const values = [];
     for (const field of uc.fields) {
-      const value = this.__getValue(field.name);
+      let value = this.__getValue(field.name);
       if (value === undefined) return undefined;
+      if (field instanceof ForeignKeyField) {
+        let key = field;
+        while (!isValue(value)) {
+          value = value[key.referencedField.name];
+          key = key.referencedField as ForeignKeyField;
+        }
+      }
       values.push(value);
     }
     return values.join(separator);
