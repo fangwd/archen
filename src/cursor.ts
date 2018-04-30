@@ -1,33 +1,25 @@
 import { QueryBuilder } from './filter';
 import { Model, SimpleField, UniqueKey, ForeignKeyField } from './model';
-import { Table, Filter, Value, toDocument } from './database';
+import { Table, Filter, Value, toDocument, _toSnake } from './database';
 import { Connection } from './engine';
 
 interface FieldInfo {
   alias: string;
-
-  // Field name, e.g. quantity, user__email
-  name: string;
-
-  // Ascending/Descending
+  field: SimpleField;
   desc: boolean;
-
-  // Value in the last row retrieved
   value: Value;
 }
 
-// Assuming last n fields uniquely identify a row
 function buildFilter(
   engine: Connection,
   fields: FieldInfo[],
   index: number
 ): string {
-  const field = fields[index];
-
-  const lhs = `${engine.escapeId(field.alias)}.${engine.escapeId(field.name)}`;
-  const rhs = engine.escape(field.value + '');
-
-  const where = `${lhs} ${field.desc ? '<' : '>'} ${rhs}`;
+  const info = fields[index];
+  const name = info.field.column.name;
+  const lhs = `${engine.escapeId(info.alias)}.${engine.escapeId(name)}`;
+  const rhs = engine.escape(_toSnake(info.value, info.field) + '');
+  const where = `${lhs} ${info.desc ? '<' : '>'} ${rhs}`;
 
   if (index + 1 === fields.length) {
     return where;
@@ -35,7 +27,7 @@ function buildFilter(
 
   const next = buildFilter(engine, fields, index + 1);
 
-  return `${where} OR (${lhs} = ${rhs} AND ${next})`;
+  return `${where} or (${lhs}=${rhs} and ${next})`;
 }
 
 export interface CursorQueryOptions {
@@ -44,11 +36,6 @@ export interface CursorQueryOptions {
   cursor?: string;
   limit?: number;
   before?: boolean;
-}
-
-function splitAliasName(aliasMap, path) {
-  const match = /^(.+)\.([^\.]+)$/.exec(path);
-  return match ? [aliasMap[match[1]].name, match[2]] : [null, path];
 }
 
 export function cursorQuery(table: Table, options: CursorQueryOptions) {
@@ -67,28 +54,33 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
 
   let sql = `select ${query.fields} from ${query.tables}`;
 
-  let whered = false;
-
   if (options.cursor) {
     const values = decodeCursor(options.cursor);
     const fields = orderBy.map((entry, index) => {
-      let [path, direction] = entry.split(/\s+/);
-      let desc = direction && /^desc$/i.test(direction);
-      const [alias, name] = splitAliasName(builder.context.aliasMap, path);
-      // TODO: Replace "name" with "field" to handle types properly
+      const [path, direction] = entry.split(/\s+/);
+      const desc = direction && /^desc$/i.test(direction);
+      const match = /^(.+)\.([^\.]+)$/.exec(path);
+      let alias, field;
+      if (match) {
+        const entry = builder.context.aliasMap[match[1]];
+        alias = entry.name;
+        field = entry.model.field(match[2]);
+      } else {
+        alias = model.table.name;
+        field = model.field(path);
+      }
       return {
-        alias: alias || model.table.name,
-        name,
+        alias,
+        field,
         desc,
         value: values[index]
       };
     });
     sql += ' where ' + buildFilter(table.db.engine, fields, 0);
-    whered = true;
   }
 
   if (query.where) {
-    if (!whered) sql += ' where ';
+    if (!options.cursor) sql += ' where ';
     sql += query.where;
   }
 
