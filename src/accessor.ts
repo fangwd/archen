@@ -64,10 +64,18 @@ export class Accessor {
             }
           }
         }
+        function __equal(row, key) {
+          const value = row[field.name];
+          if (field instanceof ForeignKeyField) {
+            return value[field.referencedField.model.keyField().name] === key;
+          } else {
+            return value === key;
+          }
+        }
         if (field.isUnique()) {
-          return keys.map(k => rows.find(r => r[field.name] === k));
+          return keys.map(k => rows.find(r => __equal(r, k)));
         } else {
-          return keys.map(k => rows.filter(r => r[field.name] === k));
+          return keys.map(k => rows.filter(r => __equal(r, k)));
         }
       });
     });
@@ -75,16 +83,31 @@ export class Accessor {
   }
 
   // args: { where, limit, offset, orderBy }
-  query(model: Model, args: SelectOptions) {
-    const builder = new QueryBuilder(model, this.db.engine);
-    const sql = builder.select('*', args.where, args.orderBy);
+  query(model: Model, args: SelectOptions | string) {
+    let sql;
+
+    if (typeof args === 'string') {
+      sql = args;
+    } else {
+      const builder = new QueryBuilder(model, this.db.engine);
+      sql = builder.select('*', args.where, args.orderBy);
+      if (args.limit) {
+        sql += ` limit ${parseInt(args.limit + '')}`;
+      }
+      if (args.offset) {
+        sql += ` offset ${parseInt(args.offset + '')}`;
+      }
+    }
 
     const loaders = this.loaders[model.name];
     return this.queryLoader.load(sql).then(rows => {
       rows = rowsToCamel(rows, model);
       for (const row of rows) {
         for (const name in loaders) {
-          loaders[name].loader.prime(row[name], row);
+          const loader = loaders[name];
+          if (loader.field.isUnique()) {
+            loader.loader.prime(row[name], row);
+          }
         }
       }
       return rows;
@@ -111,7 +134,7 @@ export class Accessor {
     }
 
     if (args.after) {
-      const values = atob(args.after, orderBy);
+      const values: { [key: string]: any } = atob(args.after, orderBy);
 
       const multiColumnOrderWhere = (index, orders) => {
         const level = orders[index];

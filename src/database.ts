@@ -83,6 +83,13 @@ export class Database {
     return this.table(name).append(data);
   }
 
+  getDirtyCount(): number {
+    return this.tableList.reduce((count, table) => {
+      count += table.getDirtyCount();
+      return count;
+    }, 0);
+  }
+
   flush() {
     return flushDatabase(this);
   }
@@ -91,6 +98,13 @@ export class Database {
     for (const name in this.tableMap) {
       this.tableMap[name].clear();
     }
+  }
+
+  json() {
+    return this.tableList.reduce((result, table) => {
+      result[table.model.name] = table.json();
+      return result;
+    }, {});
   }
 }
 
@@ -645,6 +659,20 @@ export class Table {
     this._initMap();
   }
 
+  getDirtyCount(): number {
+    let dirtyCount = 0;
+    for (const record of this.recordList) {
+      if (record.__dirty() && !record.__state.merged) {
+        dirtyCount++;
+      }
+    }
+    return dirtyCount;
+  }
+
+  json() {
+    return this.recordList.map(record => record.__json());
+  }
+
   _mapGet(record: Record): Record {
     let existing: Record;
     for (const uc of this.model.uniqueKeys) {
@@ -685,7 +713,7 @@ function _toCamel(value: Value, field: SimpleField): Value {
 }
 
 export function _toSnake(value: Value, field: SimpleField): Value {
-  if (/date|time/i.test(field.column.type)) {
+  if (value && /date|time/i.test(field.column.type)) {
     return new Date(value as any)
       .toISOString()
       .slice(0, 19)
@@ -825,7 +853,11 @@ export class Record {
 
   __primaryKey(): Value {
     const name = this.__table.model.primaryKey.fields[0].name;
-    return this.__data[name];
+    const value = this.__data[name];
+    if (value instanceof Record) {
+      return value.__primaryKey();
+    }
+    return value;
   }
 
   __setPrimaryKey(value: Value) {
@@ -848,7 +880,10 @@ export class Record {
     for (const name in fields) {
       const lhs = model.valueOf(fields[name], name);
       const rhs = model.valueOf(row[name] as Value, name);
-      if (lhs != rhs) return false;
+      const field = model.field(name) as SimpleField;
+      if (_toSnake(lhs, field) != _toSnake(rhs, field)) {
+        return false;
+      }
     }
     return true;
   }
@@ -856,8 +891,15 @@ export class Record {
   __valueOf(uc: UniqueKey, separator = '-'): string {
     const values = [];
     for (const field of uc.fields) {
-      const value = this.__getValue(field.name);
+      let value = this.__getValue(field.name);
       if (value === undefined) return undefined;
+      if (field instanceof ForeignKeyField) {
+        let key = field;
+        while (!isValue(value)) {
+          value = value[key.referencedField.name];
+          key = key.referencedField as ForeignKeyField;
+        }
+      }
       values.push(value);
     }
     return values.join(separator);
@@ -874,4 +916,23 @@ export class Record {
       root.__state.dirty.add(name);
     });
   }
+
+  __json() {
+    const result = {};
+    for (const field of this.__table.model.fields) {
+      result[field.name] = this.__getValue(field.name);
+    }
+    return result;
+  }
+}
+
+export function isValue(value): boolean {
+  if (value === null) return true;
+
+  const type = typeof value;
+  if (type === 'string' || type === 'number' || type === 'boolean') {
+    return true;
+  }
+
+  return value instanceof Date;
 }

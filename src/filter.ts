@@ -1,4 +1,5 @@
-import { Filter, OrderBy, Value, _toSnake, SelectOptions } from './database';
+import { Filter, OrderBy, Value, isValue, _toSnake } from './database';
+
 import {
   Model,
   Field,
@@ -13,6 +14,13 @@ import { toArray, DEFAULT_LIMIT } from './misc';
 interface AliasEntry {
   name: string;
   model: Model;
+}
+
+interface SelectQuery {
+  fields: string;
+  tables: string;
+  where?: string;
+  orderBy?: string;
 }
 
 class Context {
@@ -126,8 +134,11 @@ export class QueryBuilder {
           if (keys.length === 1) {
             const [name, operator] = splitKey(keys[0] as string);
             if (name === field.referencedField.name) {
-              exprs.push(this.expr(field, operator, query[keys[0]] as Value));
-              continue;
+              const value = query[keys[0]] as Value;
+              if (isValue(value)) {
+                exprs.push(this.expr(field, operator, value));
+                continue;
+              }
             }
           }
           const expr = this._join(field, query);
@@ -223,7 +234,11 @@ export class QueryBuilder {
     return filter;
   }
 
-  select(name: string|SimpleField, filter?: Filter, orderBy?: OrderBy): string {
+  _select(
+    name: string | SimpleField,
+    filter?: Filter,
+    orderBy?: OrderBy
+  ): SelectQuery {
     this.froms = [`${this.escapeId(this.model)} ${this.alias || ''}`];
 
     if (orderBy) {
@@ -231,18 +246,10 @@ export class QueryBuilder {
     }
 
     const where = this.where(filter).trim();
-
-    let sql = `select ${this.encodeField(name)} from ${this.froms.join(
-      ' left join '
-    )}`;
-
-    if (where.length > 0) {
-      sql += ` where ${where}`;
-    }
+    const fields = [this.encodeField(name)];
 
     if (orderBy) {
       const aliasMap = this.context.aliasMap;
-
       orderBy = toArray(orderBy).map(order => {
         let [path, direction] = order.split(' ');
         let alias: string, field: Field;
@@ -257,18 +264,43 @@ export class QueryBuilder {
           alias = this.alias || this.model.table.name;
           field = this.model.field(path);
         }
+
         direction = /^desc$/i.test(direction || '') ? 'DESC' : 'ASC';
 
-        if (field instanceof SimpleField || field instanceof ForeignKeyField) {
-          return `${this.escapeId(alias)}.${this.escapeId(field)} ${direction}`;
+        if (field instanceof SimpleField) {
+          const column = `${this.escapeId(alias)}.${this.escapeId(field)}`;
+          if (alias !== this.model.table.name || name !== '*') {
+            const name = this.escapeId(path.replace(/\./g, '__'));
+            fields.push(`${column} as ${name}`);
+          }
+          return `${column} ${direction}`;
         }
 
         throw new Error(`Invalid sort column: ${path}`);
       });
-
-      sql += ` order by ${orderBy.join(', ')}`;
     }
 
+    return {
+      fields: fields.join(', '),
+      tables: this.froms.join(' left join '),
+      where,
+      orderBy: orderBy ? (orderBy as string[]).join(', ') : null
+    };
+  }
+
+  select(
+    name: string | SimpleField,
+    filter?: Filter,
+    orderBy?: OrderBy
+  ): string {
+    const query = this._select(name, filter, orderBy);
+    let sql = `select ${query.fields} from ${query.tables}`;
+    if (query.where) {
+      sql += ` where ${query.where}`;
+    }
+    if (query.orderBy) {
+      sql += ` order by ${query.orderBy}`;
+    }
     return sql;
   }
 
@@ -297,7 +329,9 @@ export class QueryBuilder {
     const model = field.referencedField.model;
     const keys = Object.keys(args);
     if (keys.length === 1 && keys[0] === model.keyField().name) {
-      return this.expr(field, null, args[keys[0]]);
+      if (isValue(args[keys[0]])) {
+        return this.expr(field, null, args[keys[0]]);
+      }
     }
 
     const name = `${this.escapeId(model.table.name)} ${builder.alias}`;
@@ -351,7 +385,7 @@ export class QueryBuilder {
         return value + '';
       }
     }
-    return this.dialect.escape(value + '');
+    return this.dialect.escape(_toSnake(value, field) + '');
   }
 
   private escapeId(name: string | SimpleField | Model): string {
