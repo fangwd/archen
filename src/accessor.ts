@@ -92,10 +92,10 @@ export class Accessor {
       const builder = new QueryBuilder(model, this.db.engine);
       sql = builder.select('*', args.where, args.orderBy);
       if (args.limit) {
-        sql += ` limit ${parseInt(args.limit)}`;
+        sql += ` limit ${parseInt(args.limit + '')}`;
       }
       if (args.offset) {
-        sql += ` offset ${parseInt(args.offset)}`;
+        sql += ` offset ${parseInt(args.offset + '')}`;
       }
     }
 
