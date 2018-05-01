@@ -10,7 +10,7 @@ import {
   SelectOptions
 } from './database';
 import { Row, Connection } from './engine';
-import { encodeFilter, QueryBuilder } from './filter';
+import { QueryBuilder } from './filter';
 import { atob, btoa, toArray } from './misc';
 
 interface FieldLoader {
