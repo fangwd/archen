@@ -346,8 +346,8 @@ test('update related', async done => {
 
   row = await table.modify(data.data, data.where);
   rows = await table.select('*');
-  expect(rows.find(r => r.name === 'Apple').parent.id).toBe(null);
-  expect(rows.find(r => r.name === 'Banana').parent.id).toBe(null);
+  expect(rows.find(r => r.name === 'Apple').parent).toBe(null);
+  expect(rows.find(r => r.name === 'Banana').parent).toBe(null);
 
   done();
 });
