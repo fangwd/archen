@@ -26,6 +26,7 @@ import {
 } from './model';
 
 import { Accessor } from './accessor';
+import { cursorQuery } from './cursor';
 
 import {
   AND,
@@ -333,7 +334,6 @@ export class SchemaBuilder {
             type: getType(field.column.type)
           };
         } else if (field instanceof RelatedField) {
-          // TODO: Needs loaders -> move to accessor
           const relatedField = field as RelatedField;
           if (relatedField.throughField) {
             const referenced = relatedField.throughField.referencedField;
@@ -380,7 +380,11 @@ export class SchemaBuilder {
               resolve(object, args, context: QueryContext) {
                 args.where = args.where || {};
                 let promise;
-                if (Object.keys(args.where).length === 0 && !args.limit) {
+                if (
+                  Object.keys(args.where).length === 0 &&
+                  !args.limit &&
+                  !args.orderBy
+                ) {
                   promise = context.accessor.load(
                     related,
                     object[related.referencedField.name]
@@ -446,7 +450,28 @@ export class SchemaBuilder {
           ...ConnectionOptions
         },
         resolve(_, args, context: QueryContext) {
-          return context.accessor.cursorQuery(model, args);
+          const options = {
+            where: args.where,
+            orderBy: args.orderBy,
+            limit: args.first,
+            cursor: args.after
+          };
+          const table = context.accessor.db.table(model);
+          return cursorQuery(table, options).then(edges => {
+            const firstEdge = edges[0];
+            const lastEdge = edges.slice(-1)[0];
+            const pageInfo = {
+              startCursor: firstEdge ? firstEdge.cursor : null,
+              endCursor: lastEdge ? lastEdge.cursor : null,
+              hasNextPage: edges.length === options.limit + 1
+            };
+            edges = edges.length > options.limit ? edges.slice(0, -1) : edges;
+            return {
+              edges,
+              pageInfo,
+              [model.pluralName]: edges.map(edge => edge.node)
+            };
+          });
         }
       };
 
@@ -556,30 +581,46 @@ export class SchemaBuilder {
             type: getType(field.column.type)
           };
         } else if (field instanceof RelatedField) {
-          let connectType = this.inputTypesConnect[
-            field.referencingField.model.name
-          ];
+          let connectType;
 
-          if (field.referencingField.uniqueKey) {
-            connectType = new GraphQLInputObjectType({
-              name: getConnectChildTypeName(field),
-              fields() {
-                return getFieldsExclude(inputFieldsConnectMap, field);
-              }
-            });
+          if (field.throughField) {
+            connectType = this.inputTypesConnect[
+              field.throughField.referencedField.model.name
+            ];
+          } else {
+            connectType = this.inputTypesConnect[
+              field.referencingField.model.name
+            ];
+
+            if (field.referencingField.uniqueKey) {
+              connectType = new GraphQLInputObjectType({
+                name: getConnectChildTypeName(field),
+                fields() {
+                  return getFieldsExclude(inputFieldsConnectMap, field);
+                }
+              });
+            }
           }
 
           const createType = new GraphQLInputObjectType({
             name: getCreateChildTypeName(field),
             fields() {
-              return getFieldsExclude(inputFieldsCreate, field);
+              return field.throughField
+                ? inputFieldsCreate[
+                    field.throughField.referencedField.model.name
+                  ]
+                : getFieldsExclude(inputFieldsCreate, field);
             }
           });
 
           const updateFields = new GraphQLInputObjectType({
             name: getUpdateChildTypeName(field) + 'Fields',
             fields() {
-              return getFieldsExclude(inputFieldsUpdate, field);
+              return field.throughField
+                ? inputFieldsUpdate[
+                    field.throughField.referencedField.model.name
+                  ]
+                : getFieldsExclude(inputFieldsUpdate, field);
             }
           });
 
