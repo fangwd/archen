@@ -11,7 +11,7 @@ const mysql = archen.createConnection('mysql', {
   timezone: 'Z',
   connectionLimit: 10
 });
-/*
+
 const options = {
   models: [
     {
@@ -30,9 +30,10 @@ const options = {
     }
   ]
 };
-*/
+
 const schema = new archen.Schema(
-  JSON.parse(fs.readFileSync('example/data/schema.json'))
+  JSON.parse(fs.readFileSync('example/data/schema.json')),
+  options
 );
 
 const app = express();
@@ -70,3 +71,9 @@ app.use(
 );
 
 app.listen(3000);
+
+require('fs').writeFileSync(
+  'schema.graphql',
+  require('graphql').printSchema(archen.createGraphQLSchema(schema))
+);
+
