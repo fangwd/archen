@@ -619,6 +619,7 @@ export class Table {
         }
       })
       .then(rows => {
+        if (rows.length === 0) return Promise.resolve(0);
         const values = rows.map(
           row => row[related.throughField.name][table.model.keyField().name]
         );
