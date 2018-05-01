@@ -373,6 +373,7 @@ export class Table {
           }
         }
         return self.get(where as Document).then(row => {
+          console.log(row)
           if (row) {
             const id = row[this.model.keyField().name] as Value;
             return this.updateChildFields(data, id).then(() => row);
@@ -728,7 +729,7 @@ export function toDocument(row: Row, model: Model): Document {
   for (const field of model.fields) {
     if (field instanceof SimpleField && row[field.column.name] !== undefined) {
       const value = _toCamel(row[field.column.name], field);
-      if (field instanceof ForeignKeyField) {
+      if (field instanceof ForeignKeyField && value !== null) {
         result[field.name] = {
           [field.referencedField.model.keyField().name]: value
         };
