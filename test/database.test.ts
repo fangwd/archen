@@ -7,6 +7,25 @@ const NAME = 'database';
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
+const OPTIONS = {
+  models: [
+    {
+      table: 'product_category',
+      fields: [
+        {
+          column: 'category_id',
+          throughField: 'product_id'
+        },
+        {
+          column: 'product_id',
+          throughField: 'category_id',
+          relatedName: 'categorySet'
+        }
+      ]
+    }
+  ]
+};
+
 test('select', done => {
   expect.assertions(2);
 
@@ -351,25 +370,6 @@ test('update related', async done => {
 
   done();
 });
-
-const OPTIONS = {
-  models: [
-    {
-      table: 'product_category',
-      fields: [
-        {
-          column: 'category_id',
-          throughField: 'product_id'
-        },
-        {
-          column: 'product_id',
-          throughField: 'category_id',
-          relatedName: 'categorySet'
-        }
-      ]
-    }
-  ]
-};
 
 test('many to many - connect/create', async done => {
   expect.assertions(3);
