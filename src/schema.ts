@@ -92,7 +92,7 @@ export class SchemaBuilder {
   private schema: GraphQLSchema;
 
   private modelTypeMap: ObjectTypeMap = {};
-  private connectionModelTypeMap: ObjectTypeMap = {};
+  private connectionTypeMap: ObjectTypeMap = {};
 
   private filterInputTypeMap: InputTypeMap = {};
   private filterInputTypeMapEx = {};
@@ -247,6 +247,7 @@ export class SchemaBuilder {
     const modelFieldsMap: ObjectFieldsMap = {};
     const modelFieldsMapEx = {};
 
+    const connectionTypeMapEx = {};
     const edgeModelTypeMap: ObjectTypeMap = {};
 
     for (const model of this.domain.models) {
@@ -267,7 +268,7 @@ export class SchemaBuilder {
         }
       });
 
-      this.connectionModelTypeMap[model.name] = new GraphQLObjectType({
+      this.connectionTypeMap[model.name] = new GraphQLObjectType({
         name: `${getTypeName(model)}Connection`,
         fields(): GraphQLFieldConfigMap<any, QueryContext> {
           return {
@@ -286,6 +287,7 @@ export class SchemaBuilder {
     for (const model of this.domain.models) {
       modelTypeMapEx[model.name] = {};
       modelFieldsMapEx[model.name] = {};
+      connectionTypeMapEx[model.name] = {};
       for (const field of model.fields) {
         if (field instanceof RelatedField) {
           modelTypeMapEx[model.name][field.name] = new GraphQLObjectType({
@@ -294,6 +296,33 @@ export class SchemaBuilder {
               return modelFieldsMapEx[model.name][field.name];
             }
           });
+          if (!field.referencingField.isUnique()) {
+            const edgeType = new GraphQLObjectType({
+              name: `${getTypeName(field, true)}Edge`,
+              fields(): GraphQLFieldConfigMap<any, QueryContext> {
+                return {
+                  node: {
+                    type: modelTypeMapEx[model.name][field.name]
+                  },
+                  cursor: { type: GraphQLString }
+                };
+              }
+            });
+            connectionTypeMapEx[model.name][field.name] = new GraphQLObjectType(
+              {
+                name: `${getTypeName(field)}Connection`,
+                fields(): GraphQLFieldConfigMap<any, QueryContext> {
+                  return {
+                    pageInfo: { type: PageInfoType },
+                    edges: { type: new GraphQLList(edgeType) },
+                    [field.name]: {
+                      type: new GraphQLList(modelTypeMap[model.name])
+                    }
+                  };
+                }
+              }
+            );
+          }
         }
       }
     }
@@ -305,6 +334,7 @@ export class SchemaBuilder {
           modelFields[field.name] = {
             type: modelTypeMap[field.referencedField.model.name],
             resolve(obj, args, req: QueryContext, info) {
+              if (obj[field.name] === null) return null;
               const keyField = field.referencedField.model.keyField();
               let pkOnly = true;
               for (const fieldNode of info.fieldNodes) {
@@ -365,6 +395,28 @@ export class SchemaBuilder {
                 }
               }
             };
+            modelFields[field.name + 'Connection'] = {
+              type: this.connectionTypeMap[referenced.model.name],
+              args: {
+                where: { type: this.filterInputTypeMap[referenced.model.name] },
+                ...ConnectionOptions
+              },
+              resolve(obj, args, context: QueryContext) {
+                args.where = args.where || {};
+                const name = relatedField.throughField.relatedField.name;
+                if (relatedField.throughField.relatedField.throughField) {
+                  args.where[name] = {
+                    [model.keyField().name]: obj[model.keyField().name]
+                  };
+                } else {
+                  args.where[name] = {
+                    [field.referencingField.name]: obj[model.keyField().name]
+                  };
+                }
+                const table = context.accessor.db.table(referenced.model);
+                return doCursorQuery(table, args, field.name);
+              }
+            };
           } else {
             const modelTypeEx = modelTypeMapEx[model.name][field.name];
             const related = relatedField.referencingField;
@@ -372,7 +424,7 @@ export class SchemaBuilder {
               ? modelTypeEx
               : new GraphQLList(modelTypeEx);
             modelFields[field.name] = {
-              type: type,
+              type,
               args: {
                 where: { type: filterInputTypeMapEx[model.name][field.name] },
                 ...QueryOptions
@@ -380,11 +432,7 @@ export class SchemaBuilder {
               resolve(object, args, context: QueryContext) {
                 args.where = args.where || {};
                 let promise;
-                if (
-                  Object.keys(args.where).length === 0 &&
-                  !args.limit &&
-                  !args.orderBy
-                ) {
+                if (isEmpty(args.where) && !args.limit && !args.orderBy) {
                   promise = context.accessor.load(
                     related,
                     object[related.referencedField.name]
@@ -402,6 +450,22 @@ export class SchemaBuilder {
                 });
               }
             };
+            if (!related.isUnique()) {
+              modelFields[field.name + 'Connection'] = {
+                type: connectionTypeMapEx[model.name][field.name],
+                args: {
+                  where: { type: filterInputTypeMapEx[model.name][field.name] },
+                  ...ConnectionOptions
+                },
+                resolve(object, args, context: QueryContext) {
+                  args.where = args.where || {};
+                  args.where[related.name] =
+                    object[related.referencedField.name];
+                  const table = context.accessor.db.table(related.model);
+                  return doCursorQuery(table, args, field.name);
+                }
+              };
+            }
           }
         }
       }
@@ -444,34 +508,14 @@ export class SchemaBuilder {
       };
 
       queryFields[`${model.pluralName}Connection`] = {
-        type: this.connectionModelTypeMap[model.name],
+        type: this.connectionTypeMap[model.name],
         args: {
           where: { type: this.filterInputTypeMap[model.name] },
           ...ConnectionOptions
         },
         resolve(_, args, context: QueryContext) {
-          const options = {
-            where: args.where,
-            orderBy: args.orderBy,
-            limit: args.first,
-            cursor: args.after
-          };
           const table = context.accessor.db.table(model);
-          return cursorQuery(table, options).then(edges => {
-            const firstEdge = edges[0];
-            const lastEdge = edges.slice(-1)[0];
-            const pageInfo = {
-              startCursor: firstEdge ? firstEdge.cursor : null,
-              endCursor: lastEdge ? lastEdge.cursor : null,
-              hasNextPage: edges.length === options.limit + 1
-            };
-            edges = edges.length > options.limit ? edges.slice(0, -1) : edges;
-            return {
-              edges,
-              pageInfo,
-              [model.pluralName]: edges.map(edge => edge.node)
-            };
-          });
+          return doCursorQuery(table, args, model.pluralName);
         }
       };
 
@@ -479,9 +523,8 @@ export class SchemaBuilder {
       queryFields[name] = {
         type: this.modelTypeMap[model.name],
         args: { where: { type: this.inputTypesConnect[model.name] } },
-        // args: this.inputTypesConnect[model.name].getFields(),
         resolve(_, args, context: QueryContext) {
-          return context.accessor.get(model, args.where); // ALWAYS_WHERE: args.where
+          return context.accessor.get(model, args.where);
         }
       };
     }
@@ -780,9 +823,9 @@ export class SchemaBuilder {
   }
 }
 
-function getTypeName(input: Model | RelatedField) {
+function getTypeName(input: Model | RelatedField, plural?: boolean) {
   if (input instanceof RelatedField) {
-    return input.getPascalName();
+    return input.getPascalName(plural);
   }
   return input.name;
 }
@@ -895,4 +938,37 @@ function getFieldsExclude(
   }
 
   return fields;
+}
+
+function isEmpty(value: any) {
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  } else if (value !== null && typeof value === 'object') {
+    return Object.keys(value).length === 0;
+  }
+  return value === undefined;
+}
+
+function doCursorQuery(table, args, pluralName) {
+  const options = {
+    where: args.where,
+    orderBy: args.orderBy,
+    limit: args.first,
+    cursor: args.after
+  };
+  return cursorQuery(table, options).then(edges => {
+    const firstEdge = edges[0];
+    const lastEdge = edges.slice(-1)[0];
+    const pageInfo = {
+      startCursor: firstEdge ? firstEdge.cursor : null,
+      endCursor: lastEdge ? lastEdge.cursor : null,
+      hasNextPage: edges.length === options.limit + 1
+    };
+    edges = edges.length > options.limit ? edges.slice(0, -1) : edges;
+    return {
+      edges,
+      pageInfo,
+      [pluralName]: edges.map(edge => edge.node)
+    };
+  });
 }
