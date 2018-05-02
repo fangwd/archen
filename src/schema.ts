@@ -12,6 +12,8 @@ import {
   GraphQLInputFieldConfigMap,
   GraphQLSchema,
   GraphQLFieldConfigMap,
+  SelectionSetNode,
+  GraphQLResolveInfo,
   printSchema
 } from 'graphql';
 
@@ -336,26 +338,14 @@ export class SchemaBuilder {
             resolve(obj, args, req: QueryContext, info) {
               if (obj[field.name] === null) return null;
               const keyField = field.referencedField.model.keyField();
-              let pkOnly = true;
-              for (const fieldNode of info.fieldNodes) {
-                const selections = fieldNode.selectionSet.selections;
-                if (selections.length > 1) {
-                  pkOnly = false;
-                  break;
-                }
-                const name = selections[0].name;
-                if (!name || name.value !== keyField.name) {
-                  pkOnly = false;
-                  break;
-                }
-              }
-              if (pkOnly) {
+              const fields = getQueryFields(info);
+              if (hasOnly(fields[field.name], keyField.name)) {
                 return obj[field.name];
               }
               const key = field.referencedField.model.keyField().name;
               return req.accessor.load(
                 field.referencedField,
-                obj[field.name][key]
+                obj[field.name][keyField.name]
               );
             }
           };
@@ -502,7 +492,7 @@ export class SchemaBuilder {
           where: { type: this.filterInputTypeMap[model.name] },
           ...QueryOptions
         },
-        resolve(_, args, context: QueryContext) {
+        resolve(_, args, context, info) {
           return context.accessor.query(model, args);
         }
       };
@@ -940,15 +930,6 @@ function getFieldsExclude(
   return fields;
 }
 
-function isEmpty(value: any) {
-  if (Array.isArray(value)) {
-    return value.length === 0;
-  } else if (value !== null && typeof value === 'object') {
-    return Object.keys(value).length === 0;
-  }
-  return value === undefined;
-}
-
 function doCursorQuery(table, args, pluralName) {
   const options = {
     where: args.where,
@@ -971,4 +952,44 @@ function doCursorQuery(table, args, pluralName) {
       [pluralName]: edges.map(edge => edge.node)
     };
   });
+}
+
+export function getQueryFields(info: GraphQLResolveInfo) {
+  function __getFields(selectionSet: SelectionSetNode, object = {}) {
+    for (const selection of selectionSet.selections) {
+      if (selection.kind === 'Field') {
+        const name = selection.name.value;
+        object[name] = object[name] || {};
+        if (selection.selectionSet) {
+          __getFields(selection.selectionSet, object[name]);
+        }
+      } else if (selection.kind === 'FragmentSpread') {
+        const fragment = info.fragments[selection.name.value];
+        __getFields(fragment.selectionSet, object);
+      } else if (selection.kind === 'InlineFragment') {
+        __getFields(selection.selectionSet, object);
+      }
+    }
+    return object;
+  }
+  return __getFields(info.operation.selectionSet);
+}
+
+export function isEmpty(value: any) {
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  } else if (value !== null && typeof value === 'object') {
+    return Object.keys(value).length === 0;
+  }
+  return value === undefined;
+}
+
+export function hasOnly(object: object, key: string): boolean {
+  if (object && typeof object === 'object') {
+    const keys = Object.keys(object);
+    if (keys.length === 1) {
+      return keys[0] === key;
+    }
+  }
+  return false;
 }
