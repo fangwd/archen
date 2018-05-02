@@ -373,7 +373,6 @@ export class Table {
           }
         }
         return self.get(where as Document).then(row => {
-          console.log(row)
           if (row) {
             const id = row[this.model.keyField().name] as Value;
             return this.updateChildFields(data, id).then(() => row);
@@ -597,7 +596,7 @@ export class Table {
       const model = related.referencingField.referencedField.model;
       const name = related.throughField.relatedField.name;
       const where = {
-        [name]: { [model.keyField().name]: value },
+        [name]: { [related.referencingField.name]: value },
         ...(arg.where as object)
       };
       return table.modify(arg.data as Document, where);
