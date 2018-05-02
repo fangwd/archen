@@ -11,7 +11,7 @@ import {
 } from './database';
 import { Row, Connection } from './engine';
 import { QueryBuilder } from './filter';
-import { atob, btoa, toArray } from './misc';
+import { toArray } from './misc';
 
 interface FieldLoader {
   field: SimpleField;

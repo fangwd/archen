@@ -182,16 +182,9 @@ export class QueryBuilder {
     return exprs.length === 0 ? '' : `(${exprs.join(' and ')})`;
   }
 
-  private expr(
-    field: SimpleField,
-    operator: string,
-    value: Value | Value[] | RawQuery
-  ) {
+  private expr(field: SimpleField, operator: string, value: Value | Value[]) {
     const lhs = this.encodeField(field.column.name);
-
-    if (value instanceof RawQuery) {
-      return `${lhs} ${operator || 'in'} (${value.toString()})`;
-    } else if (Array.isArray(value)) {
+    if (Array.isArray(value)) {
       if (!operator || operator === 'in') {
         const values = value
           .filter(value => value !== null)
@@ -444,14 +437,4 @@ export function splitKey(arg: string): string[] {
     return [match[1], op];
   }
   return [arg];
-}
-
-export class RawQuery {
-  query: string;
-  constructor(query: string) {
-    this.query = query;
-  }
-  toString() {
-    return this.query;
-  }
 }
