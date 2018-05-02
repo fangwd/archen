@@ -4,7 +4,11 @@ export type Document = {
   [key: string]: Value | Value[] | Document | Document[];
 };
 
-export type Filter = Document | Document[];
+type _Filter = {
+  [key: string]: Value | Value[] | RawQuery | _Filter | _Filter[];
+};
+
+export type Filter = _Filter | _Filter[];
 
 import {
   Schema,
@@ -18,7 +22,7 @@ import {
 } from './model';
 
 import { Connection, Row } from './engine';
-import { encodeFilter, QueryBuilder } from './filter';
+import { encodeFilter, QueryBuilder, RawQuery } from './filter';
 import { toArray } from './misc';
 
 import {
@@ -364,8 +368,8 @@ export class Table {
 
     const self = this;
 
-    return this.resolveParentFields(data, filter).then(row =>
-      self.update(row, filter).then(() => {
+    return this.resolveParentFields(data, filter).then(row => {
+      return self.update(row, filter).then(() => {
         const where = Object.assign({}, filter);
         for (const key in where) {
           if (key in row) {
@@ -380,8 +384,8 @@ export class Table {
             return Promise.resolve(row);
           }
         });
-      })
-    );
+      });
+    });
   }
 
   updateChildFields(data: Document, id: Value): Promise<void> {
@@ -593,10 +597,14 @@ export class Table {
     const table = this.db.table(related.throughField.referencedField.model);
     const mapping = this.db.table(related.throughField.model);
     const promises = args.map(arg => {
-      const model = related.referencingField.referencedField.model;
-      const name = related.throughField.relatedField.name;
+      const model = related.referencingField.model;
+      const builder = new QueryBuilder(model, this.db.engine);
       const where = {
-        [name]: { [related.referencingField.name]: value },
+        [table.model.keyField().name + '_in']: new RawQuery(
+          builder.select(related.throughField, {
+            [related.referencingField.name]: value
+          })
+        ),
         ...(arg.where as object)
       };
       return table.modify(arg.data as Document, where);
