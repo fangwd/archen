@@ -878,7 +878,7 @@ function getUpsertChildTypeName(field: RelatedField): string {
 function getType(type: string): GraphQLScalarType {
   if (/char|text/i.test(type)) {
     return GraphQLString;
-  } else if (/^int/i.test(type)) {
+  } else if (/^(big|long)?(int|long)/i.test(type)) {
     return GraphQLInt;
   } else if (/float|double/i.test(type)) {
     return GraphQLFloat;
