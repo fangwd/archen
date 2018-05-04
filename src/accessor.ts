@@ -1,6 +1,13 @@
 import DataLoader = require('dataloader');
 
-import { Schema, Model, SimpleField, ForeignKeyField, Field } from './model';
+import {
+  Schema,
+  Model,
+  SimpleField,
+  ForeignKeyField,
+  Field,
+  RelatedField
+} from './model';
 import {
   Database,
   Value,
@@ -13,15 +20,9 @@ import { Row, Connection } from './engine';
 import { QueryBuilder } from './filter';
 import { toArray } from './misc';
 
-interface FieldLoader {
-  field: SimpleField;
+interface LoaderEntry {
+  key: LoaderKey;
   loader: DataLoader<Value, Row | Row[]>;
-}
-
-interface FieldLoaderMap {
-  [key: string]: {
-    [key: string]: FieldLoader;
-  };
 }
 
 interface ConnectionSelectOptions {
@@ -33,37 +34,27 @@ interface ConnectionSelectOptions {
 
 export class Accessor {
   db: Database;
-  loaders: FieldLoaderMap;
-  queryLoader: DataLoader<string, Row[]>;
+  loaderMap: { [key: string]: LoaderEntry };
 
   constructor(db: Database) {
     this.db = db;
-    this.queryLoader = createQueryLoader(this.db.engine);
-    this.loaders = {};
-    for (const model of this.db.schema.models) {
-      const loaders = {};
-      for (const field of model.fields) {
-        if (field.isUnique() || field instanceof ForeignKeyField) {
-          loaders[field.name] = this._createLoader(field as SimpleField);
-        }
-      }
-      this.loaders[model.name] = loaders;
-    }
+    this.loaderMap = {};
   }
 
-  _createLoader(field: SimpleField): FieldLoader {
+  getLoader(key: LoaderKey) {
+    const keyCode = encodeLoaderKey(key);
+    let entry = this.loaderMap[keyCode];
+
+    if (entry) return entry.loader;
+
+    const field = key.field;
     const table = this.db.table(field.model);
+
     const loader = new DataLoader<Value, Row | Row[]>((keys: Value[]) => {
-      return table.select('*', { where: { [field.name]: keys } }).then(rows => {
-        const loaders = this.loaders[field.model.name];
-        for (const row of rows) {
-          for (const key in loaders) {
-            if (key != field.name && loaders[key].field.isUnique()) {
-              // TEST: order_shipping.order_id
-              loaders[key].loader.prime(row[key] as Value, row);
-            }
-          }
-        }
+      const where = Object.assign(key.where || {}, { [field.name]: keys });
+      const options = Object.assign(key || {}, { where });
+
+      return table.select('*', options).then(rows => {
         function __equal(row, key) {
           const value = row[field.name];
           if (field instanceof ForeignKeyField) {
@@ -79,47 +70,86 @@ export class Accessor {
         }
       });
     });
-    return { field, loader };
+
+    this.loaderMap[keyCode] = { loader, key };
+
+    return loader;
+  }
+
+  getLoaderRelated(key: LoaderKey) {
+    const keyCode = encodeLoaderKey(key);
+
+    let entry = this.loaderMap[keyCode];
+
+    if (entry) return entry.loader;
+
+    const field = key.field as RelatedField;
+
+    const loader = new DataLoader<Value, Row | Row[]>((keys: Value[]) => {
+      const table = this.db.table(field.referencingField.model);
+      let where = { [field.referencingField.name]: keys };
+      if (!field.throughField && key.where) {
+        where = Object.assign(key.where, where);
+      }
+      return table.select('*', { where }).then(rows => {
+        const K0 = field.model.keyField().name;
+        const K1 = field.referencingField.name;
+        if (!field.throughField) {
+          return keys.map(key => rows.filter(row => row[K1][K0] === key));
+        }
+
+        const K2 = field.throughField.name;
+        const K3 = field.throughField.referencedField.model.keyField().name;
+
+        const keySet = new Set();
+        for (const row of rows) {
+          keySet.add(row[K2][K3]);
+        }
+
+        return this.db
+          .table(field.throughField.referencedField.model)
+          .select('*', { where: { [K3]: [...keySet], ...(key.where || {}) } })
+          .then(docs => {
+            const docMap = docs.reduce((map, doc) => {
+              map[doc[K3]] = doc;
+              return map;
+            }, {});
+            const keyMap = rows.reduce((map, row) => {
+              const key = row[K1][K0];
+              if (!map[key]) {
+                map[key] = [];
+              }
+              if (docMap[row[K2][K3]]) {
+                map[key].push(docMap[row[K2][K3]]);
+              }
+              return map;
+            }, {});
+            return keys.map(key => keyMap[key]);
+          });
+      });
+    });
+
+    this.loaderMap[keyCode] = { loader, key };
+
+    return loader;
   }
 
   // args: { where, limit, offset, orderBy }
-  query(model: Model, args: SelectOptions | string) {
-    let sql;
-
-    if (typeof args === 'string') {
-      sql = args;
-    } else {
-      const builder = new QueryBuilder(model, this.db.engine);
-      sql = builder.select('*', args.where, args.orderBy);
-      if (args.limit) {
-        sql += ` limit ${parseInt(args.limit + '')}`;
-      }
-      if (args.offset) {
-        sql += ` offset ${parseInt(args.offset + '')}`;
-      }
-    }
-
-    const loaders = this.loaders[model.name];
-    return this.queryLoader.load(sql).then(rows => {
-      rows = rowsToCamel(rows, model);
-      for (const row of rows) {
-        for (const name in loaders) {
-          const loader = loaders[name];
-          if (loader.field.isUnique()) {
-            loader.loader.prime(row[name], row);
-          }
-        }
-      }
-      return rows;
-    });
+  query(model: Model, args: SelectOptions) {
+    return this.db.table(model).select('*', args);
   }
 
   get(model: Model, args: Document) {
     return this.db.table(model.name).get(args);
   }
 
-  load(field: SimpleField, value: Value) {
-    const loader = this.loaders[field.model.name][field.name].loader;
+  load(key: LoaderKey, value: Value) {
+    let loader;
+    if (key.field instanceof RelatedField) {
+      loader = this.getLoaderRelated(key);
+    } else {
+      loader = this.getLoader(key);
+    }
     return value ? loader.load(value) : null;
   }
 
@@ -146,27 +176,28 @@ export class Accessor {
   }
 }
 
-function createQueryLoader(db: Connection): DataLoader<string, Row[]> {
-  type Result = { index: number; response: Row[] };
-  const loader = new DataLoader<string, Row[]>(
-    (queries: string[]) =>
-      new Promise(resolve => {
-        const makePromise = (query: string, index: number) =>
-          new Promise(resolve => {
-            db
-              .query(query)
-              .then((response: Row[]) => resolve({ index, response }));
-          });
-        const promises = queries.map((query, index) =>
-          makePromise(query, index)
-        );
-        Promise.all(promises).then((responses: Result[]) => {
-          const results = [];
-          responses.forEach(r => (results[r.index] = r.response));
-          resolve(results);
-        });
-      }),
-    { cache: false }
-  );
-  return loader;
+interface LoaderKey extends SelectOptions {
+  field: Field;
+}
+
+function encodeLoaderKey(key: LoaderKey): string {
+  return JSON.stringify([
+    key.field.model.name,
+    key.field.name,
+    key.where ? encodeFilter(key.where) : null,
+    key.orderBy || null,
+    key.limit || 0,
+    key.offset || 0
+  ]);
+}
+
+export function encodeFilter(filter) {
+  if (Array.isArray(filter)) {
+    return [0, filter.map(entry => encodeFilter(entry))];
+  }
+  if (filter && typeof filter === 'object' && !(filter instanceof Date)) {
+    const keys = Object.keys(filter).sort();
+    return [1, keys.map(key => [key, encodeFilter(filter[key])])];
+  }
+  return filter;
 }
