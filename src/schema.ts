@@ -344,7 +344,7 @@ export class SchemaBuilder {
               }
               const key = field.referencedField.model.keyField().name;
               return req.accessor.load(
-                field.referencedField,
+                { field: field.referencedField },
                 obj[field.name][keyField.name]
               );
             }
@@ -364,25 +364,10 @@ export class SchemaBuilder {
                 ...QueryOptions
               },
               resolve(obj, args, req: QueryContext) {
-                args.where = args.where || {};
-                const name = relatedField.throughField.relatedField.name;
-                if (relatedField.throughField.relatedField.throughField) {
-                  args.where[name] = {
-                    [model.keyField().name]: obj[model.keyField().name]
-                  };
-                  return req.accessor.query(
-                    relatedField.throughField.referencedField.model,
-                    args
-                  );
-                } else {
-                  args.where[name] = {
-                    [field.referencingField.name]: obj[model.keyField().name]
-                  };
-                  return req.accessor.query(
-                    relatedField.throughField.referencedField.model,
-                    args
-                  );
-                }
+                return req.accessor.load(
+                  { field: relatedField, ...args },
+                  obj[model.keyField().name]
+                );
               }
             };
             modelFields[field.name + 'Connection'] = {
@@ -420,24 +405,17 @@ export class SchemaBuilder {
                 ...QueryOptions
               },
               resolve(object, args, context: QueryContext) {
-                args.where = args.where || {};
-                let promise;
-                if (isEmpty(args.where) && !args.limit && !args.orderBy) {
-                  promise = context.accessor.load(
-                    related,
+                return context.accessor
+                  .load(
+                    { field: related, ...args },
                     object[related.referencedField.name]
-                  );
-                } else {
-                  args.where[related.name] =
-                    object[related.referencedField.name];
-                  promise = context.accessor.query(related.model, args);
-                }
-                return promise.then(rows => {
-                  if (related.isUnique()) {
-                    return Array.isArray(rows) ? rows[0] : rows;
-                  }
-                  return rows;
-                });
+                  )
+                  .then(rows => {
+                    if (related.isUnique()) {
+                      return Array.isArray(rows) ? rows[0] : rows;
+                    }
+                    return rows;
+                  });
               }
             };
             if (!related.isUnique()) {
