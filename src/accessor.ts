@@ -8,6 +8,7 @@ import {
   Field,
   RelatedField
 } from './model';
+
 import {
   Database,
   Value,
@@ -16,6 +17,7 @@ import {
   Filter,
   SelectOptions
 } from './database';
+
 import { Row, Connection } from './engine';
 import { QueryBuilder } from './filter';
 import { toArray } from './misc';
@@ -85,16 +87,22 @@ export class Accessor {
 
     const field = key.field as RelatedField;
 
-    const loader = new DataLoader<Value, Row | Row[]>((keys: Value[]) => {
+    const loader = new DataLoader<Value, Document[]>((keys: Value[]) => {
       const table = this.db.table(field.referencingField.model);
-      let where = { [field.referencingField.name]: keys };
-      if (!field.throughField && key.where) {
-        where = Object.assign(key.where, where);
+      const where = { [field.referencingField.name]: keys };
+
+      let options;
+      if (field.throughField) {
+        options = { where };
+      } else {
+        options = { ...key, where: { ...(key.where || {}), where } };
       }
+
       return table.select('*', { where }).then(rows => {
         const K0 = field.model.keyField().name;
         const K1 = field.referencingField.name;
         if (!field.throughField) {
+          // TODO: Test
           return keys.map(key => rows.filter(row => row[K1][K0] === key));
         }
 
@@ -106,25 +114,30 @@ export class Accessor {
           keySet.add(row[K2][K3]);
         }
 
+        const options = {
+          ...key,
+          where: { [K3]: [...keySet], ...(key.where || {}) }
+        };
+
         return this.db
           .table(field.throughField.referencedField.model)
-          .select('*', { where: { [K3]: [...keySet], ...(key.where || {}) } })
+          .select('*', options)
           .then(docs => {
             const docMap = docs.reduce((map, doc) => {
-              map[doc[K3]] = doc;
+              map[doc[K3] as string] = doc;
               return map;
             }, {});
-            const keyMap = rows.reduce((map, row) => {
+            const keyMap: any = rows.reduce((map, row) => {
               const key = row[K1][K0];
               if (!map[key]) {
                 map[key] = [];
               }
               if (docMap[row[K2][K3]]) {
-                map[key].push(docMap[row[K2][K3]]);
+                (map[key] as any[]).push(docMap[row[K2][K3]]);
               }
               return map;
             }, {});
-            return keys.map(key => keyMap[key]);
+            return keys.map(key => keyMap[key as string]);
           });
       });
     });
