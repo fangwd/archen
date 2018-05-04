@@ -27,6 +27,15 @@ const options = {
           relatedName: 'categorySet'
         }
       ]
+    },
+    {
+      table: 'user_group',
+      fields: [
+        {
+          column: 'user_id',
+          throughField: 'group_id'
+        }
+      ]
     }
   ]
 };
@@ -76,4 +85,3 @@ require('fs').writeFileSync(
   'schema.graphql',
   require('graphql').printSchema(archen.createGraphQLSchema(schema))
 );
-
