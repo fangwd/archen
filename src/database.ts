@@ -150,11 +150,16 @@ export class Table {
     return this.escapeName(name) + '=' + this.escapeValue(name, value);
   }
 
-  select(fields: string, options: SelectOptions = {}): Promise<Document[]> {
+  select(
+    fields: string,
+    options: SelectOptions = {},
+    filterThunk?: (builder: QueryBuilder) => string
+  ): Promise<Document[]> {
     let sql = new QueryBuilder(this.model, this.db.engine).select(
       fields,
       options.where,
-      options.orderBy
+      options.orderBy,
+      filterThunk
     );
 
     if (options.limit !== undefined) {
@@ -165,10 +170,8 @@ export class Table {
       sql += ` offset ${parseInt(options.offset + '')}`;
     }
 
-    return new Promise<Document[]>(resolve => {
-      this.db.engine.query(sql).then(rows => {
-        resolve(rows.map(row => toDocument(row, this.model)));
-      });
+    return this.db.engine.query(sql).then(rows => {
+      return filterThunk ? rows : rows.map(row => toDocument(row, this.model));
     });
   }
 
