@@ -290,12 +290,22 @@ export class QueryBuilder {
   select(
     name: string | SimpleField,
     filter?: Filter,
-    orderBy?: OrderBy
+    orderBy?: OrderBy,
+    filterThunk?: (QueryBuilder) => string
   ): string {
     const query = this._select(name, filter, orderBy);
     let sql = `select ${query.fields} from ${query.tables}`;
     if (query.where) {
       sql += ` where ${query.where}`;
+    }
+    if (filterThunk) {
+      const extra = filterThunk(this);
+      if (extra) {
+        if (!query.where) {
+          sql += ' where ';
+        }
+        sql += extra;
+      }
     }
     if (query.orderBy) {
       sql += ` order by ${query.orderBy}`;
