@@ -49,56 +49,41 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
 
   orderBy = matchUniqueKey(model, orderBy);
 
-  const builder = new QueryBuilder(table.model, table.db.engine);
-  const query = builder._select('*', options.where, orderBy);
-
-  let sql = `select ${query.fields} from ${query.tables}`;
-
-  if (options.cursor) {
-    const values = decodeCursor(options.cursor);
-    const fields = orderBy.map((entry, index) => {
-      const [path, direction] = entry.split(/\s+/);
-      const desc = direction && /^desc$/i.test(direction);
-      const match = /^(.+)\.([^\.]+)$/.exec(path);
-      let alias, field;
-      if (match) {
-        const entry = builder.context.aliasMap[match[1]];
-        alias = entry.name;
-        field = entry.model.field(match[2]);
-      } else {
-        alias = model.table.name;
-        field = model.field(path);
+  return table
+    .select('*', { ...options, orderBy }, builder => {
+      if (options.cursor) {
+        const values = decodeCursor(options.cursor);
+        const fields = orderBy.map((entry, index) => {
+          const [path, direction] = entry.split(/\s+/);
+          const desc = direction && /^desc$/i.test(direction);
+          const match = /^(.+)\.([^\.]+)$/.exec(path);
+          let alias, field;
+          if (match) {
+            const entry = builder.context.aliasMap[match[1]];
+            alias = entry.name;
+            field = entry.model.field(match[2]);
+          } else {
+            alias = model.table.name;
+            field = model.field(path);
+          }
+          return {
+            alias,
+            field,
+            desc,
+            value: values[index]
+          };
+        });
+        return buildFilter(table.db.engine, fields, 0);
       }
-      return {
-        alias,
-        field,
-        desc,
-        value: values[index]
-      };
+      return null;
+    })
+    .then(rows => {
+      const keys = orderBy.map(s => s.split(/\s+/)[0].replace(/\./g, '__'));
+      return rows.map(row => ({
+        node: toDocument(row, model),
+        cursor: encodeCursor(keys.map(key => row[key]))
+      }));
     });
-    sql += ' where ' + buildFilter(table.db.engine, fields, 0);
-  }
-
-  if (query.where) {
-    if (!options.cursor) sql += ' where ';
-    sql += query.where;
-  }
-
-  if (query.orderBy) {
-    sql += ` order by ${query.orderBy}`;
-  }
-
-  if (options.limit) {
-    sql += ` limit ${parseInt(options.limit + '')}`;
-  }
-
-  return table.db.engine.query(sql).then(rows => {
-    const keys = orderBy.map(s => s.split(/\s+/)[0].replace(/\./g, '__'));
-    return rows.map(row => ({
-      node: toDocument(row, model),
-      cursor: encodeCursor(keys.map(key => row[key]))
-    }));
-  });
 }
 
 export function encodeCursor(data) {
