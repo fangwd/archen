@@ -37,7 +37,7 @@ mutation {
 
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
     const user = row.data.createUser;
     expect(user.email).toBe(EMAIL);
     expect(user.status).toBe(STATUS);
@@ -90,7 +90,7 @@ mutation {
 
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
     const order = row.data.createOrder;
     expect(order.code).toBe('test-001');
     expect(order.orderItems.length).toBe(2);
@@ -133,7 +133,7 @@ mutation {
     })
     .then(order => {
       expect(order.user.id).toBe(1);
-      graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+      graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
         const order = row.data.updateOrder;
         expect(order.user).toBe(null);
         done();
@@ -164,7 +164,7 @@ mutation {
 
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
     const order = row.data.createOrder;
     expect(order.orderShipping.status).toBe(100);
     done();
@@ -192,7 +192,7 @@ mutation {
   }
 }
 `;
-    graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+    graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
       const order = row.data.updateOrder;
       expect(order.orderShipping.status).toBe(200);
       done();
@@ -223,7 +223,7 @@ mutation {
 
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
     const order = row.data.createOrder;
     expect(order.orderShipping.status).toBe(2);
     done();
@@ -255,7 +255,7 @@ mutation {
   }
 }
 `;
-      graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+      graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
         const order = row.data.updateOrder;
         expect(order.orderShipping.status).toBe(STATUS_B);
         done();
@@ -287,7 +287,7 @@ mutation {
   const archen = createArchen();
 
   createOrderAndShipping(archen.db, CODE, STATUS).then(id => {
-    graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+    graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
       const order = row.data.updateOrder;
       expect(order.orderShipping.status).toBe(STATUS + 1);
       done();
@@ -322,7 +322,7 @@ mutation {
   const archen = createArchen();
 
   createOrderAndShipping(archen.db, CODE, 100).then(id => {
-    graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+    graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
       const order = row.data.updateOrder;
       expect(order.orderShipping.status).toBe(300);
       done();
@@ -355,7 +355,7 @@ mutation {
 
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
     const order = row.data.createOrder;
     expect(order.orderShipping.status).toBe(100);
     const DATA = `
@@ -375,7 +375,7 @@ mutation {
 `;
     // To clear data loader which happens in practice
     const archen = createArchen();
-    graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+    graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
       const order = row.data.updateOrder;
       expect(order.orderShipping).toBe(null);
       done();
@@ -415,7 +415,7 @@ test('many to many #1', done => {
 
   const archen = createArchen(CONFIG);
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(result => {
     const products = result.data.products.filter(p => p.categorySet.length > 0);
     expect(products.length).toBe(2);
     done();
@@ -458,7 +458,7 @@ test('many to many #2', done => {
 
   const archen = createArchen(CONFIG);
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(result => {
     const products = result.data.products.filter(p => p.categorySet.length > 0);
     expect(products.length).toBe(2);
     done();
@@ -515,7 +515,7 @@ mutation {
   }
 
   _createItems().then(result => {
-    graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+    graphql.graphql(archen.schema, DATA, null, archen.accessor).then(result => {
       const order = result.data.updateOrder;
       const p1 = order.orderItems.find(x => x.product.id === 1);
       expect(p1.quantity).toBe(200);
@@ -542,7 +542,7 @@ mutation {
 
   const archen = createArchen();
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(row => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(row => {
     const order = row.data.updateOrder;
     expect(order.dateCreated).toBe(date);
     done();
@@ -574,7 +574,7 @@ test('order by', done => {
 }
 `;
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(result => {
     const orderItems = result.data.orderItems;
     let ordered = true;
     for (let i = 1; i < orderItems.length; i++) {
@@ -629,7 +629,7 @@ mutation{
       });
   }
 
-  graphql.graphql(archen.schema, DATA, null, archen).then(result => {
+  graphql.graphql(archen.schema, DATA, null, archen.accessor).then(result => {
     const order = result.data.updateOrder;
     expect(order.user.lastName).toBe('updated-last-name');
     done();
