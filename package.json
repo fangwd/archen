@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "0.9.11",
+  "version": "0.9.15",
   "description": "Archen - Add GraphQL API to your existing database",
   "main": "./dist/index.js",
   "files": [
@@ -23,8 +23,7 @@
   "license": "MIT",
   "dependencies": {
     "dataloader": "^1.4.0",
-    "graphql": "^0.13.1",
-    "typescript": "^2.8.1"
+    "graphql": "^0.13.1"
   },
   "repository": {
     "type": "git",
