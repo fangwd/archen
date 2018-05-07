@@ -47,27 +47,13 @@ const schema = new archen.Schema(
 
 const app = express();
 
-function buildError(table, action, data, error) {
-  const fields = Object.keys(data);
-  const value = fields.map(name => data[name]);
-  return JSON.stringify({
-    code: error.code,
-    data: {
-      table: table.model.table.name,
-      action,
-      fields,
-      value
-    }
-  });
-}
-
 app.get('/', (req, res) => res.send('Hello World!'));
 
 app.use(
   '/graphql',
   graphqlHTTP((request, response, params) => ({
     schema: archen.createGraphQLSchema(schema),
-    context: archen.createGraphQLContext(schema, mysql, { buildError }),
+    context: new archen.Accessor(schema, mysql),
     pretty: false,
     graphiql: true,
     formatError: error => ({
