@@ -28,7 +28,6 @@ import {
 } from './model';
 
 import { Accessor } from './accessor';
-import { cursorQuery } from './cursor';
 
 import {
   AND,
@@ -384,8 +383,7 @@ export class SchemaBuilder {
                     [field.referencingField.name]: obj[model.keyField().name]
                   };
                 }
-                const table = acc.db.table(referenced.model);
-                return doCursorQuery(table, args, field.name);
+                return acc.cursorQuery(referenced.model, args, field.name);
               }
             };
           } else {
@@ -425,8 +423,7 @@ export class SchemaBuilder {
                   args.where = args.where || {};
                   args.where[related.name] =
                     object[related.referencedField.name];
-                  const table = acc.db.table(related.model);
-                  return doCursorQuery(table, args, field.name);
+                  return acc.cursorQuery(related.model, args, field.name);
                 }
               };
             }
@@ -478,8 +475,7 @@ export class SchemaBuilder {
           ...ConnectionOptions
         },
         resolve(_, args, acc) {
-          const table = acc.db.table(model);
-          return doCursorQuery(table, args, model.pluralName);
+          return acc.cursorQuery(model, args, model.pluralName);
         }
       };
 
@@ -902,30 +898,6 @@ function getFieldsExclude(
   }
 
   return fields;
-}
-
-function doCursorQuery(table, args, pluralName) {
-  const options = {
-    where: args.where,
-    orderBy: args.orderBy,
-    limit: args.first,
-    cursor: args.after
-  };
-  return cursorQuery(table, options).then(edges => {
-    const firstEdge = edges[0];
-    const lastEdge = edges.slice(-1)[0];
-    const pageInfo = {
-      startCursor: firstEdge ? firstEdge.cursor : null,
-      endCursor: lastEdge ? lastEdge.cursor : null,
-      hasNextPage: edges.length === options.limit + 1
-    };
-    edges = edges.length > options.limit ? edges.slice(0, -1) : edges;
-    return {
-      edges,
-      pageInfo,
-      [pluralName]: edges.map(edge => edge.node)
-    };
-  });
 }
 
 export function getQueryFields(info: GraphQLResolveInfo) {

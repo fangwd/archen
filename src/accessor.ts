@@ -22,6 +22,7 @@ import {
 import { Row, Connection } from './engine';
 import { QueryBuilder } from './filter';
 import { toArray } from './misc';
+import { cursorQuery } from './cursor';
 
 interface LoaderEntry {
   key: LoaderKey;
@@ -221,6 +222,30 @@ export class Accessor {
     return table.get(filter).then(row => {
       if (!row) return row;
       return this.db.transaction(() => table.delete(filter)).then(() => row);
+    });
+  }
+
+  cursorQuery(model: Model, args, pluralName) {
+    const options = {
+      where: args.where,
+      orderBy: args.orderBy,
+      limit: args.first,
+      cursor: args.after
+    };
+    return cursorQuery(this.db.table(model), options).then(edges => {
+      const firstEdge = edges[0];
+      const lastEdge = edges.slice(-1)[0];
+      const pageInfo = {
+        startCursor: firstEdge ? firstEdge.cursor : null,
+        endCursor: lastEdge ? lastEdge.cursor : null,
+        hasNextPage: edges.length === options.limit + 1
+      };
+      edges = edges.length > options.limit ? edges.slice(0, -1) : edges;
+      return {
+        edges,
+        pageInfo,
+        [pluralName]: edges.map(edge => edge.node)
+      };
     });
   }
 }
