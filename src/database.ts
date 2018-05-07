@@ -635,7 +635,7 @@ export class Table {
     });
   }
 
-  append(data?: { [key: string]: any }): Record {
+  append(data?: { [key: string]: any } | any[]): Record {
     const record = new Proxy(new Record(this), RecordProxy);
     Object.assign(record, data);
     const existing = this._mapGet(record);

@@ -37,24 +37,24 @@ interface ConnectionSelectOptions {
 }
 
 export interface AccessorOptions {
-  data: any;
-  onQuery: (
+  data?: any;
+  onQuery?: (
     data: any,
-    table: Table,
     queryType: string,
+    table: Table,
     queryData: any
-  ) => Promise<boolean>;
-  onResult: (
+  ) => boolean | undefined | Promise<boolean>;
+  onResult?: (
     data: any,
-    table: Table,
     queryType: string,
+    table: Table,
     queryData: any,
     queryResult: Document[]
-  ) => Promise<Document[]>;
-  onError: (
+  ) => any | Promise<any>;
+  onError?: (
     data: any,
-    table: Table,
     queryType: string,
+    table: Table,
     queryData: any,
     queryResult: Document[]
   ) => Promise<string>;
@@ -72,10 +72,10 @@ export class Accessor {
   ) {
     if (db instanceof Database) {
       this.db = db;
-      this.options = connection as AccessorOptions;
+      this.options = (connection as AccessorOptions) || {};
     } else {
       this.db = new Database(db, connection as Connection);
-      this.options = options;
+      this.options = options || {};
     }
     this.loaderMap = {};
   }
@@ -92,21 +92,26 @@ export class Accessor {
     const loader = new DataLoader<Value, Row | Row[]>((keys: Value[]) => {
       const where = Object.assign(key.where || {}, { [field.name]: keys });
       const options = Object.assign(key || {}, { where });
-
-      return table.select('*', options).then(rows => {
-        function __equal(row, key) {
-          const value = row[field.name];
-          if (field instanceof ForeignKeyField) {
-            return value[field.referencedField.model.keyField().name] === key;
-          } else {
-            return value === key;
-          }
-        }
-        if (field.isUnique()) {
-          return keys.map(k => rows.find(r => __equal(r, k)));
-        } else {
-          return keys.map(k => rows.filter(r => __equal(r, k)));
-        }
+      return this.before('SELECT', table, options, () => {
+        return table.select('*', options).then(rows => {
+          return this.after('SELECT', table, options, rows, rows => {
+            function __equal(row, key) {
+              const value = row[field.name];
+              if (field instanceof ForeignKeyField) {
+                return (
+                  value[field.referencedField.model.keyField().name] === key
+                );
+              } else {
+                return value === key;
+              }
+            }
+            if (field.isUnique()) {
+              return keys.map(k => rows.find(r => __equal(r, k)));
+            } else {
+              return keys.map(k => rows.filter(r => __equal(r, k)));
+            }
+          });
+        });
       });
     });
 
@@ -126,56 +131,50 @@ export class Accessor {
 
     const loader = new DataLoader<Value, Document[]>((keys: Value[]) => {
       const table = this.db.table(field.referencingField.model);
-      const where = { [field.referencingField.name]: keys };
+      const options = { where: { [field.referencingField.name]: keys } };
 
-      let options;
-      if (field.throughField) {
-        options = { where };
-      } else {
-        options = { ...key, where: { ...(key.where || {}), where } };
-      }
+      return this.before('SELECT', table, options, () => {
+        return table.select('*', options).then(rows => {
+          return this.after('SELECT', table, options, rows, rows => {
+            const K0 = field.model.keyField().name;
+            const K1 = field.referencingField.name;
+            const K2 = field.throughField.name;
+            const K3 = field.throughField.referencedField.model.keyField().name;
 
-      return table.select('*', { where }).then(rows => {
-        const K0 = field.model.keyField().name;
-        const K1 = field.referencingField.name;
-        if (!field.throughField) {
-          // TODO: Test
-          return keys.map(key => rows.filter(row => row[K1][K0] === key));
-        }
+            const keySet = new Set(rows.map(row => row[K2][K3]));
 
-        const K2 = field.throughField.name;
-        const K3 = field.throughField.referencedField.model.keyField().name;
+            const options = {
+              ...key,
+              where: { [K3]: [...keySet] as string[], ...(key.where || {}) }
+            };
 
-        const keySet = new Set();
-        for (const row of rows) {
-          keySet.add(row[K2][K3]);
-        }
+            const table = this.db.table(
+              field.throughField.referencedField.model
+            );
 
-        const options = {
-          ...key,
-          where: { [K3]: [...keySet], ...(key.where || {}) }
-        };
-
-        return this.db
-          .table(field.throughField.referencedField.model)
-          .select('*', options)
-          .then(docs => {
-            const docMap = docs.reduce((map, doc) => {
-              map[doc[K3] as string] = doc;
-              return map;
-            }, {});
-            const keyMap: any = rows.reduce((map, row) => {
-              const key = row[K1][K0];
-              if (!map[key]) {
-                map[key] = [];
-              }
-              if (docMap[row[K2][K3]]) {
-                (map[key] as any[]).push(docMap[row[K2][K3]]);
-              }
-              return map;
-            }, {});
-            return keys.map(key => keyMap[key as string]);
+            return this.before('SELECT', table, options, () => {
+              return table.select('*', options).then(docs => {
+                return this.after('SELECT', table, options, docs, docs => {
+                  const docMap = docs.reduce((map, doc) => {
+                    map[doc[K3] as string] = doc;
+                    return map;
+                  }, {});
+                  const keyMap: any = rows.reduce((map, row) => {
+                    const key = row[K1][K0];
+                    if (!map[key]) {
+                      map[key] = [];
+                    }
+                    if (docMap[row[K2][K3]]) {
+                      (map[key] as any[]).push(docMap[row[K2][K3]]);
+                    }
+                    return map;
+                  }, {});
+                  return keys.map(key => keyMap[key as string] || []);
+                });
+              });
+            });
           });
+        });
       });
     });
 
@@ -247,6 +246,42 @@ export class Accessor {
         [pluralName]: edges.map(edge => edge.node)
       };
     });
+  }
+
+  before(queryType, table, queryData, next) {
+    const args = [queryType, table, queryData];
+    return this.runCallback(this.options.onQuery, args, next);
+  }
+
+  after(queryType, table, queryData, rows, next) {
+    const callback = this.options.onResult;
+    if (callback) {
+      const args = [queryType, table, queryData, rows];
+      return this.runCallback(callback, args, next, rows);
+    }
+    return next(rows);
+  }
+
+  runCallback(callback, args: any[], next, defaultResult?) {
+    if (!callback) return next.call(this);
+    try {
+      function __check(result) {
+        if (result === false) {
+          return Promise.reject('Forbidden');
+        } else if (result === undefined) {
+          result = defaultResult;
+        }
+        return next.call(this, result);
+      }
+      const result = callback.apply(this, [this.options.data, ...args]);
+      if (result instanceof Promise) {
+        return result.then(__check);
+      } else {
+        return __check(result);
+      }
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 }
 
