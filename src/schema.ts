@@ -359,7 +359,7 @@ export class SchemaBuilder {
                 where: { type: this.filterInputTypeMap[referenced.model.name] },
                 ...QueryOptions
               },
-              resolve(obj, args, acc: Accessor) {
+              resolve(obj, args, acc) {
                 return acc.load(
                   { field: relatedField, ...args },
                   obj[model.keyField().name]
@@ -372,7 +372,7 @@ export class SchemaBuilder {
                 where: { type: this.filterInputTypeMap[referenced.model.name] },
                 ...ConnectionOptions
               },
-              resolve(obj, args, acc: Accessor) {
+              resolve(obj, args, acc) {
                 args.where = args.where || {};
                 const name = relatedField.throughField.relatedField.name;
                 if (relatedField.throughField.relatedField.throughField) {
@@ -400,7 +400,7 @@ export class SchemaBuilder {
                 where: { type: filterInputTypeMapEx[model.name][field.name] },
                 ...QueryOptions
               },
-              resolve(object, args, acc: Accessor) {
+              resolve(object, args, acc) {
                 return acc
                   .load(
                     { field: related, ...args },
@@ -421,7 +421,7 @@ export class SchemaBuilder {
                   where: { type: filterInputTypeMapEx[model.name][field.name] },
                   ...ConnectionOptions
                 },
-                resolve(object, args, acc: Accessor) {
+                resolve(object, args, acc) {
                   args.where = args.where || {};
                   args.where[related.name] =
                     object[related.referencedField.name];
@@ -477,7 +477,7 @@ export class SchemaBuilder {
           where: { type: this.filterInputTypeMap[model.name] },
           ...ConnectionOptions
         },
-        resolve(_, args, acc: Accessor) {
+        resolve(_, args, acc) {
           const table = acc.db.table(model);
           return doCursorQuery(table, args, model.pluralName);
         }
@@ -487,7 +487,7 @@ export class SchemaBuilder {
       queryFields[name] = {
         type: this.modelTypeMap[model.name],
         args: { where: { type: this.inputTypesConnect[model.name] } },
-        resolve(_, args, acc: Accessor) {
+        resolve(_, args, acc) {
           return acc.get(model, args.where);
         }
       };
@@ -735,7 +735,7 @@ export class SchemaBuilder {
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: { data: { type: inputTypesCreate[model.name] } },
-        resolve(_, args, acc: Accessor) {
+        resolve(_, args, acc) {
           return acc.create(model, args.data);
         }
       };
@@ -749,7 +749,7 @@ export class SchemaBuilder {
           where: { type: this.inputTypesConnect[model.name] },
           data: { type: inputTypesUpdate[model.name] }
         },
-        resolve(_, args, acc: Accessor) {
+        resolve(_, args, acc) {
           return acc.update(model, args.data, args.where);
         }
       };
@@ -760,7 +760,7 @@ export class SchemaBuilder {
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: inputTypesUpsert[model.name].getFields(),
-        resolve(_, args, acc: Accessor) {
+        resolve(_, args, acc) {
           return acc.upsert(model, args.create, args.update);
         }
       };
