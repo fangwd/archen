@@ -231,20 +231,28 @@ export class Accessor {
       limit: args.first,
       cursor: args.after
     };
-    return cursorQuery(this.db.table(model), options).then(edges => {
-      const firstEdge = edges[0];
-      const lastEdge = edges.slice(-1)[0];
-      const pageInfo = {
-        startCursor: firstEdge ? firstEdge.cursor : null,
-        endCursor: lastEdge ? lastEdge.cursor : null,
-        hasNextPage: edges.length === options.limit + 1
-      };
-      edges = edges.length > options.limit ? edges.slice(0, -1) : edges;
-      return {
-        edges,
-        pageInfo,
-        [pluralName]: edges.map(edge => edge.node)
-      };
+    const table = this.db.table(model);
+    return this.before('SELECT', table, options, () => {
+      return cursorQuery(table, options).then(edges => {
+        const docs = edges.map(edge => edge.node);
+        return this.after('SELECT', table, options, docs, docs => {
+          // TODO: skip edges' primary keys are not in docs
+          // (add hashUniqueKey to model)
+          const firstEdge = edges[0];
+          const lastEdge = edges.slice(-1)[0];
+          const pageInfo = {
+            startCursor: firstEdge ? firstEdge.cursor : null,
+            endCursor: lastEdge ? lastEdge.cursor : null,
+            hasNextPage: edges.length === options.limit + 1
+          };
+          edges = edges.length > options.limit ? edges.slice(0, -1) : edges;
+          return {
+            edges,
+            pageInfo,
+            [pluralName]: edges.map(edge => edge.node)
+          };
+        });
+      });
     });
   }
 
