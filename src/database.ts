@@ -29,29 +29,16 @@ import {
   flushRecord
 } from './flush';
 
-export interface DatabaseOptions {
-  fieldSeparator: string;
-  buildError: (table: Table, action: string, data: any, error: any) => string;
-}
-
-const DEFAULT_OPTIONS = {
-  fieldSeparator: '-'
-};
-
 export class Database {
   schema: Schema;
   engine: Connection;
   tableMap: { [key: string]: Table } = {};
   tableList: Table[] = [];
-  options: DatabaseOptions;
 
-  constructor(
-    schema: Schema,
-    connection?: Connection,
-    options?: DatabaseOptions
-  ) {
+  constructor(schema: Schema, connection?: Connection) {
     this.schema = schema;
     this.engine = connection;
+
     for (const model of schema.models) {
       const table = new Table(this, model);
       this.tableMap[model.name] = table;
@@ -63,7 +50,6 @@ export class Database {
         return record;
       };
     }
-    this.options = Object.assign({}, options, DEFAULT_OPTIONS);
   }
 
   table(name: string | Field | Model): Table {
@@ -204,9 +190,6 @@ export class Table {
     }
 
     return this.db.engine.query(sql).catch(error => {
-      if (typeof this.db.options.buildError === 'function') {
-        error = this.db.options.buildError(this, 'UPDATE', data, error);
-      }
       throw Error(error);
     });
   }
@@ -217,9 +200,6 @@ export class Table {
     const value = keys.map(key => this.escapeValue(key, data[key])).join(', ');
     const sql = `insert into ${this._name()} (${name}) values (${value})`;
     return this.db.engine.query(sql).catch(error => {
-      if (typeof this.db.options.buildError === 'function') {
-        error = this.db.options.buildError(this, 'INSERT', data, error);
-      }
       throw Error(error);
     });
   }
@@ -689,7 +669,7 @@ export class Table {
   _mapGet(record: Record): Record {
     let existing: Record;
     for (const uc of this.model.uniqueKeys) {
-      const value = record.__valueOf(uc, this.db.options.fieldSeparator);
+      const value = record.__valueOf(uc);
       if (value !== undefined) {
         const record = this.recordMap[uc.name()][value];
         if (existing !== record) {
@@ -703,7 +683,7 @@ export class Table {
 
   _mapPut(record: Record) {
     for (const uc of this.model.uniqueKeys) {
-      const value = record.__valueOf(uc, this.db.options.fieldSeparator);
+      const value = record.__valueOf(uc);
       if (value !== undefined) {
         this.recordMap[uc.name()][value] = record;
       }
@@ -901,7 +881,7 @@ export class Record {
     return true;
   }
 
-  __valueOf(uc: UniqueKey, separator = '-'): string {
+  __valueOf(uc: UniqueKey): string {
     const values = [];
     for (const field of uc.fields) {
       let value = this.__getValue(field.name);
@@ -915,7 +895,7 @@ export class Record {
       }
       values.push(value);
     }
-    return values.join(separator);
+    return JSON.stringify(values);
   }
 
   __merge() {

@@ -53,7 +53,7 @@ interface ObjectTypeMap {
 }
 
 interface ObjectFieldsMap {
-  [key: string]: GraphQLFieldConfigMap<any, QueryContext>;
+  [key: string]: GraphQLFieldConfigMap<any, Accessor>;
 }
 
 interface InputTypeMap {
@@ -62,10 +62,6 @@ interface InputTypeMap {
 
 interface InputFieldsMap {
   [key: string]: GraphQLInputFieldConfigMap;
-}
-
-interface QueryContext {
-  accessor: Accessor;
 }
 
 const ConnectionOptions = {
@@ -255,14 +251,14 @@ export class SchemaBuilder {
     for (const model of this.domain.models) {
       this.modelTypeMap[model.name] = new GraphQLObjectType({
         name: getTypeName(model),
-        fields(): GraphQLFieldConfigMap<any, QueryContext> {
+        fields(): GraphQLFieldConfigMap<any, Accessor> {
           return modelFieldsMap[model.name];
         }
       });
 
       edgeModelTypeMap[model.name] = new GraphQLObjectType({
         name: `${getTypeName(model)}Edge`,
-        fields(): GraphQLFieldConfigMap<any, QueryContext> {
+        fields(): GraphQLFieldConfigMap<any, Accessor> {
           return {
             node: { type: modelTypeMap[model.name] },
             cursor: { type: GraphQLString }
@@ -272,7 +268,7 @@ export class SchemaBuilder {
 
       this.connectionTypeMap[model.name] = new GraphQLObjectType({
         name: `${getTypeName(model)}Connection`,
-        fields(): GraphQLFieldConfigMap<any, QueryContext> {
+        fields(): GraphQLFieldConfigMap<any, Accessor> {
           return {
             pageInfo: { type: PageInfoType },
             edges: { type: new GraphQLList(edgeModelTypeMap[model.name]) },
@@ -294,14 +290,14 @@ export class SchemaBuilder {
         if (field instanceof RelatedField) {
           modelTypeMapEx[model.name][field.name] = new GraphQLObjectType({
             name: getTypeName(field),
-            fields(): GraphQLFieldConfigMap<any, QueryContext> {
+            fields(): GraphQLFieldConfigMap<any, Accessor> {
               return modelFieldsMapEx[model.name][field.name];
             }
           });
           if (!field.referencingField.isUnique()) {
             const edgeType = new GraphQLObjectType({
               name: `${getTypeName(field, true)}Edge`,
-              fields(): GraphQLFieldConfigMap<any, QueryContext> {
+              fields(): GraphQLFieldConfigMap<any, Accessor> {
                 return {
                   node: {
                     type: modelTypeMapEx[model.name][field.name]
@@ -313,7 +309,7 @@ export class SchemaBuilder {
             connectionTypeMapEx[model.name][field.name] = new GraphQLObjectType(
               {
                 name: `${getTypeName(field)}Connection`,
-                fields(): GraphQLFieldConfigMap<any, QueryContext> {
+                fields(): GraphQLFieldConfigMap<any, Accessor> {
                   return {
                     pageInfo: { type: PageInfoType },
                     edges: { type: new GraphQLList(edgeType) },
@@ -335,7 +331,7 @@ export class SchemaBuilder {
         if (field instanceof ForeignKeyField) {
           modelFields[field.name] = {
             type: modelTypeMap[field.referencedField.model.name],
-            resolve(obj, args, req: QueryContext, info) {
+            resolve(obj, args, acc, info) {
               if (obj[field.name] === null) return null;
               const keyField = field.referencedField.model.keyField();
               const fields = getQueryFields(info);
@@ -343,7 +339,7 @@ export class SchemaBuilder {
                 return obj[field.name];
               }
               const key = field.referencedField.model.keyField().name;
-              return req.accessor.load(
+              return acc.load(
                 { field: field.referencedField },
                 obj[field.name][keyField.name]
               );
@@ -363,8 +359,8 @@ export class SchemaBuilder {
                 where: { type: this.filterInputTypeMap[referenced.model.name] },
                 ...QueryOptions
               },
-              resolve(obj, args, req: QueryContext) {
-                return req.accessor.load(
+              resolve(obj, args, acc: Accessor) {
+                return acc.load(
                   { field: relatedField, ...args },
                   obj[model.keyField().name]
                 );
@@ -376,7 +372,7 @@ export class SchemaBuilder {
                 where: { type: this.filterInputTypeMap[referenced.model.name] },
                 ...ConnectionOptions
               },
-              resolve(obj, args, context: QueryContext) {
+              resolve(obj, args, acc: Accessor) {
                 args.where = args.where || {};
                 const name = relatedField.throughField.relatedField.name;
                 if (relatedField.throughField.relatedField.throughField) {
@@ -388,7 +384,7 @@ export class SchemaBuilder {
                     [field.referencingField.name]: obj[model.keyField().name]
                   };
                 }
-                const table = context.accessor.db.table(referenced.model);
+                const table = acc.db.table(referenced.model);
                 return doCursorQuery(table, args, field.name);
               }
             };
@@ -404,8 +400,8 @@ export class SchemaBuilder {
                 where: { type: filterInputTypeMapEx[model.name][field.name] },
                 ...QueryOptions
               },
-              resolve(object, args, context: QueryContext) {
-                return context.accessor
+              resolve(object, args, acc: Accessor) {
+                return acc
                   .load(
                     { field: related, ...args },
                     object[related.referencedField.name]
@@ -425,11 +421,11 @@ export class SchemaBuilder {
                   where: { type: filterInputTypeMapEx[model.name][field.name] },
                   ...ConnectionOptions
                 },
-                resolve(object, args, context: QueryContext) {
+                resolve(object, args, acc: Accessor) {
                   args.where = args.where || {};
                   args.where[related.name] =
                     object[related.referencedField.name];
-                  const table = context.accessor.db.table(related.model);
+                  const table = acc.db.table(related.model);
                   return doCursorQuery(table, args, field.name);
                 }
               };
@@ -470,8 +466,8 @@ export class SchemaBuilder {
           where: { type: this.filterInputTypeMap[model.name] },
           ...QueryOptions
         },
-        resolve(_, args, context, info) {
-          return context.accessor.query(model, args);
+        resolve(_, args, acc, info) {
+          return acc.query(model, args);
         }
       };
 
@@ -481,8 +477,8 @@ export class SchemaBuilder {
           where: { type: this.filterInputTypeMap[model.name] },
           ...ConnectionOptions
         },
-        resolve(_, args, context: QueryContext) {
-          const table = context.accessor.db.table(model);
+        resolve(_, args, acc: Accessor) {
+          const table = acc.db.table(model);
           return doCursorQuery(table, args, model.pluralName);
         }
       };
@@ -491,8 +487,8 @@ export class SchemaBuilder {
       queryFields[name] = {
         type: this.modelTypeMap[model.name],
         args: { where: { type: this.inputTypesConnect[model.name] } },
-        resolve(_, args, context: QueryContext) {
-          return context.accessor.get(model, args.where);
+        resolve(_, args, acc: Accessor) {
+          return acc.get(model, args.where);
         }
       };
     }
@@ -725,22 +721,22 @@ export class SchemaBuilder {
     return { inputTypesCreate, inputTypesUpdate, inputTypesUpsert };
   }
 
-  createMutationFields(): GraphQLFieldConfigMap<any, QueryContext> {
+  createMutationFields(): GraphQLFieldConfigMap<any, Accessor> {
     const {
       inputTypesCreate,
       inputTypesUpdate,
       inputTypesUpsert
     } = this.createMutationInputTypes();
 
-    const mutationFields: GraphQLFieldConfigMap<any, QueryContext> = {};
+    const mutationFields: GraphQLFieldConfigMap<any, Accessor> = {};
 
     for (const model of this.domain.models) {
       const name = 'create' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: { data: { type: inputTypesCreate[model.name] } },
-        resolve(_, args, context: QueryContext) {
-          return context.accessor.create(model, args.data);
+        resolve(_, args, acc: Accessor) {
+          return acc.create(model, args.data);
         }
       };
     }
@@ -753,8 +749,8 @@ export class SchemaBuilder {
           where: { type: this.inputTypesConnect[model.name] },
           data: { type: inputTypesUpdate[model.name] }
         },
-        resolve(_, args, context: QueryContext) {
-          return context.accessor.update(model, args.data, args.where);
+        resolve(_, args, acc: Accessor) {
+          return acc.update(model, args.data, args.where);
         }
       };
     }
@@ -764,8 +760,8 @@ export class SchemaBuilder {
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: inputTypesUpsert[model.name].getFields(),
-        resolve(_, args, context: QueryContext) {
-          return context.accessor.upsert(model, args.create, args.update);
+        resolve(_, args, acc: Accessor) {
+          return acc.upsert(model, args.create, args.update);
         }
       };
     }
@@ -777,8 +773,8 @@ export class SchemaBuilder {
         args: {
           where: { type: this.inputTypesConnect[model.name] }
         },
-        resolve(_, args, context) {
-          return context.accessor.delete(model, args.where);
+        resolve(_, args, acc) {
+          return acc.delete(model, args.where);
         }
       };
     }

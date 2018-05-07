@@ -387,12 +387,10 @@ function mergeRecords(table: Table) {
     return map;
   }, {});
 
-  const separator = table.db.options.fieldSeparator;
-
   for (const record of table.recordList) {
     if (record.__state.merged) continue;
     for (const uc of model.uniqueKeys) {
-      const value = record.__valueOf(uc, separator);
+      const value = record.__valueOf(uc);
       if (value === undefined) continue;
       const existing = map[uc.name()][value];
       if (existing) {

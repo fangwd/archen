@@ -11,6 +11,7 @@ import {
 
 import {
   Database,
+  Table,
   Value,
   Document,
   rowsToCamel,
@@ -34,12 +35,47 @@ interface ConnectionSelectOptions {
   where?: Filter;
 }
 
+export interface AccessorOptions {
+  data: any;
+  onQuery: (
+    data: any,
+    table: Table,
+    queryType: string,
+    queryData: any
+  ) => Promise<boolean>;
+  onResult: (
+    data: any,
+    table: Table,
+    queryType: string,
+    queryData: any,
+    queryResult: Document[]
+  ) => Promise<Document[]>;
+  onError: (
+    data: any,
+    table: Table,
+    queryType: string,
+    queryData: any,
+    queryResult: Document[]
+  ) => Promise<string>;
+}
+
 export class Accessor {
   db: Database;
+  options: AccessorOptions;
   loaderMap: { [key: string]: LoaderEntry };
 
-  constructor(db: Database) {
-    this.db = db;
+  constructor(
+    db: Database | Schema,
+    connection?: Connection | AccessorOptions,
+    options?: AccessorOptions
+  ) {
+    if (db instanceof Database) {
+      this.db = db;
+      this.options = connection as AccessorOptions;
+    } else {
+      this.db = new Database(db, connection as Connection);
+      this.options = options;
+    }
     this.loaderMap = {};
   }
 
