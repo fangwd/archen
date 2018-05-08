@@ -132,31 +132,33 @@ export class Database {
   }
 
   runCallback(callback, queryType, table, queryData): Promise<any> {
-    if (!callback) return Promise.resolve(queryData);
-    try {
-      function __check(data) {
-        if (data === false) {
-          return Promise.reject('Forbidden');
-        } else if (data === undefined) {
-          data = queryData;
+    return new Promise((resolve, reject) => {
+      if (!callback) return resolve(queryData);
+      try {
+        function __check(data) {
+          if (data === false) {
+            return reject('Forbidden');
+          } else if (data === undefined) {
+            data = queryData;
+          }
+          resolve(data);
         }
-        return Promise.resolve(data);
+        const result = callback.call(
+          this,
+          this.callbacks.data,
+          queryType,
+          table,
+          queryData
+        );
+        if (result instanceof Promise) {
+          result.then(__check);
+        } else {
+          __check(result);
+        }
+      } catch (error) {
+        reject(error);
       }
-      const result = callback.call(
-        this,
-        this.callbacks.data,
-        queryType,
-        table,
-        queryData
-      );
-      if (result instanceof Promise) {
-        return result.then(__check);
-      } else {
-        return __check(result);
-      }
-    } catch (error) {
-      return Promise.reject(error);
-    }
+    });
   }
 }
 
@@ -215,11 +217,13 @@ export class Table {
     options: SelectOptions = {},
     filterThunk?: (builder: QueryBuilder) => string
   ): Promise<Document[]> {
-    return this.before('SELECT', { fields, options }).then(result =>
-      this._select(result.fields, result.options, filterThunk).then(rows =>
-        this.after('SELECT', { ...result, rows }).then(result => result.rows)
-      )
-    );
+    return this.before('SELECT', { fields, options }).then(result => {
+      console.log('before', result);
+      return this._select(result.fields, result.options, filterThunk).then(
+        rows =>
+          this.after('SELECT', { ...result, rows }).then(result => result.rows)
+      );
+    });
   }
 
   _select(

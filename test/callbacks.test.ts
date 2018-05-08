@@ -12,9 +12,8 @@ beforeAll(() => {
     .then(() => createRelatedFieldData());
 });
 
-//afterAll(() => helper.dropDatabase(NAME));
+afterAll(() => helper.dropDatabase(NAME));
 
-/*
 test('onQuery - data', done => {
   expect.assertions(2);
 
@@ -86,7 +85,6 @@ test('onResult', done => {
     done();
   });
 });
-*/
 
 const options = {
   models: [
@@ -129,21 +127,24 @@ test('related', done => {
         };
       }
     },
-    onResult: async (data, queryType, table, queryData) => {
+    onResult: (data, queryType, table, queryData) => {
       // Exclude "group 1.1"
       if (table.model.name === 'UserGroup') {
         const rows = queryData.rows;
-        const groups = db
-          .table('group')
-          .select('*', { where: { id: rows.map(row => row.group.id) } });
-        const result = [];
-        for (const row of rows) {
-          const group = groups.find(group => group.id === row.group.id);
-          if (group.name.indexOf('1.1') === -1) {
-            result.push(row);
+        return new Promise(async resolve => {
+          const groups = await db
+            .table('group')
+            .select('*', { where: { id: rows.map(row => row.group.id) } });
+          const result = [];
+          for (const row of rows) {
+            const group = groups.find(group => group.id === row.group.id);
+            if (group && group.name.indexOf('1.1') === -1) {
+              result.push(row);
+            }
           }
-        }
-        queryData.rows = result;
+          queryData.rows = result;
+          resolve(queryData);
+        });
       } else if (table.model.name === 'Group') {
         // Exclude "group 1.2.1"
         queryData.rows = queryData.rows
@@ -170,7 +171,6 @@ test('related', done => {
 
   graphql.graphql(schema, DATA, null, accessor).then(result => {
     const users = result.data.users;
-    console.log(users);
     const names = [
       ...users.reduce((result, user) => {
         console.log(user);
