@@ -29,28 +29,18 @@ import {
   flushRecord
 } from './flush';
 
+type Callback = (
+  data: any,
+  queryType: string,
+  table: Table,
+  queryData: any
+) => any;
+
 export interface DatabaseCallbacks {
   data?: any;
-  onQuery?: (
-    data: any,
-    queryType: string,
-    table: Table,
-    queryData: any
-  ) => boolean | undefined | Promise<boolean>;
-  onResult?: (
-    data: any,
-    queryType: string,
-    table: Table,
-    queryData: any,
-    queryResult: Document[]
-  ) => any | Promise<any>;
-  onError?: (
-    data: any,
-    queryType: string,
-    table: Table,
-    queryData: any,
-    queryResult: Document[]
-  ) => Promise<string>;
+  onQuery?: Callback;
+  onResult?: Callback;
+  onError?: Callback;
 }
 
 export class Database {
@@ -67,7 +57,7 @@ export class Database {
   ) {
     this.schema = schema;
     this.engine = connection;
-    this.callbacks = callbacks;
+    this.callbacks = callbacks || {};
 
     for (const model of schema.models) {
       const table = new Table(this, model);
@@ -123,32 +113,42 @@ export class Database {
     }, {});
   }
 
-  before(queryType, table, queryData, next) {
-    const args = [queryType, table, queryData];
-    return this.runCallback(this.callbacks.onQuery, args, next);
+  before(queryType, table, queryData): Promise<any> {
+    return this.runCallback(
+      this.callbacks.onQuery,
+      queryType,
+      table,
+      queryData
+    );
   }
 
-  after(queryType, table, queryData, rows, next) {
-    const callback = this.callbacks.onResult;
-    if (callback) {
-      const args = [queryType, table, queryData, rows];
-      return this.runCallback(callback, args, next, rows);
-    }
-    return next(rows);
+  after(queryType, table, queryData): Promise<any> {
+    return this.runCallback(
+      this.callbacks.onResult,
+      queryType,
+      table,
+      queryData
+    );
   }
 
-  runCallback(callback, args: any[], next, defaultResult?) {
-    if (!callback) return next.call(this);
+  runCallback(callback, queryType, table, queryData): Promise<any> {
+    if (!callback) return Promise.resolve(queryData);
     try {
-      function __check(result) {
-        if (result === false) {
+      function __check(data) {
+        if (data === false) {
           return Promise.reject('Forbidden');
-        } else if (result === undefined) {
-          result = defaultResult;
+        } else if (data === undefined) {
+          data = queryData;
         }
-        return next.call(this, result);
+        return Promise.resolve(data);
       }
-      const result = callback.apply(this, [this.callbacks.data, ...args]);
+      const result = callback.call(
+        this,
+        this.callbacks.data,
+        queryType,
+        table,
+        queryData
+      );
       if (result instanceof Promise) {
         return result.then(__check);
       } else {
@@ -202,7 +202,27 @@ export class Table {
     return this.escapeName(name) + '=' + this.escapeValue(name, value);
   }
 
+  before(queryType, queryData): Promise<any> {
+    return this.db.before(queryType, this, queryData);
+  }
+
+  after(queryType, queryData): Promise<any> {
+    return this.db.after(queryType, this, queryData);
+  }
+
   select(
+    fields: string,
+    options: SelectOptions = {},
+    filterThunk?: (builder: QueryBuilder) => string
+  ): Promise<Document[]> {
+    return this.before('SELECT', { fields, options }).then(result =>
+      this._select(result.fields, result.options, filterThunk).then(rows =>
+        this.after('SELECT', { ...result, rows }).then(result => result.rows)
+      )
+    );
+  }
+
+  _select(
     fields: string,
     options: SelectOptions = {},
     filterThunk?: (builder: QueryBuilder) => string
