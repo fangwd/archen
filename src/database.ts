@@ -570,6 +570,33 @@ export class Table {
         }
         const where = args.map(arg => ({ [field.name]: id, ...arg }));
         promises.push(table.update({ [field.name]: null }, where));
+      } else if (method === 'set') {
+        const promise = related.throughField
+          ? this.deleteThrough(related, id, {})
+          : table.delete({ [field.name]: id });
+        promises.push(
+          promise.then(() => {
+            if (related.throughField) {
+              return this.createThrough(related, id, args);
+            }
+            // create: [{parent: {id: 2}, name: 'Apple'}, ...]
+            const docs = toArray(args).map(arg => ({
+              [field.name]: id,
+              ...arg
+            }));
+            if (field.isUnique()) {
+              return this._disconnectUnique(field, id).then(() =>
+                table.create(docs[0])
+              );
+            } else {
+              return Promise.all(
+                docs.map(doc => {
+                  table.create(doc);
+                })
+              );
+            }
+          })
+        );
       } else {
         throw Error(`Unknown method: ${method}`);
       }

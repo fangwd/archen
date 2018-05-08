@@ -703,6 +703,7 @@ export class SchemaBuilder {
                   return {
                     connect: { type: new GraphQLList(connectType) },
                     create: { type: new GraphQLList(createType) },
+                    set: { type: new GraphQLList(createType) },
                     upsert: { type: new GraphQLList(upsertType) },
                     update: { type: new GraphQLList(updateType) },
                     delete: { type: new GraphQLList(connectType) },
