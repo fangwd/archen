@@ -29,15 +29,45 @@ import {
   flushRecord
 } from './flush';
 
+export interface DatabaseCallbacks {
+  data?: any;
+  onQuery?: (
+    data: any,
+    queryType: string,
+    table: Table,
+    queryData: any
+  ) => boolean | undefined | Promise<boolean>;
+  onResult?: (
+    data: any,
+    queryType: string,
+    table: Table,
+    queryData: any,
+    queryResult: Document[]
+  ) => any | Promise<any>;
+  onError?: (
+    data: any,
+    queryType: string,
+    table: Table,
+    queryData: any,
+    queryResult: Document[]
+  ) => Promise<string>;
+}
+
 export class Database {
   schema: Schema;
   engine: Connection;
   tableMap: { [key: string]: Table } = {};
   tableList: Table[] = [];
+  callbacks: DatabaseCallbacks;
 
-  constructor(schema: Schema, connection?: Connection) {
+  constructor(
+    schema: Schema,
+    connection?: Connection,
+    callbacks?: DatabaseCallbacks
+  ) {
     this.schema = schema;
     this.engine = connection;
+    this.callbacks = callbacks;
 
     for (const model of schema.models) {
       const table = new Table(this, model);
@@ -91,6 +121,42 @@ export class Database {
       result[table.model.name] = table.json();
       return result;
     }, {});
+  }
+
+  before(queryType, table, queryData, next) {
+    const args = [queryType, table, queryData];
+    return this.runCallback(this.callbacks.onQuery, args, next);
+  }
+
+  after(queryType, table, queryData, rows, next) {
+    const callback = this.callbacks.onResult;
+    if (callback) {
+      const args = [queryType, table, queryData, rows];
+      return this.runCallback(callback, args, next, rows);
+    }
+    return next(rows);
+  }
+
+  runCallback(callback, args: any[], next, defaultResult?) {
+    if (!callback) return next.call(this);
+    try {
+      function __check(result) {
+        if (result === false) {
+          return Promise.reject('Forbidden');
+        } else if (result === undefined) {
+          result = defaultResult;
+        }
+        return next.call(this, result);
+      }
+      const result = callback.apply(this, [this.callbacks.data, ...args]);
+      if (result instanceof Promise) {
+        return result.then(__check);
+      } else {
+        return __check(result);
+      }
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 }
 
