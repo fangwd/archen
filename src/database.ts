@@ -553,7 +553,7 @@ export class Table {
           const filter = { [field.name]: id, ...where };
           promises.push(table.modify(data, filter));
         }
-      } else if (method === 'delete') {
+      } else if (method.startsWith('delete')) {
         if (related.throughField) {
           promises.push(this.deleteThrough(related, id, args));
           continue;
@@ -563,7 +563,7 @@ export class Table {
           [field.name]: id
         }));
         promises.push(table.delete(filter as Filter));
-      } else if (method === 'disconnect') {
+      } else if (method.startsWith('disconnect')) {
         if (related.throughField) {
           promises.push(this.disconnectThrough(related, id, args));
           continue;

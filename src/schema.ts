@@ -584,12 +584,12 @@ export class SchemaBuilder {
             type: getType(field.column.type)
           };
         } else if (field instanceof RelatedField) {
-          let connectType;
+          let connectType, filterType;
 
           if (field.throughField) {
-            connectType = this.inputTypesConnect[
-              field.throughField.referencedField.model.name
-            ];
+            const model = field.throughField.referencedField.model;
+            connectType = this.inputTypesConnect[model.name];
+            filterType = this.filterInputTypeMap[model.name];
           } else {
             connectType = this.inputTypesConnect[
               field.referencingField.model.name
@@ -603,6 +603,8 @@ export class SchemaBuilder {
                 }
               });
             }
+
+            filterType = this.filterInputTypeMapEx[model.name][field.name];
           }
 
           const createType = new GraphQLInputObjectType({
@@ -704,7 +706,9 @@ export class SchemaBuilder {
                     upsert: { type: new GraphQLList(upsertType) },
                     update: { type: new GraphQLList(updateType) },
                     delete: { type: new GraphQLList(connectType) },
-                    disconnect: { type: new GraphQLList(connectType) }
+                    deleteMany: { type: new GraphQLList(filterType) },
+                    disconnect: { type: new GraphQLList(connectType) },
+                    disconnectMany: { type: new GraphQLList(filterType) }
                   };
                 }
               })
