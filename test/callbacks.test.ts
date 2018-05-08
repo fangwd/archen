@@ -6,14 +6,14 @@ import helper = require('./helper');
 
 const NAME = 'callbacks';
 
-beforeAll(() => {
-  return helper
-    .createDatabase(NAME, false)
-    .then(() => createRelatedFieldData());
-});
+// beforeAll(() => {
+//   return helper
+//     .createDatabase(NAME, false)
+//     .then(() => createRelatedFieldData());
+// });
+//afterAll(() => helper.dropDatabase(NAME));
 
-afterAll(() => helper.dropDatabase(NAME));
-
+/*
 test('onQuery - data', done => {
   expect.assertions(2);
 
@@ -28,6 +28,7 @@ test('onQuery - data', done => {
     done();
   });
 });
+
 test('onQuery - default', done => {
   getAliceBob({ onQuery: () => undefined }).then(rows => {
     expect(rows.length).toBe(2);
@@ -173,7 +174,6 @@ test('related', done => {
     const users = result.data.users;
     const names = [
       ...users.reduce((result, user) => {
-        console.log(user);
         user.groups.forEach(group => result.add(group.name));
         return result;
       }, new Set())
@@ -183,6 +183,49 @@ test('related', done => {
     done();
   });
 });
+
+test('get', done => {
+  const onQuery = (data, action, table, queryData) => {
+    const where = queryData.options.where || {};
+    where.status = -1;
+    queryData.options.where = where;
+  };
+  const db = helper.connectToDatabase(NAME);
+  db
+    .table('user')
+    .get({ email: 'alice' })
+    .then(row => {
+      expect(!!row).toBe(true);
+      db.callbacks = { onQuery };
+      db
+        .table('user')
+        .get({ email: 'alice' })
+        .then(row => {
+          expect(!!row).toBe(false);
+          done();
+        });
+
+      done();
+    });
+});
+
+test('create', done => {
+  const onQuery = (data, action, table, queryData) => {
+    if (table.model.name === 'User') {
+      queryData.status = 200;
+    }
+  };
+  const db = helper.connectToDatabase(NAME);
+  db.callbacks = { onQuery };
+  db
+    .table('user')
+    .create({ email: helper.getId() })
+    .then(row => {
+      expect(row.status).toBe(200);
+      done();
+    });
+});
+*/
 
 function createRelatedFieldData() {
   const schema = new Schema(helper.getExampleData(), options);

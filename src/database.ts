@@ -217,13 +217,11 @@ export class Table {
     options: SelectOptions = {},
     filterThunk?: (builder: QueryBuilder) => string
   ): Promise<Document[]> {
-    return this.before('SELECT', { fields, options }).then(result => {
-      console.log('before', result);
-      return this._select(result.fields, result.options, filterThunk).then(
-        rows =>
-          this.after('SELECT', { ...result, rows }).then(result => result.rows)
-      );
-    });
+    return this.before('SELECT', { fields, options }).then(result =>
+      this._select(result.fields, result.options, filterThunk).then(rows =>
+        this.after('SELECT', { ...result, rows }).then(result => result.rows)
+      )
+    );
   }
 
   _select(
@@ -294,7 +292,19 @@ export class Table {
     });
   }
 
-  delete(filter?: Filter): Promise<any> {
+  delete(
+    fields: string,
+    options: SelectOptions = {},
+    filterThunk?: (builder: QueryBuilder) => string
+  ): Promise<Document[]> {
+    return this.before('SELECT', { fields, options }).then(result =>
+      this._select(result.fields, result.options, filterThunk).then(rows =>
+        this.after('SELECT', { ...result, rows }).then(result => result.rows)
+      )
+    );
+  }
+
+  _delete(filter?: Filter): Promise<any> {
     let sql = `delete from ${this._name()}`;
 
     if (filter) {
@@ -399,7 +409,13 @@ export class Table {
   }
 
   create(data: Document): Promise<Document> {
-    // TODO: Don't allow inserting empty objects
+    return this.before('CREATE', data).then(data =>
+      this._create(data).then(data => this.after('CREATE', data))
+    );
+  }
+
+  _create(data: Document): Promise<Document> {
+    if (Object.keys(data).length === 0) throw Error('Empty data');
     return this.resolveParentFields(data).then(row =>
       this.insert(row).then(id => {
         return this.updateChildFields(data, id).then(() => this.get(id));
@@ -576,7 +592,7 @@ export class Table {
         promises.push(table.update({ [field.name]: null }, where));
       } else if (method === 'set') {
         const promise = related.throughField
-          ? this.deleteThrough(related, id, {})
+          ? this.deleteThrough(related, id, [])
           : table.delete({ [field.name]: id });
         promises.push(
           promise.then(() => {
