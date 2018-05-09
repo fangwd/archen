@@ -101,7 +101,7 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
   return Promise.all(promises).then(result => ({
     rows: result[0],
     totalCount: result[1]
-  });
+  }));
 }
 
 export function encodeCursor(data) {
