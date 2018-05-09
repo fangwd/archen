@@ -36,6 +36,7 @@ export interface CursorQueryOptions {
   cursor?: string;
   limit?: number;
   before?: boolean;
+  withTotal: boolean;
 }
 
 export function cursorQuery(table: Table, options: CursorQueryOptions) {
@@ -49,41 +50,58 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
 
   orderBy = matchUniqueKey(model, orderBy);
 
-  return table
-    .select('*', { ...options, orderBy }, builder => {
-      if (options.cursor) {
-        const values = decodeCursor(options.cursor);
-        const fields = orderBy.map((entry, index) => {
-          const [path, direction] = entry.split(/\s+/);
-          const desc = direction && /^desc$/i.test(direction);
-          const match = /^(.+)\.([^\.]+)$/.exec(path);
-          let alias, field;
-          if (match) {
-            const entry = builder.context.aliasMap[match[1]];
-            alias = entry.name;
-            field = entry.model.field(match[2]);
-          } else {
-            alias = model.table.name;
-            field = model.field(path);
-          }
-          return {
-            alias,
-            field,
-            desc,
-            value: values[index]
-          };
-        });
-        return buildFilter(table.db.engine, fields, 0);
-      }
-      return null;
-    })
-    .then(rows => {
+  const builder = function(builder) {
+    if (options.cursor) {
+      const values = decodeCursor(options.cursor);
+      const fields = orderBy.map((entry, index) => {
+        const [path, direction] = entry.split(/\s+/);
+        const desc = direction && /^desc$/i.test(direction);
+        const match = /^(.+)\.([^\.]+)$/.exec(path);
+        let alias, field;
+        if (match) {
+          const entry = builder.context.aliasMap[match[1]];
+          alias = entry.name;
+          field = entry.model.field(match[2]);
+        } else {
+          alias = model.table.name;
+          field = model.field(path);
+        }
+        return {
+          alias,
+          field,
+          desc,
+          value: values[index]
+        };
+      });
+      return buildFilter(table.db.engine, fields, 0);
+    }
+    return null;
+  };
+
+  const selectOptions = { ...options, orderBy };
+
+  const promises: Promise<any>[] = [
+    table.select('*', selectOptions, builder).then(rows => {
       const keys = orderBy.map(s => s.split(/\s+/)[0].replace(/\./g, '__'));
       return rows.map(row => ({
-        node: toDocument(row, model),
-        cursor: encodeCursor(keys.map(key => row[key]))
+        ...toDocument(row, model),
+        __cursor: encodeCursor(keys.map(key => row[key]))
       }));
-    });
+    })
+  ];
+
+  if (options.withTotal) {
+    promises.push(
+      table
+        .select('count(*)', selectOptions, builder)
+        .then(rows => rows[0]['count(*)'])
+    );
+  }
+
+  return Promise.all(promises).then(result => ({
+    rows: result[0],
+    totalCount: result[1]
+  });
 }
 
 export function encodeCursor(data) {

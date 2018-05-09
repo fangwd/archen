@@ -269,6 +269,7 @@ export class SchemaBuilder {
         name: `${getTypeName(model)}Connection`,
         fields(): GraphQLFieldConfigMap<any, Accessor> {
           return {
+            totalCount: { type: GraphQLInt },
             pageInfo: { type: PageInfoType },
             edges: { type: new GraphQLList(edgeModelTypeMap[model.name]) },
             [model.pluralName]: {
@@ -474,8 +475,13 @@ export class SchemaBuilder {
           where: { type: this.filterInputTypeMap[model.name] },
           ...ConnectionOptions
         },
-        resolve(_, args, acc) {
-          return acc.cursorQuery(model, args, model.pluralName);
+        resolve(_, args, acc, info) {
+          return acc.cursorQuery(
+            model,
+            args,
+            model.pluralName,
+            firstOf(getQueryFields(info))
+          );
         }
       };
 
@@ -933,6 +939,10 @@ export function isEmpty(value: any) {
     return Object.keys(value).length === 0;
   }
   return value === undefined;
+}
+
+function firstOf(object) {
+  return object[Object.keys(object)[0]];
 }
 
 export function hasOnly(object: object, key: string): boolean {

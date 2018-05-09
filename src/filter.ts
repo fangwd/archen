@@ -174,7 +174,8 @@ export class QueryBuilder {
               ]
          }
          */
-        exprs.push('not (' + value.map(c => this.and(c)).join(' or ') + ')');
+        const filters = toArray(value);
+        exprs.push('not (' + filters.map(c => this.and(c)).join(' or ') + ')');
       } else {
         throw Error(`Bad field: ${this.model.name}.${name}`);
       }
@@ -269,8 +270,10 @@ export class QueryBuilder {
         if (field instanceof SimpleField) {
           const column = `${this.escapeId(alias)}.${this.escapeId(field)}`;
           if (alias !== this.model.table.name || name !== '*') {
-            const name = this.escapeId(path.replace(/\./g, '__'));
-            fields.push(`${column} as ${name}`);
+            if (name !== 'count(*)') {
+              const name = this.escapeId(path.replace(/\./g, '__'));
+              fields.push(`${column} as ${name}`);
+            }
           }
           return `${column} ${direction}`;
         }
@@ -303,6 +306,8 @@ export class QueryBuilder {
       if (extra) {
         if (!query.where) {
           sql += ' where ';
+        } else {
+          sql += ' and ';
         }
         sql += extra;
       }
@@ -322,7 +327,9 @@ export class QueryBuilder {
       name = name.column.name;
     }
 
-    if (name !== '*') {
+    if (/count\(\*\)/i.test(name)) {
+      return name;
+    } else if (name !== '*') {
       name = this.escapeId(name);
     }
 

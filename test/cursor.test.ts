@@ -27,16 +27,16 @@ test('cursor query', async done => {
     orderBy: ['event_time', 'orderShipping.order.code desc']
   };
 
-  let result = await cursorQuery(table, options);
-  let cursor = decodeCursor(result.slice(-1)[0].cursor);
+  let result = (await cursorQuery(table, options)).rows;
+  let cursor = decodeCursor(result.slice(-1)[0].__cursor);
   expect(result.length).toBe(5);
   expect(cursor[1]).toBe('eve-1');
   expect(new Date(cursor[0]).getDay()).toBe(1);
 
   options.cursor = encodeCursor(cursor);
 
-  result = await cursorQuery(table, options);
-  cursor = decodeCursor(result.slice(-1)[0].cursor);
+  result = (await cursorQuery(table, options)).rows;
+  cursor = decodeCursor(result.slice(-1)[0].__cursor);
 
   expect(cursor[1]).toBe('david-1');
   expect(new Date(cursor[0]).getDay()).toBe(1);

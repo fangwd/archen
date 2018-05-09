@@ -29,35 +29,15 @@ import {
   flushRecord
 } from './flush';
 
-type Callback = (
-  data: any,
-  queryType: string,
-  table: Table,
-  queryData: any
-) => any;
-
-export interface DatabaseCallbacks {
-  data?: any;
-  onQuery?: Callback;
-  onResult?: Callback;
-  onError?: Callback;
-}
-
 export class Database {
   schema: Schema;
   engine: Connection;
   tableMap: { [key: string]: Table } = {};
   tableList: Table[] = [];
-  callbacks: DatabaseCallbacks;
 
-  constructor(
-    schema: Schema,
-    connection?: Connection,
-    callbacks?: DatabaseCallbacks
-  ) {
+  constructor(schema: Schema, connection?: Connection) {
     this.schema = schema;
     this.engine = connection;
-    this.callbacks = callbacks || {};
 
     for (const model of schema.models) {
       const table = new Table(this, model);
@@ -79,6 +59,10 @@ export class Database {
       name = name.name;
     }
     return this.tableMap[name];
+  }
+
+  model(name: string): Model {
+    return this.table(name).model;
   }
 
   transaction(callback): Promise<Database> {
@@ -111,54 +95,6 @@ export class Database {
       result[table.model.name] = table.json();
       return result;
     }, {});
-  }
-
-  before(queryType, table, queryData): Promise<any> {
-    return this.runCallback(
-      this.callbacks.onQuery,
-      queryType,
-      table,
-      queryData
-    );
-  }
-
-  after(queryType, table, queryData): Promise<any> {
-    return this.runCallback(
-      this.callbacks.onResult,
-      queryType,
-      table,
-      queryData
-    );
-  }
-
-  runCallback(callback, queryType, table, queryData): Promise<any> {
-    return new Promise((resolve, reject) => {
-      if (!callback) return resolve(queryData);
-      try {
-        function __check(data) {
-          if (data === false) {
-            return reject('Forbidden');
-          } else if (data === undefined) {
-            data = queryData;
-          }
-          resolve(data);
-        }
-        const result = callback.call(
-          this,
-          this.callbacks.data,
-          queryType,
-          table,
-          queryData
-        );
-        if (result instanceof Promise) {
-          result.then(__check);
-        } else {
-          __check(result);
-        }
-      } catch (error) {
-        reject(error);
-      }
-    });
   }
 }
 
@@ -204,27 +140,7 @@ export class Table {
     return this.escapeName(name) + '=' + this.escapeValue(name, value);
   }
 
-  before(queryType, queryData): Promise<any> {
-    return this.db.before(queryType, this, queryData);
-  }
-
-  after(queryType, queryData): Promise<any> {
-    return this.db.after(queryType, this, queryData);
-  }
-
   select(
-    fields: string,
-    options: SelectOptions = {},
-    filterThunk?: (builder: QueryBuilder) => string
-  ): Promise<Document[]> {
-    return this.before('SELECT', { fields, options }).then(result =>
-      this._select(result.fields, result.options, filterThunk).then(rows =>
-        this.after('SELECT', { ...result, rows }).then(result => result.rows)
-      )
-    );
-  }
-
-  _select(
     fields: string,
     options: SelectOptions = {},
     filterThunk?: (builder: QueryBuilder) => string
@@ -292,19 +208,7 @@ export class Table {
     });
   }
 
-  delete(
-    fields: string,
-    options: SelectOptions = {},
-    filterThunk?: (builder: QueryBuilder) => string
-  ): Promise<Document[]> {
-    return this.before('SELECT', { fields, options }).then(result =>
-      this._select(result.fields, result.options, filterThunk).then(rows =>
-        this.after('SELECT', { ...result, rows }).then(result => result.rows)
-      )
-    );
-  }
-
-  _delete(filter?: Filter): Promise<any> {
+  delete(filter?: Filter): Promise<any> {
     let sql = `delete from ${this._name()}`;
 
     if (filter) {
@@ -409,12 +313,6 @@ export class Table {
   }
 
   create(data: Document): Promise<Document> {
-    return this.before('CREATE', data).then(data =>
-      this._create(data).then(data => this.after('CREATE', data))
-    );
-  }
-
-  _create(data: Document): Promise<Document> {
     if (Object.keys(data).length === 0) throw Error('Empty data');
     return this.resolveParentFields(data).then(row =>
       this.insert(row).then(id => {
