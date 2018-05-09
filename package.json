@@ -15,6 +15,8 @@
     "dist/flush.js",
     "dist/cursor.js",
     "bin/archen.js",
+    "src",
+    "test",
     "LICENSE",
     "package.json",
     "README.md"
