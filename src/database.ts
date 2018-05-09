@@ -29,15 +29,35 @@ import {
   flushRecord
 } from './flush';
 
+type Callback = (
+  data: any,
+  queryType: string,
+  table: Table,
+  queryData: any
+) => any;
+
+export interface DatabaseCallbacks {
+  data?: any;
+  onQuery?: Callback;
+  onResult?: Callback;
+  onError?: Callback;
+}
+
 export class Database {
   schema: Schema;
   engine: Connection;
   tableMap: { [key: string]: Table } = {};
   tableList: Table[] = [];
+  callbacks: DatabaseCallbacks;
 
-  constructor(schema: Schema, connection?: Connection) {
+  constructor(
+    schema: Schema,
+    connection?: Connection,
+    callbacks?: DatabaseCallbacks
+  ) {
     this.schema = schema;
     this.engine = connection;
+    this.callbacks = callbacks || {};
 
     for (const model of schema.models) {
       const table = new Table(this, model);
@@ -92,6 +112,54 @@ export class Database {
       return result;
     }, {});
   }
+
+  before(queryType, table, queryData): Promise<any> {
+    return this.runCallback(
+      this.callbacks.onQuery,
+      queryType,
+      table,
+      queryData
+    );
+  }
+
+  after(queryType, table, queryData): Promise<any> {
+    return this.runCallback(
+      this.callbacks.onResult,
+      queryType,
+      table,
+      queryData
+    );
+  }
+
+  runCallback(callback, queryType, table, queryData): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!callback) return resolve(queryData);
+      try {
+        function __check(data) {
+          if (data === false) {
+            return reject('Forbidden');
+          } else if (data === undefined) {
+            data = queryData;
+          }
+          resolve(data);
+        }
+        const result = callback.call(
+          this,
+          this.callbacks.data,
+          queryType,
+          table,
+          queryData
+        );
+        if (result instanceof Promise) {
+          result.then(__check);
+        } else {
+          __check(result);
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
 }
 
 export type OrderBy = string | string[];
@@ -136,7 +204,27 @@ export class Table {
     return this.escapeName(name) + '=' + this.escapeValue(name, value);
   }
 
+  before(queryType, queryData): Promise<any> {
+    return this.db.before(queryType, this, queryData);
+  }
+
+  after(queryType, queryData): Promise<any> {
+    return this.db.after(queryType, this, queryData);
+  }
+
   select(
+    fields: string,
+    options: SelectOptions = {},
+    filterThunk?: (builder: QueryBuilder) => string
+  ): Promise<Document[]> {
+    return this.before('SELECT', { fields, options }).then(result =>
+      this._select(result.fields, result.options, filterThunk).then(rows =>
+        this.after('SELECT', { ...result, rows }).then(result => result.rows)
+      )
+    );
+  }
+
+  _select(
     fields: string,
     options: SelectOptions = {},
     filterThunk?: (builder: QueryBuilder) => string
@@ -204,7 +292,19 @@ export class Table {
     });
   }
 
-  delete(filter?: Filter): Promise<any> {
+  delete(
+    fields: string,
+    options: SelectOptions = {},
+    filterThunk?: (builder: QueryBuilder) => string
+  ): Promise<Document[]> {
+    return this.before('SELECT', { fields, options }).then(result =>
+      this._select(result.fields, result.options, filterThunk).then(rows =>
+        this.after('SELECT', { ...result, rows }).then(result => result.rows)
+      )
+    );
+  }
+
+  _delete(filter?: Filter): Promise<any> {
     let sql = `delete from ${this._name()}`;
 
     if (filter) {
@@ -309,7 +409,13 @@ export class Table {
   }
 
   create(data: Document): Promise<Document> {
-    // TODO: Don't allow inserting empty objects
+    return this.before('CREATE', data).then(data =>
+      this._create(data).then(data => this.after('CREATE', data))
+    );
+  }
+
+  _create(data: Document): Promise<Document> {
+    if (Object.keys(data).length === 0) throw Error('Empty data');
     return this.resolveParentFields(data).then(row =>
       this.insert(row).then(id => {
         return this.updateChildFields(data, id).then(() => this.get(id));
@@ -467,7 +573,7 @@ export class Table {
           const filter = { [field.name]: id, ...where };
           promises.push(table.modify(data, filter));
         }
-      } else if (method === 'delete') {
+      } else if (method.startsWith('delete')) {
         if (related.throughField) {
           promises.push(this.deleteThrough(related, id, args));
           continue;
@@ -477,13 +583,40 @@ export class Table {
           [field.name]: id
         }));
         promises.push(table.delete(filter as Filter));
-      } else if (method === 'disconnect') {
+      } else if (method.startsWith('disconnect')) {
         if (related.throughField) {
           promises.push(this.disconnectThrough(related, id, args));
           continue;
         }
         const where = args.map(arg => ({ [field.name]: id, ...arg }));
         promises.push(table.update({ [field.name]: null }, where));
+      } else if (method === 'set') {
+        const promise = related.throughField
+          ? this.deleteThrough(related, id, [])
+          : table.delete({ [field.name]: id });
+        promises.push(
+          promise.then(() => {
+            if (related.throughField) {
+              return this.createThrough(related, id, args);
+            }
+            // create: [{parent: {id: 2}, name: 'Apple'}, ...]
+            const docs = toArray(args).map(arg => ({
+              [field.name]: id,
+              ...arg
+            }));
+            if (field.isUnique()) {
+              return this._disconnectUnique(field, id).then(() =>
+                table.create(docs[0])
+              );
+            } else {
+              return Promise.all(
+                docs.map(doc => {
+                  table.create(doc);
+                })
+              );
+            }
+          })
+        );
       } else {
         throw Error(`Unknown method: ${method}`);
       }
