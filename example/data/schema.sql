@@ -102,3 +102,18 @@ create table `order_shipping_event` (
   foreign key (order_shipping_id) references order_shipping(order_id),
   unique (order_shipping_id, event_time)
 );
+
+create table `store` (
+  id integer primary key auto_increment,
+  name varchar(200) unique
+);
+
+create table `store_product` (
+  id integer primary key auto_increment,
+  store_id integer,
+  product_id integer,
+  price float,
+  constraint unique (store_id, product_id),
+  foreign key (store_id) references store(id),
+  foreign key (product_id) references product(id)
+);
