@@ -29,6 +29,15 @@ import {
   flushRecord
 } from './flush';
 
+class ClosureTable {
+  constructor(
+    public table: Table,
+    public ancestor: ForeignKeyField,
+    public descendant: ForeignKeyField,
+    public depth?: SimpleField
+  ) {}
+}
+
 export class Database {
   schema: Schema;
   engine: Connection;
@@ -49,6 +58,45 @@ export class Database {
         Object.assign(record, data);
         return record;
       };
+    }
+
+    for (const model of schema.models) {
+      if (model.config.closureTable) {
+        const config = model.config.closureTable;
+        const fields: any = config.fields || {};
+
+        const table = this.table(config.name);
+        if (!table) {
+          throw Error(`Table ${config.name} not found.`);
+        }
+
+        let fieldName = fields.ancestor || 'ancestor';
+        const ancestor = table.model.field(fieldName);
+        if (!ancestor || !(ancestor instanceof ForeignKeyField)) {
+          throw Error(`Field ${fieldName} is not a foreign key`);
+        }
+
+        fieldName = fields.descendant || 'descendant';
+        const descendant = table.model.field(fieldName);
+        if (!descendant || !(descendant instanceof ForeignKeyField)) {
+          throw Error(`Field ${fieldName} is not a foreign key`);
+        }
+
+        let depth: SimpleField;
+        if (fields.depth) {
+          depth = table.model.field(fields.depth) as SimpleField;
+          if (!depth) {
+            throw Error(`Field ${fields.depth} not found`);
+          }
+        }
+
+        this.table(model).closureTable = new ClosureTable(
+          table,
+          ancestor,
+          descendant,
+          depth
+        );
+      }
     }
   }
 
@@ -110,6 +158,7 @@ export interface SelectOptions {
 export class Table {
   db: Database;
   model: Model;
+  closureTable?: ClosureTable;
 
   recordList: Record[] = [];
   recordMap: { [key: string]: { [key: string]: Record } };
@@ -257,6 +306,51 @@ export class Table {
     );
   }
 
+  getParentField(model?: Model): ForeignKeyField {
+    return this.model.getForeignKeyOf(model || this.model);
+  }
+
+  treeQuery(
+    node: Value | Document,
+    joinField: ForeignKeyField,
+    filter?: Filter
+  ): Promise<Document[]> {
+    const dialect = this.db.engine;
+    const t0 = dialect.escapeId(this.model.table.name);
+    const t1 = dialect.escapeId(this.closureTable.table.model.table.name);
+    const key = this.model.keyField();
+    const value = isValue(node) ? node : this.model.keyValue(node as Document);
+    const lhs = dialect.escapeId(key.column.name);
+    const rhs = dialect.escapeId(joinField.column.name);
+    const field =
+      joinField === this.closureTable.descendant
+        ? dialect.escapeId(this.closureTable.ancestor.column.name)
+        : dialect.escapeId(this.closureTable.descendant.column.name);
+
+    let sql =
+      `select ${t0}.* from ${t0} join ${t1} t1 on ${t0}.${lhs}=t1.${rhs}` +
+      ` where t1.${field}=${this.escapeValue(key, value as Value)}`;
+
+    if (filter) {
+      const additional = encodeFilter(filter, this.model, dialect);
+      if (additional) {
+        sql += ` and ${additional}`;
+      }
+    }
+
+    return this.db.engine
+      .query(sql)
+      .then(rows => rows.map(row => toDocument(row, this.model)));
+  }
+
+  getAncestors(row: Value | Document, filter?: Filter): Promise<Document[]> {
+    return this.treeQuery(row, this.closureTable.ancestor, filter);
+  }
+
+  getDescendants(row: Value | Document, filter?: Filter): Promise<Document[]> {
+    return this.treeQuery(row, this.closureTable.descendant, filter);
+  }
+
   // GraphQL mutations
   resolveParentFields(input: Document, filter?: Filter): Promise<Row> {
     const result: Row = {};
@@ -316,7 +410,39 @@ export class Table {
     if (Object.keys(data).length === 0) throw Error('Empty data');
     return this.resolveParentFields(data).then(row =>
       this.insert(row).then(id => {
-        return this.updateChildFields(data, id).then(() => this.get(id));
+        return this.updateChildFields(data, id).then(() =>
+          this.get(id).then(row => {
+            if (!this.closureTable) return row;
+
+            const dialect = this.db.engine;
+            const closure = this.closureTable;
+
+            const table = dialect.escapeId(closure.table.model.table.name);
+            const ancestor = dialect.escapeId(closure.ancestor.column.name);
+            const descendant = dialect.escapeId(closure.descendant.column.name);
+            const keyValue = dialect.escape(this.model.keyValue(row) + '');
+
+            let depth: string, depth_1: string, depth_0: string;
+            if (closure.depth) {
+              depth = `, ${dialect.escapeId(closure.depth.column.name)}`;
+              depth_1 = `${depth} + 1`;
+              depth_0 = ', 0';
+            } else {
+              depth = depth_1 = depth_0 = '';
+            }
+
+            const value = this.model.valueOf(row, this.getParentField());
+            const where = value ? `= ${dialect.escape(value + '')}` : 'is null';
+
+            const sql =
+              `insert into ${table} (${ancestor}, ${descendant}${depth}) ` +
+              `select ${ancestor}, ${keyValue}${depth_1} ` +
+              `from ${table} where ${descendant} ${where} ` +
+              `union all select ${keyValue}, ${keyValue}${depth_0}`;
+
+            return this.db.engine.query(sql).then(() => row);
+          })
+        );
       })
     );
   }
@@ -902,8 +1028,8 @@ export class Record {
     const model = this.__table.model;
     const fields = this.__filter();
     for (const name in fields) {
-      const lhs = model.valueOf(fields[name], name);
-      const rhs = model.valueOf(row[name] as Value, name);
+      const lhs = model.valueOf(fields, name);
+      const rhs = model.valueOf(row, name);
       const field = model.field(name) as SimpleField;
       if (_toSnake(lhs, field) != _toSnake(rhs, field)) {
         return false;
