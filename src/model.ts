@@ -1,7 +1,7 @@
 import { pluralise, toPascalCase, toCamelCase } from './misc';
 import { Document, Value, isValue } from './database';
 
-export interface DatabaseInfo {
+export interface SchemaInfo {
   name?: string;
   tables: TableInfo[];
 }
@@ -33,11 +33,21 @@ export interface SchemaConfig {
   models: ModelConfig[];
 }
 
+interface ClosureTableConfig {
+  name: string;
+  fields?: {
+    ancestor: string;
+    descendant: string;
+    depth?: string;
+  };
+}
+
 interface ModelConfig {
   name?: string;
   table?: string;
   fields?: FieldConfig[];
   pluralName?: string;
+  closureTable?: ClosureTableConfig;
 }
 
 interface FieldConfig {
@@ -52,7 +62,7 @@ const MODEL_CONFIG: ModelConfig = { fields: [] };
 const FIELD_CONFIG: FieldConfig = {};
 
 export class Schema {
-  database: DatabaseInfo;
+  database: SchemaInfo;
   config: SchemaConfig;
   models: Model[] = [];
 
@@ -81,7 +91,7 @@ export class Schema {
     }
   }
 
-  constructor(database: DatabaseInfo, config = SCHEMA_CONFIG) {
+  constructor(database: SchemaInfo, config = SCHEMA_CONFIG) {
     this.database = database;
     this.config = Object.assign({}, SCHEMA_CONFIG, config);
 
@@ -161,13 +171,14 @@ export class Model {
     return row[this.keyField().name] as Document;
   }
 
-  valueOf(value: Value | Document, name: string): Value {
-    const field = this.field(name);
+  valueOf(row: Document, name: string | SimpleField): Value {
+    const field = typeof name === 'string' ? this.field(name) : name;
+    let value = row[field.name];
     if (field instanceof ForeignKeyField) {
       let key = field;
       while (!isValue(value)) {
-        value = value[key.referencedField.name];
         key = key.referencedField as ForeignKeyField;
+        value = value[key.name];
       }
     }
     return value as Value;
@@ -243,6 +254,17 @@ export class Model {
       }
     }
     return count;
+  }
+
+  getForeignKeyOf(model: Model): ForeignKeyField {
+    for (const field of this.fields) {
+      if (field instanceof ForeignKeyField) {
+        if (field.referencedField.model === model) {
+          return field;
+        }
+      }
+    }
+    return null;
   }
 
   resolveForeignKeyFields() {
@@ -366,12 +388,36 @@ export class RelatedField extends Field {
     super(config.relatedName, model, config);
     this.referencingField = field;
 
-    if (config.throughField) {
-      const throughField = field.model.field(config.throughField);
+    let throughFieldName = config.throughField;
+    if (throughFieldName === undefined && !config.relatedName) {
+      const model = this.referencingField.model;
+      if (model.fields.length <= 3) {
+        let other: ForeignKeyField, extra: Field;
+        for (const uniqueKey of model.uniqueKeys) {
+          if (uniqueKey.fields.length === 2) {
+            for (const field of model.fields) {
+              if (this.referencingField === field) continue;
+              if (field instanceof ForeignKeyField) {
+                other = field;
+              } else if (!field.uniqueKey.primary) {
+                extra = field;
+                break;
+              }
+            }
+          }
+        }
+        if (!extra && other) {
+          throughFieldName = other.name;
+        }
+      }
+    }
+
+    if (throughFieldName) {
+      const throughField = field.model.field(throughFieldName);
       if (throughField instanceof ForeignKeyField) {
         this.throughField = throughField;
       } else {
-        throw Error(`Field ${config.throughField} is not a foreign key`);
+        throw Error(`Field ${throughFieldName} is not a foreign key`);
       }
     }
 
