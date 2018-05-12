@@ -1,17 +1,17 @@
 import { Connection } from './connection';
-import { DatabaseInfo, TableInfo, ColumnInfo, ConstraintInfo } from '../model';
+import { SchemaInfo, TableInfo, ColumnInfo, ConstraintInfo } from '../model';
 
 export function getInformationSchema(
   connection: Connection,
   schemaName: string
-): Promise<DatabaseInfo> {
+): Promise<SchemaInfo> {
   return new Builder(connection, schemaName).getResult();
 }
 
 class Builder {
   constructor(public connection: Connection, public schemaName: string) {}
 
-  getResult(): Promise<DatabaseInfo> {
+  getResult(): Promise<SchemaInfo> {
     return this.getTables().then(tables => {
       const result = {
         name: this.schemaName,

@@ -13,7 +13,6 @@ class MySQL implements Connection {
   }
 
   query(sql: string): Promise<any[] | void> {
-    console.log('--', sql);
     this.queryCounter.total++;
     return new Promise((resolve, reject) => {
       this.connection.query(sql, (error, results, fields) => {
@@ -33,7 +32,7 @@ class MySQL implements Connection {
 
   transaction(callback: TransactionCallback): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.connection.beginTransaction(error => {
+      return this.connection.beginTransaction(error => {
         if (error) return reject(error);
         let promise;
         try {
@@ -44,23 +43,23 @@ class MySQL implements Connection {
           });
         }
         if (promise instanceof Promise) {
-          promise
-            .then(result => {
+          return promise
+            .then(result =>
               this.connection.commit(function(error) {
                 if (error) {
-                  this.conn.rollback(function() {
+                  return this.conn.rollback(function() {
                     reject(error);
                   });
                 } else {
                   resolve(result);
                 }
-              });
-            })
-            .catch(reason => {
+              })
+            )
+            .catch(reason =>
               this.connection.rollback(function() {
                 reject(reason);
-              });
-            });
+              })
+            );
         } else {
           resolve();
         }
