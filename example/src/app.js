@@ -1,49 +1,53 @@
 const express = require('express');
 const graphqlHTTP = require('express-graphql');
-const fs = require('fs');
-const archen = require('../../dist');
 
-const mysql = archen.createConnection('mysql', {
-  host: 'localhost',
-  user: 'root',
-  password: 'secret',
-  database: 'example',
-  timezone: 'Z',
-  connectionLimit: 10
-});
+const { Archen } = require('archen');
 
 const options = {
-  models: [
-    {
-      table: 'product_category',
-      fields: [
-        {
-          column: 'category_id',
-          throughField: 'product_id'
-        },
-        {
-          column: 'product_id',
-          throughField: 'category_id',
-          relatedName: 'categorySet'
-        }
-      ]
-    },
-    {
-      table: 'user_group',
-      fields: [
-        {
-          column: 'user_id',
-          throughField: 'group_id'
-        }
-      ]
+  database: {
+    dialect: 'mysql',
+    connection: {
+      host: 'localhost',
+      user: 'root',
+      password: 'secret',
+      database: 'example',
+      timezone: 'Z',
+      connectionLimit: 10
     }
-  ]
+  },
+  schema: {
+    models: [
+      {
+        table: 'product_category',
+        fields: [
+          {
+            column: 'category_id',
+            throughField: 'product_id'
+          },
+          {
+            column: 'product_id',
+            throughField: 'category_id',
+            relatedName: 'categorySet'
+          }
+        ]
+      },
+      {
+        table: 'user_group',
+        fields: [
+          {
+            column: 'user_id',
+            throughField: 'group_id'
+          }
+        ]
+      }
+    ]
+  },
+  graphql: {
+    getAccessor: context => context.loader
+  }
 };
 
-const schema = new archen.Schema(
-  JSON.parse(fs.readFileSync('example/data/schema.json')),
-  options
-);
+const archen = new Archen(options);
 
 const app = express();
 
@@ -52,8 +56,9 @@ app.get('/', (req, res) => res.send('Hello World!'));
 app.use(
   '/graphql',
   graphqlHTTP((request, response, params) => ({
-    schema: archen.createGraphQLSchema(schema),
-    context: new archen.Accessor(schema, mysql),
+    schema: archen.graphql.getSchema(),
+    rootValue: archen.graphql.getRootValue(),
+    context: { loader: archen.getAccessor() },
     pretty: false,
     graphiql: true,
     formatError: error => ({
@@ -65,9 +70,6 @@ app.use(
   }))
 );
 
-app.listen(3000);
-
-require('fs').writeFileSync(
-  'schema.graphql',
-  require('graphql').printSchema(archen.createGraphQLSchema(schema))
-);
+archen.getSchemaInfo().then(() => {
+  app.listen(3000);
+});
