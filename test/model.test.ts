@@ -84,12 +84,7 @@ test('related fields', () => {
     models: [
       {
         table: 'order_item',
-        fields: [
-          {
-            column: 'order_id',
-            relatedName: 'items'
-          }
-        ]
+        fields: [{ column: 'order_id', relatedName: 'items' }]
       },
       {
         table: 'category',
@@ -100,6 +95,10 @@ test('related fields', () => {
             relatedName: 'childCategories'
           }
         ]
+      },
+      {
+        table: 'product_category',
+        fields: [{ column: 'category_id', throughField: null }]
       }
     ]
   };
@@ -198,7 +197,73 @@ test('Model.getValue()', () => {
   const d1 = { user: 1 };
   const d2 = { user: { id: 2 } };
   const d3 = { user: null };
-  expect(model.valueOf(d1.user, 'user')).toBe(1);
-  expect(model.valueOf(d2.user, 'user')).toBe(2);
-  expect(model.valueOf(d3.user, 'user')).toBe(null);
+  expect(model.valueOf(d1, 'user')).toBe(1);
+  expect(model.valueOf(d2, 'user')).toBe(2);
+  expect(model.valueOf(d3, 'user')).toBe(null);
 });
+
+test('infer many to many', () => {
+  const data = getStoreProductData();
+
+  let model = new Schema(data).model('store');
+  expect(model.field('storeProducts') instanceof RelatedField).toBe(true);
+  expect(model.field('products')).toBe(undefined);
+
+  const table = data.tables.find(table => table.name === 'store_product');
+  table.columns = table.columns.filter(column => column.name !== 'price');
+
+  model = new Schema(data).model('store');
+  expect(model.field('storeProducts')).toBe(undefined);
+  expect(model.field('products') instanceof RelatedField).toBe(true);
+});
+
+function getStoreProductData() {
+  const data = {
+    tables: [
+      {
+        name: 'product',
+        columns: [
+          { name: 'id', type: 'integer', autoIncrement: true },
+          { name: 'name', type: 'char' }
+        ],
+        constraints: [
+          { primaryKey: true, columns: ['id'] },
+          { unique: true, columns: ['name'] }
+        ]
+      },
+      {
+        name: 'store',
+        columns: [
+          { name: 'id', type: 'integer', autoIncrement: true },
+          { name: 'name', type: 'varchar' }
+        ],
+        constraints: [
+          { primaryKey: true, columns: ['id'] },
+          { unique: true, columns: ['name'] }
+        ]
+      },
+      {
+        name: 'store_product',
+        columns: [
+          { name: 'id', type: 'integer', autoIncrement: true },
+          { name: 'store_id', type: 'integer' },
+          { name: 'product_id', type: 'integer' },
+          { name: 'price', type: 'float' }
+        ],
+        constraints: [
+          {
+            columns: ['store_id'],
+            references: { table: 'store', columns: ['id'] }
+          },
+          {
+            columns: ['product_id'],
+            references: { table: 'product', columns: ['id'] }
+          },
+          { primaryKey: true, columns: ['id'] },
+          { unique: true, columns: ['store_id', 'product_id'] }
+        ]
+      }
+    ]
+  };
+  return JSON.parse(JSON.stringify(data));
+}
