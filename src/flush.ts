@@ -294,8 +294,8 @@ function _flushTable(table: Table, perfect: boolean): Promise<number> {
           }
           for (const name in row) {
             if (!record.__state.dirty.has(name)) continue;
-            const lhs = model.valueOf(record.__data[name], name);
-            const rhs = model.valueOf(row[name] as Value, name);
+            const lhs = model.valueOf(record.__data, name);
+            const rhs = model.valueOf(row, name);
             if (lhs === rhs) {
               record.__state.dirty.delete(name);
             }
