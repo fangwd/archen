@@ -2,7 +2,7 @@ import { Accessor, encodeFilter, options } from '../src/accessor';
 
 import helper = require('./helper');
 import { Schema } from '../src/model';
-import { createSchema } from '../src/schema';
+import { SchemaBuilder } from '../src/schema';
 
 import * as graphql from 'graphql';
 
@@ -311,7 +311,9 @@ test('related', done => {
   };
 
   const accessor = new Accessor(db, accessorOptions);
-  const schema = createSchema(helper.getExampleData(), options);
+  const builder = new SchemaBuilder(new Schema(helper.getExampleData(), options));
+  const schema = builder.getSchema();
+  const rootValue = builder.getRootValue();
 
   const DATA = `
     {
@@ -323,7 +325,7 @@ test('related', done => {
       }
     }
 `;
-  graphql.graphql(schema, DATA, null, accessor).then(result => {
+  graphql.graphql(schema, DATA, rootValue, accessor).then(result => {
     const users = result.data.users;
     const names = [
       ...users.reduce((result, user) => {
