@@ -84,9 +84,19 @@ const PageInfoType = new GraphQLObjectType({
   })
 });
 
+export interface SchemaBuilderOptions {
+  getAccessor: (any) => Accessor;
+}
+
+const DEFAULT_OPTIONS = {
+  getAccessor: context => context
+};
+
 export class SchemaBuilder {
   private domain: Schema;
   private schema: GraphQLSchema;
+  private rootValue = {};
+  private options: SchemaBuilderOptions;
 
   private modelTypeMap: ObjectTypeMap = {};
   private connectionTypeMap: ObjectTypeMap = {};
@@ -97,8 +107,9 @@ export class SchemaBuilder {
   private inputTypesConnect: InputTypeMap = {};
   private inputFieldsConnectMap: InputFieldsMap = {};
 
-  constructor(domain: Schema | any) {
+  constructor(domain: Schema, options?: SchemaBuilderOptions) {
     this.domain = domain;
+    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
 
     this.createFilterInputTypes();
     this.createModelTypes();
@@ -247,6 +258,8 @@ export class SchemaBuilder {
     const connectionTypeMapEx = {};
     const edgeModelTypeMap: ObjectTypeMap = {};
 
+    const self = this;
+
     for (const model of this.domain.models) {
       this.modelTypeMap[model.name] = new GraphQLObjectType({
         name: getTypeName(model),
@@ -339,10 +352,12 @@ export class SchemaBuilder {
                 return obj[field.name];
               }
               const key = field.referencedField.model.keyField().name;
-              return acc.load(
-                { field: field.referencedField },
-                obj[field.name][keyField.name]
-              );
+              return self
+                .getAccessor(acc)
+                .load(
+                  { field: field.referencedField },
+                  obj[field.name][keyField.name]
+                );
             }
           };
         } else if (field instanceof SimpleField) {
@@ -360,10 +375,12 @@ export class SchemaBuilder {
                 ...QueryOptions
               },
               resolve(obj, args, acc) {
-                return acc.load(
-                  { field: relatedField, ...args },
-                  obj[model.keyField().name]
-                );
+                return self
+                  .getAccessor(acc)
+                  .load(
+                    { field: relatedField, ...args },
+                    obj[model.keyField().name]
+                  );
               }
             };
             modelFields[field.name + 'Connection'] = {
@@ -372,7 +389,7 @@ export class SchemaBuilder {
                 where: { type: this.filterInputTypeMap[referenced.model.name] },
                 ...ConnectionOptions
               },
-              resolve(obj, args, acc) {
+              resolve(obj, args, acc, info) {
                 args.where = args.where || {};
                 const name = relatedField.throughField.relatedField.name;
                 if (relatedField.throughField.relatedField.throughField) {
@@ -384,7 +401,14 @@ export class SchemaBuilder {
                     [field.referencingField.name]: obj[model.keyField().name]
                   };
                 }
-                return acc.cursorQuery(referenced.model, args, field.name);
+                return self
+                  .getAccessor(acc)
+                  .cursorQuery(
+                    referenced.model,
+                    args,
+                    field.name,
+                    firstOf(getQueryFields(info))
+                  );
               }
             };
           } else {
@@ -400,7 +424,8 @@ export class SchemaBuilder {
                 ...QueryOptions
               },
               resolve(object, args, acc) {
-                return acc
+                return self
+                  .getAccessor(acc)
                   .load(
                     { field: related, ...args },
                     object[related.referencedField.name]
@@ -420,11 +445,18 @@ export class SchemaBuilder {
                   where: { type: filterInputTypeMapEx[model.name][field.name] },
                   ...ConnectionOptions
                 },
-                resolve(object, args, acc) {
+                resolve(object, args, acc, info) {
                   args.where = args.where || {};
                   args.where[related.name] =
                     object[related.referencedField.name];
-                  return acc.cursorQuery(related.model, args, field.name);
+                  return self
+                    .getAccessor(acc)
+                    .cursorQuery(
+                      related.model,
+                      args,
+                      field.name,
+                      firstOf(getQueryFields(info))
+                    );
                 }
               };
             }
@@ -454,6 +486,10 @@ export class SchemaBuilder {
     }
   }
 
+  getAccessor(context): Accessor {
+    return this.options.getAccessor(context);
+  }
+
   createQueryFields() {
     const queryFields = {};
 
@@ -463,10 +499,11 @@ export class SchemaBuilder {
         args: {
           where: { type: this.filterInputTypeMap[model.name] },
           ...QueryOptions
-        },
-        resolve(_, args, acc, info) {
-          return acc.query(model, args);
         }
+      };
+
+      this.rootValue[model.pluralName] = (args, acc, info) => {
+        return this.getAccessor(acc).query(model, args);
       };
 
       queryFields[`${model.pluralName}Connection`] = {
@@ -474,24 +511,26 @@ export class SchemaBuilder {
         args: {
           where: { type: this.filterInputTypeMap[model.name] },
           ...ConnectionOptions
-        },
-        resolve(_, args, acc, info) {
-          return acc.cursorQuery(
-            model,
-            args,
-            model.pluralName,
-            firstOf(getQueryFields(info))
-          );
         }
+      };
+
+      this.rootValue[`${model.pluralName}Connection`] = (args, acc, info) => {
+        return this.getAccessor(acc).cursorQuery(
+          model,
+          args,
+          model.pluralName,
+          firstOf(getQueryFields(info))
+        );
       };
 
       const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
       queryFields[name] = {
         type: this.modelTypeMap[model.name],
-        args: { where: { type: this.inputTypesConnect[model.name] } },
-        resolve(_, args, acc) {
-          return acc.get(model, args.where);
-        }
+        args: { where: { type: this.inputTypesConnect[model.name] } }
+      };
+
+      this.rootValue[name] = (args, acc) => {
+        return this.getAccessor(acc).get(model, args.where);
       };
     }
 
@@ -741,10 +780,10 @@ export class SchemaBuilder {
       const name = 'create' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
-        args: { data: { type: inputTypesCreate[model.name] } },
-        resolve(_, args, acc) {
-          return acc.create(model, args.data);
-        }
+        args: { data: { type: inputTypesCreate[model.name] } }
+      };
+      this.rootValue[name] = (args, acc) => {
+        return this.getAccessor(acc).create(model, args.data);
       };
     }
 
@@ -755,10 +794,10 @@ export class SchemaBuilder {
         args: {
           where: { type: this.inputTypesConnect[model.name] },
           data: { type: inputTypesUpdate[model.name] }
-        },
-        resolve(_, args, acc) {
-          return acc.update(model, args.data, args.where);
         }
+      };
+      this.rootValue[name] = (args, acc) => {
+        return this.getAccessor(acc).update(model, args.data, args.where);
       };
     }
 
@@ -766,10 +805,10 @@ export class SchemaBuilder {
       const name = 'upsert' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
-        args: inputTypesUpsert[model.name].getFields(),
-        resolve(_, args, acc) {
-          return acc.upsert(model, args.create, args.update);
-        }
+        args: inputTypesUpsert[model.name].getFields()
+      };
+      this.rootValue[name] = (args, acc) => {
+        return this.getAccessor(acc).upsert(model, args.create, args.update);
       };
     }
 
@@ -779,10 +818,10 @@ export class SchemaBuilder {
         type: this.modelTypeMap[model.name],
         args: {
           where: { type: this.inputTypesConnect[model.name] }
-        },
-        resolve(_, args, acc) {
-          return acc.delete(model, args.where);
         }
+      };
+      this.rootValue[name] = (args, acc) => {
+        return this.getAccessor(acc).delete(model, args.where);
       };
     }
 
@@ -791,6 +830,10 @@ export class SchemaBuilder {
 
   getSchema(): GraphQLSchema {
     return this.schema;
+  }
+
+  getRootValue() {
+    return this.rootValue;
   }
 }
 
@@ -874,11 +917,6 @@ function getInputType(field: SimpleField): GraphQLInputType {
   return field.column.nullable || field.column.autoIncrement
     ? type
     : new GraphQLNonNull(type);
-}
-
-export function createSchema(data, config?: SchemaConfig): GraphQLSchema {
-  const schema = data instanceof Schema ? data : new Schema(data, config);
-  return new SchemaBuilder(schema).getSchema();
 }
 
 function _exclude(data, except: string | Field) {
