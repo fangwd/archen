@@ -41,10 +41,10 @@ test('example query', done => {
       orderItems_none: {
         product: {
           name_like: '%Lamb%',
-          stockQuantity: [null, 0]
-        }
-      }
-    }
+          stockQuantity: [null, 0],
+        },
+      },
+    },
   };
 
   db
@@ -63,13 +63,13 @@ test('foreign key column filter', () => {
   const args = {
     order: {
       user: {
-        id_gt: 2
+        id_gt: 2,
       },
-      dateCreated: '2018-3-21'
+      dateCreated: '2018-3-21',
     },
     product: {
-      id: [1, 2, 3]
-    }
+      id: [1, 2, 3],
+    },
   };
   const condition = encodeFilter(args, model, DefaultEscape);
   expect(condition.indexOf('`product_id` in (1, 2, 3)')).not.toBe(-1);
@@ -101,16 +101,16 @@ test('many to many', done => {
         fields: [
           {
             column: 'category_id',
-            throughField: 'product_id'
+            throughField: 'product_id',
           },
           {
             column: 'product_id',
             throughField: 'category_id',
-            relatedName: 'categorySet'
-          }
-        ]
-      }
-    ]
+            relatedName: 'categorySet',
+          },
+        ],
+      },
+    ],
   };
 
   const domain = new Schema(data, options);
@@ -119,9 +119,9 @@ test('many to many', done => {
     categories: {
       name_like: 'Apple%',
       products: {
-        name_like: '%Apple%'
-      }
-    }
+        name_like: '%Apple%',
+      },
+    },
   };
 
   const db = helper.connectToDatabase(NAME, domain);
@@ -161,9 +161,9 @@ test('or', done => {
     or: [
       { name_like: '%Apple%' },
       {
-        productCategories_some: { category: { name: 'Banana' } }
-      }
-    ]
+        categories_some: { name: 'Banana' },
+      },
+    ],
   };
   db
     .table('product')
@@ -186,11 +186,11 @@ test('not', done => {
         not: [
           { name_like: '%Apple%' },
           {
-            productCategories_some: { category: { name: 'Banana' } }
-          }
-        ]
-      }
-    ]
+            categories_some: { name: 'Banana' },
+          },
+        ],
+      },
+    ],
   };
 
   db
@@ -206,7 +206,7 @@ test('order by', () => {
   const model = domain.model('OrderItem');
   const args = {
     where: { quantity_gt: 1 },
-    orderBy: ['order.code desc', 'order.user.email', 'quantity']
+    orderBy: ['order.code desc', 'order.user.email', 'quantity'],
   };
   const builder = new QueryBuilder(model, DefaultEscape);
   const sql = builder.select('*', args.where, args.orderBy);
