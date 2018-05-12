@@ -193,6 +193,7 @@ export class QueryBuilder {
         if (values.length < value.length) {
           return `(${lhs} is null or ${lhs} in (${values.join(', ')}))`;
         } else {
+          if (values.length === 0) return 'false';
           return `${lhs} in (${values.join(', ')})`;
         }
       } else {
