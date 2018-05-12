@@ -266,7 +266,7 @@ export class Accessor {
     );
   }
 
-  cursorQuery(model: Model, args, pluralName, fields) {
+  cursorQuery(model: Model, args, pluralName, fields?) {
     const table = this.db.table(model);
     const limit = args.first || this.options.defaultLimit;
 
