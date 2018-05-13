@@ -29,6 +29,8 @@ import {
   flushRecord
 } from './flush';
 
+import { createNode, moveSubtree, deleteSubtree, treeQuery } from './tree';
+
 class ClosureTable {
   constructor(
     public table: Table,
@@ -258,12 +260,21 @@ export class Table {
   }
 
   delete(filter?: Filter): Promise<any> {
-    let sql = `delete from ${this._name()}`;
+    const scope = filter ? `${this._where(filter)}` : '';
 
-    if (filter) {
-      sql += ` where ${this._where(filter)}`;
+    const _delete = () => {
+      let sql = `delete from ${this._name()}`;
+      if (scope) {
+        sql += ` where ${scope}`;
+      }
+      return this.db.engine.query(sql);
+    };
+
+    if (this.closureTable) {
+      return deleteSubtree(this, scope).then(() => _delete());
+    } else {
+      return _delete();
     }
-    return this.db.engine.query(sql);
   }
 
   escapeName(name: SimpleField | string | number): string {
@@ -310,45 +321,12 @@ export class Table {
     return this.model.getForeignKeyOf(model || this.model);
   }
 
-  treeQuery(
-    node: Value | Document,
-    joinField: ForeignKeyField,
-    filter?: Filter
-  ): Promise<Document[]> {
-    const dialect = this.db.engine;
-    const t0 = dialect.escapeId(this.model.table.name);
-    const t1 = dialect.escapeId(this.closureTable.table.model.table.name);
-    const key = this.model.keyField();
-    const value = isValue(node) ? node : this.model.keyValue(node as Document);
-    const lhs = dialect.escapeId(key.column.name);
-    const rhs = dialect.escapeId(joinField.column.name);
-    const field =
-      joinField === this.closureTable.descendant
-        ? dialect.escapeId(this.closureTable.ancestor.column.name)
-        : dialect.escapeId(this.closureTable.descendant.column.name);
-
-    let sql =
-      `select ${t0}.* from ${t0} join ${t1} t1 on ${t0}.${lhs}=t1.${rhs}` +
-      ` where t1.${field}=${this.escapeValue(key, value as Value)}`;
-
-    if (filter) {
-      const additional = encodeFilter(filter, this.model, dialect);
-      if (additional) {
-        sql += ` and ${additional}`;
-      }
-    }
-
-    return this.db.engine
-      .query(sql)
-      .then(rows => rows.map(row => toDocument(row, this.model)));
-  }
-
   getAncestors(row: Value | Document, filter?: Filter): Promise<Document[]> {
-    return this.treeQuery(row, this.closureTable.ancestor, filter);
+    return treeQuery(this, row, this.closureTable.ancestor, filter);
   }
 
   getDescendants(row: Value | Document, filter?: Filter): Promise<Document[]> {
-    return this.treeQuery(row, this.closureTable.descendant, filter);
+    return treeQuery(this, row, this.closureTable.descendant, filter);
   }
 
   // GraphQL mutations
@@ -411,37 +389,10 @@ export class Table {
     return this.resolveParentFields(data).then(row =>
       this.insert(row).then(id => {
         return this.updateChildFields(data, id).then(() =>
-          this.get(id).then(row => {
-            if (!this.closureTable) return row;
-
-            const dialect = this.db.engine;
-            const closure = this.closureTable;
-
-            const table = dialect.escapeId(closure.table.model.table.name);
-            const ancestor = dialect.escapeId(closure.ancestor.column.name);
-            const descendant = dialect.escapeId(closure.descendant.column.name);
-            const keyValue = dialect.escape(this.model.keyValue(row) + '');
-
-            let depth: string, depth_1: string, depth_0: string;
-            if (closure.depth) {
-              depth = `, ${dialect.escapeId(closure.depth.column.name)}`;
-              depth_1 = `${depth} + 1`;
-              depth_0 = ', 0';
-            } else {
-              depth = depth_1 = depth_0 = '';
-            }
-
-            const value = this.model.valueOf(row, this.getParentField());
-            const where = value ? `= ${dialect.escape(value + '')}` : 'is null';
-
-            const sql =
-              `insert into ${table} (${ancestor}, ${descendant}${depth}) ` +
-              `select ${ancestor}, ${keyValue}${depth_1} ` +
-              `from ${table} where ${descendant} ${where} ` +
-              `union all select ${keyValue}, ${keyValue}${depth_0}`;
-
-            return this.db.engine.query(sql).then(() => row);
-          })
+          this.get(id).then(
+            row =>
+              this.closureTable ? createNode(this, row).then(() => row) : row
+          )
         );
       })
     );
@@ -488,7 +439,12 @@ export class Table {
         return self.get(where as Document).then(row => {
           if (row) {
             const id = row[this.model.keyField().name] as Value;
-            return this.updateChildFields(data, id).then(() => row);
+            return this.updateChildFields(data, id).then(
+              () =>
+                !this.closureTable || !data[this.getParentField().name]
+                  ? row
+                  : moveSubtree(this, row).then(() => row)
+            );
           } else {
             return Promise.resolve(row);
           }

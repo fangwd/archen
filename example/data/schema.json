@@ -161,6 +161,12 @@
                     "nullable": true
                 },
                 {
+                    "name": "description",
+                    "type": "varchar",
+                    "size": 200,
+                    "nullable": true
+                },
+                {
                     "name": "parent_id",
                     "type": "integer",
                     "nullable": true
@@ -641,6 +647,100 @@
                     "columns": [
                         "order_shipping_id",
                         "event_time"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "store",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "name",
+                    "type": "varchar",
+                    "size": 200,
+                    "nullable": true
+                }
+            ],
+            "constraints": [
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "name"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "store_product",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": false,
+                    "autoIncrement": true
+                },
+                {
+                    "name": "store_id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "product_id",
+                    "type": "integer",
+                    "nullable": true
+                },
+                {
+                    "name": "price",
+                    "type": "float",
+                    "nullable": true
+                }
+            ],
+            "constraints": [
+                {
+                    "columns": [
+                        "store_id"
+                    ],
+                    "references": {
+                        "table": "store",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "columns": [
+                        "product_id"
+                    ],
+                    "references": {
+                        "table": "product",
+                        "columns": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "primaryKey": true,
+                    "columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "unique": true,
+                    "columns": [
+                        "store_id",
+                        "product_id"
                     ]
                 }
             ]

@@ -24,8 +24,9 @@ create table user_group (
 create table category (
   id integer primary key auto_increment,
   name varchar(200),
+  description varchar(200),
   parent_id integer default null,
-  foreign key (parent_id) references category(id),
+  foreign key (parent_id) references category(id) on delete set null,
   unique (parent_id, name)
 );
 

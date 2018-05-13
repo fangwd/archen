@@ -176,7 +176,7 @@ export class Model {
     let value = row[field.name];
     if (field instanceof ForeignKeyField) {
       let key = field;
-      while (!isValue(value)) {
+      while (value !== undefined && !isValue(value)) {
         key = key.referencedField as ForeignKeyField;
         value = value[key.name];
       }

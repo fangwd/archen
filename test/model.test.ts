@@ -141,7 +141,7 @@ test('through fields', () => {
   };
   const domain = new Schema(data, options);
   const categoryModel = domain.model('Category');
-  expect(categoryModel.fields.length).toBe(7);
+  expect(categoryModel.fields.length).toBe(8);
   const products = categoryModel.field('products') as RelatedField;
   expect(products.referencingField.model.name).toBe('ProductCategory');
   expect(products.throughField.referencedField.model.name).toBe('Product');
