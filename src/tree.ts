@@ -1,17 +1,15 @@
 import { ForeignKeyField } from './model';
 import { encodeFilter } from './filter';
+import { Connection, Value } from './engine';
 
-import {
-  Document,
-  Value,
-  Table,
-  Filter,
-  isValue,
-  toDocument
-} from './database';
+import { Document, Table, Filter, isValue, toDocument } from './database';
 
-export function createNode(table: Table, row: Document): Promise<any> {
-  const dialect = table.db.engine;
+export function createNode(
+  connection: Connection,
+  table: Table,
+  row: Document
+): Promise<any> {
+  const dialect = table.db.pool;
   const closure = table.closureTable;
 
   const closureTable = dialect.escapeId(closure.table.model.table.name);
@@ -37,12 +35,16 @@ export function createNode(table: Table, row: Document): Promise<any> {
     `from ${closureTable} where ${descendant} ${where} ` +
     `union all select ${keyValue}, ${keyValue}${depth_0}`;
 
-  return table.db.engine.query(sql);
+  return connection.query(sql);
 }
 
-export function moveSubtree(table: Table, row: Document) {
-  const escapeId = s => table.db.engine.escapeId(s);
-  const escape = s => table.db.engine.escape(s);
+export function moveSubtree(
+  connection: Connection,
+  table: Table,
+  row: Document
+) {
+  const escapeId = s => table.db.pool.escapeId(s);
+  const escape = s => table.db.pool.escape(s);
 
   const closure = table.closureTable;
 
@@ -80,14 +82,18 @@ from ${closureTable} as t1 cross join ${closureTable} as t2
 where t1.${descendant} = ${parentId} and t2.${ancestor} = ${pk}
 `;
 
-  return table.db.engine
+  return connection
     .query(deleteQuery)
-    .then(() => table.db.engine.query(insertQuery));
+    .then(() => connection.query(insertQuery));
 }
 
-export function deleteSubtree(table: Table, filter: string) {
-  const escapeId = s => table.db.engine.escapeId(s);
-  const escape = s => table.db.engine.escape(s);
+export function deleteSubtree(
+  connection: Connection,
+  table: Table,
+  filter: string
+) {
+  const escapeId = s => table.db.pool.escapeId(s);
+  const escape = s => table.db.pool.escape(s);
 
   const closure = table.closureTable;
 
@@ -110,16 +116,17 @@ delete from ${closureTable} where ${descendant} in
   (select * from (select ${descendant} from ${closureTable}${where}) as t)
 `;
 
-  return table.db.engine.query(query);
+  return connection.query(query);
 }
 
 export function treeQuery(
+  connection: Connection,
   table: Table,
   node: Value | Document,
   joinField: ForeignKeyField,
   filter?: Filter
 ): Promise<Document[]> {
-  const dialect = table.db.engine;
+  const dialect = table.db.pool;
   const t0 = dialect.escapeId(table.model.table.name);
   const t1 = dialect.escapeId(table.closureTable.table.model.table.name);
   const key = table.model.keyField();
@@ -142,7 +149,7 @@ export function treeQuery(
     }
   }
 
-  return table.db.engine
+  return connection
     .query(sql)
     .then(rows => rows.map(row => toDocument(row, table.model)));
 }

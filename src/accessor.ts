@@ -9,24 +9,16 @@ import {
   RelatedField
 } from './model';
 
-import {
-  Database,
-  Table,
-  Value,
-  Document,
-  rowsToCamel,
-  Filter,
-  SelectOptions
-} from './database';
+import { Database, Table, Document, Filter, SelectOptions } from './database';
 
-import { Row, Connection } from './engine';
+import { ConnectionPool, Row, Value } from './engine';
 import { QueryBuilder } from './filter';
 import { toArray } from './misc';
 import { cursorQuery } from './cursor';
 
 interface LoaderEntry {
   key: LoaderKey;
-  loader: DataLoader<Value, Row | Row[]>;
+  loader: DataLoader<Value, Document | Document[]>;
 }
 
 interface ConnectionSelectOptions {
@@ -48,24 +40,18 @@ export interface AccessorOptions {
   };
 }
 
+const DEFAULT_OPTIONS = {
+  defaultLimit: 100,
+  callbacks: {}
+};
 export class Accessor {
   db: Database;
   options: AccessorOptions;
   loaderMap: { [key: string]: LoaderEntry };
 
-  constructor(
-    db: Database | Schema,
-    connection?: Connection | AccessorOptions,
-    callbacks?: AccessorOptions
-  ) {
-    if (db instanceof Database) {
-      this.db = db;
-      this.options = (connection as AccessorOptions) || {};
-    } else {
-      this.db = new Database(db, connection as Connection);
-      this.options = callbacks || {};
-    }
-    this.options = { defaultLimit: 100, callbacks: {}, ...this.options };
+  constructor(db: Database, options?: AccessorOptions) {
+    this.db = db;
+    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
     this.loaderMap = {};
   }
 
@@ -214,36 +200,30 @@ export class Accessor {
 
   create(model: Model, args: Document) {
     return this.before('CREATE', model, args).then(args =>
-      this.db.transaction(() =>
-        this.db
-          .table(model)
-          .create(args)
-          .then(doc => this.after('CREATE', model, doc))
-      )
+      this.db
+        .table(model)
+        .create(args)
+        .then(doc => this.after('CREATE', model, doc))
     );
   }
 
   update(model: Model, data: Document, filter: Filter) {
     return this.before('UPDATE', model, { data, filter }).then(result =>
-      this.db.transaction(() =>
-        this.db
-          .table(model)
-          .modify(result.data, result.filter)
-          .then(row => this.after('UPDATE', model, { data, filter, row }))
-          .then(result => result.row)
-      )
+      this.db
+        .table(model)
+        .modify(result.data, result.filter)
+        .then(row => this.after('UPDATE', model, { data, filter, row }))
+        .then(result => result.row)
     );
   }
 
   upsert(model: Model, create: Document, update: Document) {
     return this.before('UPSERT', model, { create, update }).then(result =>
-      this.db.transaction(() =>
-        this.db
-          .table(model)
-          .upsert(result.create, result.update)
-          .then(row => this.after('UPSERT', model, { create, update, row }))
-          .then(result => result.row)
-      )
+      this.db
+        .table(model)
+        .upsert(result.create, result.update)
+        .then(row => this.after('UPSERT', model, { create, update, row }))
+        .then(result => result.row)
     );
   }
 
@@ -255,8 +235,8 @@ export class Accessor {
           return this.after('DELETE', table, { filter, row }).then(
             result => result.row
           );
-        return this.db
-          .transaction(() => table.delete(filter))
+        return table
+          .delete(filter)
           .then(() =>
             this.after('DELETE', table, { filter, row }).then(
               result => result.row

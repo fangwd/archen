@@ -158,7 +158,7 @@ test('transaction commit (by user)', done => {
   const ID = 500;
 
   const conn = helper.createTestConnection(NAME);
-  conn.transaction(conn => {
+  conn.transaction(conn =>
     conn
       .query(`insert into category (id, name) values (${ID}, 'Grocery')`)
       .then(id => {
@@ -166,12 +166,12 @@ test('transaction commit (by user)', done => {
           .query(`select * from category where id=${ID}`)
           .then(rows => {
             expect(rows[0].name).toBe('Grocery');
-            conn
+            return conn
               .query(
                 `insert into category(id, name) values (${ID + 1}, 'Dairy')`
               )
-              .then(() => {
-                conn.commit().then(() => {
+              .then(() =>
+                conn.commit().then(() =>
                   conn
                     .query(
                       `select * from category where id in (${ID}, ${ID +
@@ -181,12 +181,12 @@ test('transaction commit (by user)', done => {
                       expect(rows.length).toBe(2);
                       expect(rows[1].name).toBe('Dairy');
                       done();
-                    });
-                });
-              });
+                    })
+                )
+              );
           });
-      });
-  });
+      })
+  );
 });
 
 test('transaction rollback (by user)', done => {
@@ -198,29 +198,39 @@ test('transaction rollback (by user)', done => {
   conn.transaction(conn => {
     conn
       .query(`insert into category (id, name) values (${ID}, 'Grocery')`)
-      .then(id => {
-        return conn
-          .query(`select * from category where id=${ID}`)
-          .then(rows => {
-            expect(rows[0].name).toBe('Grocery');
-            conn
-              .query(
-                `insert into category(id, name) values (${ID + 1}, 'Dairy')`
-              )
-              .then(() => {
-                conn.rollback().then(() => {
-                  conn
-                    .query(
-                      `select * from category where id in (${ID}, ${ID +
-                        1}) order by id`
-                    )
-                    .then(rows => {
-                      expect(rows.length).toBe(0);
-                      done();
-                    });
-                });
-              });
-          });
+      .then(id =>
+        conn.query(`select * from category where id=${ID}`).then(rows => {
+          expect(rows[0].name).toBe('Grocery');
+          conn
+            .query(`insert into category(id, name) values (${ID + 1}, 'Dairy')`)
+            .then(() => {
+              conn.rollback().then(() =>
+                conn
+                  .query(
+                    `select * from category where id in (${ID}, ${ID +
+                      1}) order by id`
+                  )
+                  .then(rows => {
+                    expect(rows.length).toBe(0);
+                    done();
+                  })
+              );
+            });
+        })
+      );
+  });
+});
+
+test('pool', done => {
+  const pool = helper.createTestConnectionPool(NAME);
+  pool.getConnection().then(connection => {
+    connection.query('SELECT 1 + 1 AS solution').then(result => {
+      expect(result[0].solution).toBe(2);
+      connection.release();
+      pool.getConnection().then(connection2 => {
+        expect(connection2.connection).toBe(connection.connection);
+        done();
       });
+    });
   });
 });

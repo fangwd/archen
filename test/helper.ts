@@ -2,7 +2,12 @@ const fs = require('fs');
 
 require('dotenv').config();
 
-import { Connection, createConnection } from '../src/engine';
+import {
+  Connection,
+  createConnection,
+  createConnectionPool,
+  ConnectionPool
+} from '../src/engine';
 import { Schema } from '../src/model';
 import { Database } from '../src/database';
 
@@ -174,12 +179,24 @@ export function createTestConnection(name: string): Connection {
     : createSQLite3Connection(name);
 }
 
+export function createTestConnectionPool(name: string): ConnectionPool {
+  const database = `${DB_NAME}_${name}`;
+  return createConnectionPool('mysql', {
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: database,
+    timezone: 'Z',
+    connectionLimit: 10
+  });
+}
+
 export function connectToDatabase(name: string, schema?: Schema): Database {
   if (!schema) {
     schema = new Schema(getExampleData());
   }
-  const conn = createTestConnection(name);
-  return new Database(schema, conn);
+  const pool = createTestConnectionPool(name);
+  return new Database(schema, pool);
 }
 
 export function getId(length: number = 8) {

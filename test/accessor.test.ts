@@ -1,8 +1,8 @@
-import { Accessor, encodeFilter, options } from '../src/accessor';
+import { Accessor, encodeFilter } from '../src/accessor';
 
 import helper = require('./helper');
 import { Schema } from '../src/model';
-import { SchemaBuilder } from '../src/schema';
+import { GraphQLSchemaBuilder } from '../src/schema';
 
 import * as graphql from 'graphql';
 
@@ -287,7 +287,7 @@ test('related', done => {
       onResult: async (context, event, table, data) => {
         // Exclude "group 1.1"
         if (table.model.name === 'UserGroup') {
-          const rows = data.rows;
+          const rows = data.rows as any[];
           const promises = rows.map(row =>
             loader.load({ field }, row.group.id)
           );
@@ -311,7 +311,9 @@ test('related', done => {
   };
 
   const accessor = new Accessor(db, accessorOptions);
-  const builder = new SchemaBuilder(new Schema(helper.getExampleData(), options));
+  const builder = new GraphQLSchemaBuilder(
+    new Schema(helper.getExampleData(), options)
+  );
   const schema = builder.getSchema();
   const rootValue = builder.getRootValue();
 

@@ -1,7 +1,7 @@
 import * as graphql from 'graphql';
 import * as helper from './helper';
 
-import { SchemaBuilder } from '../src/schema';
+import { GraphQLSchemaBuilder } from '../src/schema';
 import { Accessor } from '../src/accessor';
 import { Schema, SchemaConfig } from '../src/model';
 import { Database } from '../src/database';
@@ -702,7 +702,7 @@ function createOrderAndShipping(
 
 function createSchema(data, config?: SchemaConfig) {
   const schema = data instanceof Schema ? data : new Schema(data, config);
-  const builder = new SchemaBuilder(schema, {
+  const builder = new GraphQLSchemaBuilder(schema, {
     getAccessor: context => {
       return context;
     }

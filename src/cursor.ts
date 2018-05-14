@@ -1,7 +1,7 @@
 import { QueryBuilder } from './filter';
 import { Model, SimpleField, UniqueKey, ForeignKeyField } from './model';
-import { Table, Filter, Value, toDocument, _toSnake } from './database';
-import { Connection } from './engine';
+import { Table, Filter, toDocument, _toSnake } from './database';
+import { Dialect, Value } from './engine';
 
 interface FieldInfo {
   alias: string;
@@ -11,21 +11,21 @@ interface FieldInfo {
 }
 
 function buildFilter(
-  engine: Connection,
+  dialect: Dialect,
   fields: FieldInfo[],
   index: number
 ): string {
   const info = fields[index];
   const name = info.field.column.name;
-  const lhs = `${engine.escapeId(info.alias)}.${engine.escapeId(name)}`;
-  const rhs = engine.escape(_toSnake(info.value, info.field) + '');
+  const lhs = `${dialect.escapeId(info.alias)}.${dialect.escapeId(name)}`;
+  const rhs = dialect.escape(_toSnake(info.value, info.field) + '');
   const where = `${lhs} ${info.desc ? '<' : '>'} ${rhs}`;
 
   if (index + 1 === fields.length) {
     return where;
   }
 
-  const next = buildFilter(engine, fields, index + 1);
+  const next = buildFilter(dialect, fields, index + 1);
 
   return `${where} or (${lhs}=${rhs} and ${next})`;
 }
@@ -73,7 +73,7 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
           value: values[index]
         };
       });
-      return buildFilter(table.db.engine, fields, 0);
+      return buildFilter(table.db.pool, fields, 0);
     }
     return null;
   };

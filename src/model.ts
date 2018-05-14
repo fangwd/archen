@@ -1,5 +1,6 @@
 import { pluralise, toPascalCase, toCamelCase } from './misc';
-import { Document, Value, isValue } from './database';
+import { Document, isValue } from './database';
+import { Value } from './engine';
 
 export interface SchemaInfo {
   name?: string;

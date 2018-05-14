@@ -45,7 +45,7 @@ import {
   NONE
 } from './filter';
 
-import { toPascalCase } from './misc';
+import { toPascalCase, firstOf } from './misc';
 
 interface ObjectTypeMap {
   [key: string]: GraphQLObjectType;
@@ -92,7 +92,7 @@ const DEFAULT_OPTIONS = {
   getAccessor: context => context
 };
 
-export class SchemaBuilder {
+export class GraphQLSchemaBuilder {
   private domain: Schema;
   private schema: GraphQLSchema;
   private rootValue = {};
@@ -977,10 +977,6 @@ export function isEmpty(value: any) {
     return Object.keys(value).length === 0;
   }
   return value === undefined;
-}
-
-function firstOf(object) {
-  return object[Object.keys(object)[0]];
 }
 
 export function hasOnly(object: object, key: string): boolean {

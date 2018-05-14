@@ -1,9 +1,17 @@
-import { Accessor, AccessorOptions } from './accessor';
-import { Connection, createConnection } from './engine';
+import { Accessor, AccessorOptions, encodeFilter } from './accessor';
 import { Schema, SchemaInfo, SchemaConfig } from './model';
-import { SchemaBuilder, SchemaBuilderOptions } from './schema';
+import { GraphQLSchemaBuilder, SchemaBuilderOptions } from './schema';
 import { Database } from './database';
-import { getInformationSchema } from './engine';
+
+import {
+  ConnectionInfo,
+  createConnection,
+  createConnectionPool,
+  Connection,
+  ConnectionPool,
+  getInformationSchema
+} from './engine';
+import { GraphQLSchema } from 'graphql';
 
 export interface ArchenConfig {
   database: {
@@ -16,44 +24,84 @@ export interface ArchenConfig {
   graphql: SchemaBuilderOptions;
 }
 
+type ConnectionMap = { [key: string]: ConnectionPool };
+
 export class Archen {
   config: ArchenConfig;
   schema: Schema;
-  graphql: SchemaBuilder;
+  graphql: GraphQLSchemaBuilder;
+
+  private connectionMap: ConnectionMap = {};
 
   constructor(config: ArchenConfig) {
     this.config = config;
+
+    if (config.database.connection) {
+      this.getConnectionPool(config.database);
+    }
+
     if (config.database.schemaInfo) {
-      this.schema = new Schema(config.database.schemaInfo, config.schema);
-      this.graphql = new SchemaBuilder(this.schema, this.config.graphql);
+      this.buildGraphQLSchema();
     }
   }
 
-  getSchemaInfo(): Promise<SchemaInfo> {
-    const connection = this.createConnection();
-    const name = this.getDatabaseName();
-    return getInformationSchema(connection, name).then(schemaInfo => {
-      this.config.database.schemaInfo = schemaInfo;
-      this.schema = new Schema(schemaInfo, this.config.schema);
-      this.graphql = new SchemaBuilder(this.schema, this.config.graphql);
-      return connection.disconnect().then(() => schemaInfo);
+  getSchemaInfo(connectionInfo?: ConnectionInfo): Promise<SchemaInfo> {
+    return this.getConnection(connectionInfo).then(connection => {
+      const name = this.getDatabaseName(connectionInfo);
+      return getInformationSchema(connection, name).then(schemaInfo => {
+        this.config.database.schemaInfo = schemaInfo;
+        this.buildGraphQLSchema();
+        connection.release();
+        return schemaInfo;
+      });
     });
   }
 
-  getAccessor(): Accessor {
-    const database = new Database(this.schema, this.createConnection());
+  getAccessor(connectionInfo?: ConnectionInfo): Accessor {
+    const database = new Database(
+      this.schema,
+      this.getConnectionPool(connectionInfo)
+    );
     return new Accessor(database, this.config.accessor);
   }
 
-  createConnection(): Connection {
-    return createConnection(
-      this.config.database.dialect,
-      this.config.database.connection
-    );
+  private getConnection(connectionInfo?: ConnectionInfo): Promise<Connection> {
+    return this.getConnectionPool(connectionInfo).getConnection();
   }
 
-  getDatabaseName(): string {
-    const connection = this.config.database.connection;
+  private getConnectionPool(connectionInfo?: ConnectionInfo): ConnectionPool {
+    if (!(connectionInfo = connectionInfo || this.config.database)) {
+      throw Error('No connection info');
+    }
+    let key = encodeConnectionInfo(connectionInfo);
+    let pool = this.connectionMap[key];
+    if (!pool) {
+      connectionInfo = connectionInfo || this.config.database;
+      pool = createConnectionPool(
+        connectionInfo.dialect,
+        connectionInfo.connection
+      );
+      this.connectionMap[key] = pool;
+    }
+    return pool;
+  }
+
+  private buildGraphQLSchema() {
+    this.schema = new Schema(
+      this.config.database.schemaInfo,
+      this.config.schema
+    );
+    this.graphql = new GraphQLSchemaBuilder(this.schema, this.config.graphql);
+  }
+
+  private getDatabaseName(connectionInfo?: ConnectionInfo): string {
+    connectionInfo = connectionInfo || this.config.database;
+    const connection = connectionInfo.connection;
     return connection.name || connection.database;
   }
+}
+
+function encodeConnectionInfo(connectionInfo: ConnectionInfo): string {
+  if (!connectionInfo) throw Error('Empty');
+  return JSON.stringify(encodeFilter(connectionInfo.connection));
 }

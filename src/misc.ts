@@ -63,4 +63,6 @@ export const DefaultEscape = {
   escape: s => "'" + (s + '').replace(/'/g, "\\'") + "'"
 };
 
-export const DEFAULT_LIMIT = 50;
+export function firstOf(object) {
+  return object[Object.keys(object)[0]];
+}

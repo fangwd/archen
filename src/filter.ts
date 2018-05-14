@@ -1,4 +1,4 @@
-import { Filter, OrderBy, Value, isValue, _toSnake } from './database';
+import { Filter, OrderBy, isValue, _toSnake } from './database';
 
 import {
   Model,
@@ -8,8 +8,8 @@ import {
   RelatedField
 } from './model';
 
-import { Escape } from './engine';
-import { toArray, DEFAULT_LIMIT } from './misc';
+import { Dialect, Value } from './engine';
+import { toArray } from './misc';
 
 interface AliasEntry {
   name: string;
@@ -53,7 +53,7 @@ export class QueryBuilder {
   field?: Field;
   parent?: QueryBuilder;
 
-  dialect: Escape;
+  dialect: Dialect;
   context?: Context;
   alias?: string;
 
@@ -68,10 +68,10 @@ export class QueryBuilder {
   }
 
   // (model, dialect), or (parent, field)
-  constructor(model: Model | QueryBuilder, dialect: Escape | Field) {
+  constructor(model: Model | QueryBuilder, dialect: Dialect | Field) {
     if (model instanceof Model) {
       this.model = model;
-      this.dialect = dialect as Escape;
+      this.dialect = dialect as Dialect;
       this.context = new Context();
     } else {
       this.parent = model;
@@ -418,7 +418,7 @@ export class QueryBuilder {
 export function encodeFilter(
   args: Filter,
   model: Model,
-  escape: Escape
+  escape: Dialect
 ): string {
   const builder = new QueryBuilder(model, escape);
   return builder.where(args);

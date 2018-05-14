@@ -1,13 +1,6 @@
-import {
-  Database,
-  Table,
-  Record,
-  Value,
-  Document,
-  toDocument
-} from './database';
+import { Database, Table, Record, Document, toDocument } from './database';
 
-import { Row } from './engine';
+import { Connection, Row, Value } from './engine';
 import { encodeFilter } from './filter';
 
 import DataLoader = require('dataloader');
@@ -80,11 +73,10 @@ class FlushContext {
 
 export class RecordStore {
   inserter: DataLoader<Record, Record>;
-  counter: number = 0;
 
-  constructor(db: Database) {
+  constructor(connection: Connection) {
     this.inserter = new DataLoader<Record, Record>((records: Record[]) =>
-      Promise.all(records.map(record => _persist(this, record)))
+      Promise.all(records.map(record => _persist(connection, this, record)))
     );
   }
 }
@@ -114,8 +106,11 @@ function collectParentFields(
   });
 }
 
-export function flushRecord(record: Record): Promise<any> {
-  const store = new RecordStore(record.__table.db);
+export function flushRecord(
+  connection: Connection,
+  record: Record
+): Promise<any> {
+  const store = new RecordStore(connection);
 
   return new Promise((resolve, reject) => {
     function __resolve() {
@@ -125,7 +120,7 @@ export function flushRecord(record: Record): Promise<any> {
         Promise.all(context.promises).then(() => __resolve());
       } else {
         if (record.__flushable(false)) {
-          _persist(store, record).then(() => {
+          _persist(connection, store, record).then(() => {
             if (!record.__dirty()) {
               resolve(record);
             } else {
@@ -154,7 +149,11 @@ export function flushRecord(record: Record): Promise<any> {
  *
  * @param record Record to be flushed to disk
  */
-function _persist(store: RecordStore, record: Record): Promise<Record> {
+function _persist(
+  connection: Connection,
+  store: RecordStore,
+  record: Record
+): Promise<Record> {
   const method = record.__state.method;
   const model = record.__table.model;
   const filter = model.getUniqueFields(record.__data);
@@ -169,7 +168,7 @@ function _persist(store: RecordStore, record: Record): Promise<Record> {
   const fields = record.__fields();
 
   if (method === FlushMethod.UPDATE) {
-    return record.__table.update(fields, filter).then(affected => {
+    return record.__table._update(connection, fields, filter).then(affected => {
       if (affected > 0) {
         record.__remove_dirty(Object.keys(fields));
         return record;
@@ -178,45 +177,48 @@ function _persist(store: RecordStore, record: Record): Promise<Record> {
     });
   }
 
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     function _insert() {
-      record.__table.get(filter).then(row => {
-        if (row) {
-          record.__remove_dirty(Object.keys(filter));
-          if (!record.__dirty()) {
-            resolve(record);
-          } else {
-            record.__table.update(fields, filter).then(() => {
-              record.__remove_dirty(Object.keys(fields));
-              if (record.__primaryKey() === undefined) {
-                const value = row[model.primaryKey.fields[0].name];
-                record.__setPrimaryKey(value as Value);
-              }
-              resolve(record);
-            });
+      record.__table
+        ._insert(connection, fields)
+        .then(id => {
+          if (record.__primaryKey() === undefined) {
+            record.__setPrimaryKey(id);
           }
-        } else {
-          record.__table
-            .insert(fields)
-            .then(id => {
-              if (record.__primaryKey() === undefined) {
-                record.__setPrimaryKey(id);
+          record.__remove_dirty(Object.keys(fields));
+          record.__state.method = FlushMethod.UPDATE;
+          resolve(record);
+        })
+        .catch(error => {
+          if (!isIntegrityError(error)) return reject(error);
+          record.__table._get(connection, filter).then(row => {
+            if (row) {
+              record.__remove_dirty(Object.keys(filter));
+              if (!record.__dirty()) {
+                resolve(record);
+              } else {
+                record.__table._update(connection, fields, filter).then(() => {
+                  record.__remove_dirty(Object.keys(fields));
+                  if (record.__primaryKey() === undefined) {
+                    const value = row[model.primaryKey.fields[0].name];
+                    record.__setPrimaryKey(value as Value);
+                  }
+                  resolve(record);
+                });
               }
-              record.__remove_dirty(Object.keys(fields));
-              record.__state.method = FlushMethod.UPDATE;
-              resolve(record);
-            })
-            .catch(error => {
-              _insert();
-            });
-        }
-      });
+            }
+          });
+        });
     }
     _insert();
   });
 }
 
-export function flushTable(table: Table, perfect?: boolean): Promise<number> {
+function flushTable(
+  connection: Connection,
+  table: Table,
+  perfect?: boolean
+): Promise<number> {
   if (table.recordList.length === 0) {
     return Promise.resolve(0);
   }
@@ -231,32 +233,30 @@ export function flushTable(table: Table, perfect?: boolean): Promise<number> {
     });
   }
 
-  const db = table.db;
-
   return new Promise((resolve, reject) => {
     function __try() {
-      db.transaction(() => {
-        return _flushTable(table, perfect)
-          .then(number => resolve(number))
-          .catch(error => {
-            if (!isIntegrityError(error)) return reject(error);
-            for (let i = 0; i < table.recordList.length; i++) {
-              const record = table.recordList[i];
-              const state = states[i];
-              record.__data = { ...state.data };
-              record.__state = state.state.clone();
-            }
-            db.engine.rollback().then(() => {
-              __try();
-            });
-          });
-      });
+      return _flushTable(connection, table, perfect)
+        .then(number => resolve(number))
+        .catch(error => {
+          if (!isIntegrityError(error)) return reject(error);
+          for (let i = 0; i < table.recordList.length; i++) {
+            const record = table.recordList[i];
+            const state = states[i];
+            record.__data = { ...state.data };
+            record.__state = state.state.clone();
+          }
+          __try();
+        });
     }
     __try();
   });
 }
 
-function _flushTable(table: Table, perfect: boolean): Promise<number> {
+function _flushTable(
+  connection: Connection,
+  table: Table,
+  perfect: boolean
+): Promise<number> {
   mergeRecords(table);
 
   const filter = [];
@@ -271,7 +271,7 @@ function _flushTable(table: Table, perfect: boolean): Promise<number> {
     }
   }
 
-  const dialect = table.db.engine;
+  const dialect = table.db.pool;
   const model = table.model;
 
   function _select(): Promise<any> {
@@ -282,7 +282,7 @@ function _flushTable(table: Table, perfect: boolean): Promise<number> {
     const from = dialect.escapeId(model.table.name);
     const where = encodeFilter(filter, table.model, dialect);
     const query = `select ${columns.join(',')} from ${from} where ${where}`;
-    return table.db.engine.query(query).then(rows => {
+    return connection.query(query).then(rows => {
       rows = rows.map(row => toDocument(row, table.model));
       for (const record of table.recordList) {
         if (!record.__dirty()) continue;
@@ -294,7 +294,7 @@ function _flushTable(table: Table, perfect: boolean): Promise<number> {
           }
           for (const name in row) {
             if (!record.__state.dirty.has(name)) continue;
-            const lhs = model.valueOf(record.__data, name);
+            const lhs = model.valueOf(record.__data as Document, name);
             const rhs = model.valueOf(row, name);
             if (lhs === rhs) {
               record.__state.dirty.delete(name);
@@ -344,7 +344,7 @@ function _flushTable(table: Table, perfect: boolean): Promise<number> {
     if ((insertCount = values.length) > 0) {
       const joined = values.join(', ');
       const query = `insert into ${into} (${columns}) values ${joined}`;
-      return table.db.engine.query(query).then(id => {
+      return connection.query(query).then(id => {
         for (const record of records) {
           if (model.primaryKey.autoIncrement()) {
             record.__setPrimaryKey(id++);
@@ -364,7 +364,7 @@ function _flushTable(table: Table, perfect: boolean): Promise<number> {
       if (record.__state.method !== FlushMethod.UPDATE) continue;
       const fields = record.__fields();
       record.__remove_dirty(Object.keys(fields));
-      promises.push(table.update(fields, record.__filter()));
+      promises.push(table._update(connection, fields, record.__filter()));
     }
     if ((updateCount = promises.length) > 0) {
       return Promise.all(promises);
@@ -409,10 +409,12 @@ function mergeRecords(table: Table) {
   }
 }
 
-function flushDatabaseA(db: Database) {
+function flushDatabaseA(connection: Connection, db: Database) {
   return new Promise((resolve, reject) => {
     function _flush() {
-      const promises = db.tableList.map(table => flushTable(table, true));
+      const promises = db.tableList.map(table =>
+        flushTable(connection, table, true)
+      );
       Promise.all(promises)
         .then(results => {
           if (results.reduce((a, b) => a + b, 0) === 0) {
@@ -427,11 +429,11 @@ function flushDatabaseA(db: Database) {
   });
 }
 
-export function flushDatabaseB(db: Database) {
+export function flushDatabaseB(connection: Connection, db: Database) {
   return new Promise((resolve, reject) => {
     let waiting = 0;
     function _flush() {
-      const promises = db.tableList.map(table => flushTable(table));
+      const promises = db.tableList.map(table => flushTable(connection, table));
       Promise.all(promises)
         .then(results => {
           const count = results.reduce((a, b) => a + b, 0);
@@ -454,8 +456,10 @@ export function flushDatabaseB(db: Database) {
   });
 }
 
-export function flushDatabase(db: Database) {
-  return flushDatabaseA(db).then(() => flushDatabaseB(db));
+export function flushDatabase(connection: Connection, db: Database) {
+  return flushDatabaseA(connection, db).then(() =>
+    flushDatabaseB(connection, db)
+  );
 }
 
 function isIntegrityError(error) {

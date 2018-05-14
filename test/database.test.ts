@@ -1,5 +1,5 @@
 import { Schema, ForeignKeyField } from '../src/model';
-import { Value } from '../src/database';
+import { Value } from '../src/engine';
 import helper = require('./helper');
 
 const NAME = 'database';

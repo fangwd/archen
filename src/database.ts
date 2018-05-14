@@ -1,4 +1,4 @@
-export type Value = string | number | boolean | Date | null;
+import { Value } from './engine';
 
 export type Document = {
   [key: string]: Value | Value[] | Document | Document[];
@@ -17,7 +17,7 @@ import {
   UniqueKey
 } from './model';
 
-import { Connection, Row } from './engine';
+import { Connection, ConnectionPool, Row } from './engine';
 import { encodeFilter, QueryBuilder } from './filter';
 import { toArray } from './misc';
 
@@ -42,13 +42,13 @@ class ClosureTable {
 
 export class Database {
   schema: Schema;
-  engine: Connection;
+  pool: ConnectionPool;
   tableMap: { [key: string]: Table } = {};
   tableList: Table[] = [];
 
-  constructor(schema: Schema, connection?: Connection) {
+  constructor(schema: Schema, pool: ConnectionPool) {
     this.schema = schema;
-    this.engine = connection;
+    this.pool = pool;
 
     for (const model of schema.models) {
       const table = new Table(this, model);
@@ -115,10 +115,6 @@ export class Database {
     return this.table(name).model;
   }
 
-  transaction(callback): Promise<Database> {
-    return this.engine.transaction(callback);
-  }
-
   append(name: string, data: { [key: string]: any }): any {
     return this.table(name).append(data);
   }
@@ -131,7 +127,14 @@ export class Database {
   }
 
   flush() {
-    return flushDatabase(this);
+    return this.pool.getConnection().then(connection =>
+      connection.transaction(() =>
+        flushDatabase(connection, this).then(result => {
+          connection.release();
+          return connection;
+        })
+      )
+    );
   }
 
   clear() {
@@ -176,12 +179,142 @@ export class Table {
     return field.column;
   }
 
+  getParentField(model?: Model): ForeignKeyField {
+    return this.model.getForeignKeyOf(model || this.model);
+  }
+
+  getAncestors(row: Value | Document, filter?: Filter): Promise<Document[]> {
+    const field = this.closureTable.ancestor;
+    return this.db.pool.getConnection().then(connection =>
+      treeQuery(connection, this, row, field, filter).then(result => {
+        connection.release();
+        return result;
+      })
+    );
+  }
+
+  getDescendants(row: Value | Document, filter?: Filter): Promise<Document[]> {
+    const field = this.closureTable.descendant;
+    return this.db.pool.getConnection().then(connection =>
+      treeQuery(connection, this, row, field, filter).then(result => {
+        connection.release();
+        return result;
+      })
+    );
+  }
+
+  select(
+    fields: string,
+    options: SelectOptions = {},
+    filterThunk?: (builder: QueryBuilder) => string
+  ): Promise<Row[]> {
+    return this.db.pool.getConnection().then(connection =>
+      this._select(connection, fields, options, filterThunk).then(result => {
+        connection.release();
+        return result;
+      })
+    );
+  }
+
+  get(key: Value | Filter): Promise<Document> {
+    return this.db.pool.getConnection().then(connection =>
+      this._get(connection, key).then(result => {
+        connection.release();
+        return result;
+      })
+    );
+  }
+
+  insert(data: Row): Promise<any> {
+    return this.db.pool.getConnection().then(connection =>
+      this._insert(connection, data).then(result => {
+        connection.release();
+        return result;
+      })
+    );
+  }
+
+  create(data: Document): Promise<Document> {
+    return this.db.pool.getConnection().then(connection =>
+      connection.transaction(() =>
+        this._create(connection, data).then(result => {
+          connection.release();
+          return result;
+        })
+      )
+    );
+  }
+
+  update(data: Document, filter: Filter): Promise<any> {
+    return this.db.pool.getConnection().then(connection =>
+      this._update(connection, data, filter).then(result => {
+        connection.release();
+        return result;
+      })
+    );
+  }
+
+  upsert(data: Document, update?: Document): Promise<Document> {
+    return this.db.pool.getConnection().then(connection =>
+      connection.transaction(() =>
+        this._upsert(connection, data, update).then(result => {
+          connection.release();
+          return result;
+        })
+      )
+    );
+  }
+
+  modify(data: Document, filter: Filter): Promise<Document> {
+    return this.db.pool.getConnection().then(connection =>
+      connection.transaction(() =>
+        this._modify(connection, data, filter).then(result => {
+          connection.release();
+          return result;
+        })
+      )
+    );
+  }
+
+  delete(filter: Filter): Promise<any> {
+    return this.db.pool.getConnection().then(connection => {
+      if (this.closureTable) {
+        return connection.transaction(() =>
+          this._delete(connection, filter).then(result => {
+            connection.release();
+            return result;
+          })
+        );
+      } else {
+        return this._delete(connection, filter).then(result => {
+          connection.release();
+          return result;
+        });
+      }
+    });
+  }
+
+  count(filter?: Filter): Promise<number> {
+    let sql = `select count(1) as result from ${this._name()}`;
+
+    if (filter) {
+      sql += ` where ${this._where(filter)}`;
+    }
+
+    return this.db.pool.getConnection().then(connection =>
+      connection.query(sql).then(rows => {
+        connection.release();
+        return parseInt(rows[0].result);
+      })
+    );
+  }
+
   private _name(): string {
-    return this.db.engine.escapeId(this.model.table.name);
+    return this.db.pool.escapeId(this.model.table.name);
   }
 
   private _where(filter: Filter) {
-    return encodeFilter(filter, this.model, this.db.engine);
+    return encodeFilter(filter, this.model, this.db.pool);
   }
 
   private _pair(name: string | SimpleField, value: Value): string {
@@ -191,12 +324,13 @@ export class Table {
     return this.escapeName(name) + '=' + this.escapeValue(name, value);
   }
 
-  select(
+  private _select(
+    connection: Connection,
     fields: string,
     options: SelectOptions = {},
     filterThunk?: (builder: QueryBuilder) => string
-  ): Promise<Document[]> {
-    let sql = new QueryBuilder(this.model, this.db.engine).select(
+  ): Promise<Row[]> {
+    let sql = new QueryBuilder(this.model, this.db.pool).select(
       fields,
       options.where,
       options.orderBy,
@@ -211,12 +345,16 @@ export class Table {
       sql += ` offset ${parseInt(options.offset + '')}`;
     }
 
-    return this.db.engine.query(sql).then(rows => {
+    return connection.query(sql).then(rows => {
       return filterThunk ? rows : rows.map(row => toDocument(row, this.model));
     });
   }
 
-  update(data: Document, filter?: Filter): Promise<any> {
+  _update(
+    connection: Connection,
+    data: Document,
+    filter: Filter
+  ): Promise<any> {
     let sql = `update ${this._name()} set`;
     let cnt = 0;
 
@@ -244,36 +382,32 @@ export class Table {
       }
     }
 
-    return this.db.engine.query(sql).catch(error => {
-      throw Error(error);
-    });
+    return connection.query(sql);
   }
 
-  insert(data: Row): Promise<any> {
+  _insert(connection: Connection, data: Row): Promise<any> {
     const keys = Object.keys(data);
     const name = keys.map(key => this.escapeName(key)).join(', ');
     const value = keys.map(key => this.escapeValue(key, data[key])).join(', ');
     const sql = `insert into ${this._name()} (${name}) values (${value})`;
-    return this.db.engine.query(sql).catch(error => {
-      throw Error(error);
-    });
+    return connection.query(sql);
   }
 
-  delete(filter?: Filter): Promise<any> {
+  _delete(connection: Connection, filter: Filter): Promise<any> {
     const scope = filter ? `${this._where(filter)}` : '';
 
-    const _delete = () => {
+    const __delete = () => {
       let sql = `delete from ${this._name()}`;
       if (scope) {
         sql += ` where ${scope}`;
       }
-      return this.db.engine.query(sql);
+      return connection.query(sql);
     };
 
     if (this.closureTable) {
-      return deleteSubtree(this, scope).then(() => _delete());
+      return deleteSubtree(connection, this, scope).then(() => __delete());
     } else {
-      return _delete();
+      return __delete();
     }
   }
 
@@ -287,7 +421,7 @@ export class Table {
       if (name === '*') return name;
       name = (this.model.field(name) as SimpleField).column.name;
     }
-    return this.db.engine.escapeId(name);
+    return this.db.pool.escapeId(name);
   }
 
   escapeValue(field: SimpleField | string, value: Value): string {
@@ -300,10 +434,10 @@ export class Table {
     if (typeof field === 'string') {
       field = this.model.field(field) as SimpleField;
     }
-    return this.db.engine.escape(_toSnake(value, field) + '');
+    return this.db.pool.escape(_toSnake(value, field) + '');
   }
 
-  get(key: Value | Filter): Promise<Document> {
+  _get(connection: Connection, key: Value | Filter): Promise<Document> {
     if (key === null || typeof key !== 'object') {
       key = {
         [this.model.keyField().name]: key
@@ -312,25 +446,17 @@ export class Table {
       const msg = `Bad selector: ${JSON.stringify(key)}`;
       return Promise.reject(Error(msg));
     }
-    return this.select('*', { where: key } as SelectOptions).then(
+    return this._select(connection, '*', { where: key } as SelectOptions).then(
       rows => rows[0]
     );
   }
 
-  getParentField(model?: Model): ForeignKeyField {
-    return this.model.getForeignKeyOf(model || this.model);
-  }
-
-  getAncestors(row: Value | Document, filter?: Filter): Promise<Document[]> {
-    return treeQuery(this, row, this.closureTable.ancestor, filter);
-  }
-
-  getDescendants(row: Value | Document, filter?: Filter): Promise<Document[]> {
-    return treeQuery(this, row, this.closureTable.descendant, filter);
-  }
-
   // GraphQL mutations
-  resolveParentFields(input: Document, filter?: Filter): Promise<Row> {
+  _resolveParentFields(
+    connection: Connection,
+    input: Document,
+    filter?: Filter
+  ): Promise<Row> {
     const result: Row = {};
     const promises = [];
     const self = this;
@@ -341,15 +467,19 @@ export class Table {
       let promise;
       switch (method) {
         case 'connect':
-          promise = table.get(data[method] as Document);
+          promise = table._get(connection, data[method] as Document);
           break;
         case 'create':
-          promise = table.create(data[method] as Document);
+          promise = table._create(connection, data[method] as Document);
           break;
         case 'update':
           {
             const where = { [field.relatedField.name]: filter };
-            promise = table.modify(data[method] as Document, where);
+            promise = table._modify(
+              connection,
+              data[method] as Document,
+              where
+            );
           }
           break;
         default:
@@ -384,35 +514,42 @@ export class Table {
     return Promise.all(promises).then(() => result);
   }
 
-  create(data: Document): Promise<Document> {
+  private _create(connection: Connection, data: Document): Promise<Document> {
     if (Object.keys(data).length === 0) throw Error('Empty data');
-    return this.resolveParentFields(data).then(row =>
-      this.insert(row).then(id => {
-        return this.updateChildFields(data, id).then(() =>
-          this.get(id).then(
+
+    return this._resolveParentFields(connection, data).then(row =>
+      this._insert(connection, row).then(id => {
+        return this._updateChildFields(connection, data, id).then(() =>
+          this._get(connection, id).then(
             row =>
-              this.closureTable ? createNode(this, row).then(() => row) : row
+              this.closureTable
+                ? createNode(connection, this, row).then(() => row)
+                : row
           )
         );
       })
     );
   }
 
-  upsert(data: Document, update?: Document): Promise<Document> {
+  private _upsert(
+    connection,
+    data: Document,
+    update?: Document
+  ): Promise<Document> {
     if (!this.model.checkUniqueKey(data)) {
       return Promise.reject(`Incomplete: ${JSON.stringify(data)}`);
     }
 
     const self = this;
 
-    return this.resolveParentFields(data).then(row => {
+    return this._resolveParentFields(connection, data).then(row => {
       const uniqueFields = self.model.getUniqueFields(row);
-      return self.get(uniqueFields).then(row => {
+      return self._get(connection, uniqueFields).then(row => {
         if (!row) {
-          return self.create(data);
+          return self._create(connection, data);
         } else {
           if (update && Object.keys(update).length > 0) {
-            return self.modify(update, uniqueFields);
+            return self._modify(connection, update, uniqueFields);
           } else {
             return row;
           }
@@ -421,29 +558,33 @@ export class Table {
     });
   }
 
-  modify(data: Document, filter: Filter): Promise<Document> {
+  private _modify(
+    connection,
+    data: Document,
+    filter: Filter
+  ): Promise<Document> {
     if (!this.model.checkUniqueKey(filter)) {
       return Promise.reject(`Bad filter: ${JSON.stringify(filter)}`);
     }
 
     const self = this;
 
-    return this.resolveParentFields(data, filter).then(row => {
-      return self.update(row, filter).then(() => {
+    return this._resolveParentFields(connection, data, filter).then(row => {
+      return self._update(connection, row, filter).then(() => {
         const where = Object.assign({}, filter);
         for (const key in where) {
           if (key in row) {
             where[key] = row[key];
           }
         }
-        return self.get(where as Document).then(row => {
+        return self._get(connection, where as Document).then(row => {
           if (row) {
             const id = row[this.model.keyField().name] as Value;
-            return this.updateChildFields(data, id).then(
+            return this._updateChildFields(connection, data, id).then(
               () =>
                 !this.closureTable || !data[this.getParentField().name]
                   ? row
-                  : moveSubtree(this, row).then(() => row)
+                  : moveSubtree(connection, this, row).then(() => row)
             );
           } else {
             return Promise.resolve(row);
@@ -453,18 +594,25 @@ export class Table {
     });
   }
 
-  updateChildFields(data: Document, id: Value): Promise<void> {
+  private _updateChildFields(
+    connection: Connection,
+    data: Document,
+    id: Value
+  ): Promise<void> {
     const promises = [];
     for (const key in data) {
       let field = this.model.field(key);
       if (field instanceof RelatedField) {
-        promises.push(this.updateChildField(field, id, data[key] as Document));
+        promises.push(
+          this._updateChildField(connection, field, id, data[key] as Document)
+        );
       }
     }
     return Promise.all(promises).then(() => Promise.resolve());
   }
 
-  updateChildField(
+  private _updateChildField(
+    connection: Connection,
     related: RelatedField,
     id: Value,
     data: Document
@@ -476,16 +624,20 @@ export class Table {
     if (!data || field.model.keyValue(data) === null) {
       const nullable = field.column.nullable;
       if (field.column.nullable) {
-        return table.update({ [field.name]: null }, { [field.name]: id });
+        return table._update(
+          connection,
+          { [field.name]: null },
+          { [field.name]: id }
+        );
       } else {
-        return table.delete({ [field.name]: id });
+        return table._delete(connection, { [field.name]: id });
       }
     }
     for (const method in data) {
       const args = data[method] as Document[];
       if (method === 'connect') {
         if (related.throughField) {
-          promises.push(this.connectThrough(related, id, args));
+          promises.push(this._connectThrough(connection, related, id, args));
           continue;
         }
         // connect: [{parent: {id: 2}, name: 'Apple'}, ...]
@@ -495,33 +647,35 @@ export class Table {
           }
           let promise;
           if (field.isUnique()) {
-            promise = this._disconnectUnique(field, id).then(() =>
-              table.update({ [field.name]: id }, args)
+            promise = this._disconnectUnique(connection, field, id).then(() =>
+              table._update(connection, { [field.name]: id }, args)
             );
           } else {
-            promise = table.update({ [field.name]: id }, args);
+            promise = table._update(connection, { [field.name]: id }, args);
           }
           promises.push(promise);
         }
       } else if (method === 'create') {
         if (related.throughField) {
-          promises.push(this.createThrough(related, id, args));
+          promises.push(this._createThrough(connection, related, id, args));
           continue;
         }
         // create: [{parent: {id: 2}, name: 'Apple'}, ...]
         const docs = toArray(args).map(arg => ({ [field.name]: id, ...arg }));
         if (field.isUnique()) {
           promises.push(
-            this._disconnectUnique(field, id).then(() => table.create(docs[0]))
+            this._disconnectUnique(connection, field, id).then(() =>
+              table._create(connection, docs[0])
+            )
           );
         } else {
           for (const doc of docs) {
-            promises.push(table.create(doc));
+            promises.push(table._create(connection, doc));
           }
         }
       } else if (method === 'upsert') {
         if (related.throughField) {
-          promises.push(this.upsertThrough(related, id, args));
+          promises.push(this._upsertThrough(connection, related, id, args));
           continue;
         }
         const rows = [];
@@ -534,11 +688,13 @@ export class Table {
           if (create[field.name] === undefined) {
             update = Object.assign({ [field.name]: id }, update);
           }
-          promises.push(table.upsert(create as Document, update as Document));
+          promises.push(
+            table._upsert(connection, create as Document, update as Document)
+          );
         }
       } else if (method === 'update') {
         if (related.throughField) {
-          promises.push(this.updateThrough(related, id, args));
+          promises.push(this._updateThrough(connection, related, id, args));
           continue;
         }
         for (const arg of toArray(args)) {
@@ -551,33 +707,33 @@ export class Table {
             where = arg.where;
           }
           const filter = { [field.name]: id, ...where };
-          promises.push(table.modify(data, filter));
+          promises.push(table._modify(connection, data, filter));
         }
       } else if (method.startsWith('delete')) {
         if (related.throughField) {
-          promises.push(this.deleteThrough(related, id, args));
+          promises.push(this._deleteThrough(connection, related, id, args));
           continue;
         }
         const filter = args.map(arg => ({
           ...(arg /*.where*/ as Document),
           [field.name]: id
         }));
-        promises.push(table.delete(filter as Filter));
+        promises.push(table._delete(connection, filter as Filter));
       } else if (method.startsWith('disconnect')) {
         if (related.throughField) {
-          promises.push(this.disconnectThrough(related, id, args));
+          promises.push(this._disconnectThrough(connection, related, id, args));
           continue;
         }
         const where = args.map(arg => ({ [field.name]: id, ...arg }));
-        promises.push(table.update({ [field.name]: null }, where));
+        promises.push(table._update(connection, { [field.name]: null }, where));
       } else if (method === 'set') {
         const promise = related.throughField
-          ? this.deleteThrough(related, id, [])
-          : table.delete({ [field.name]: id });
+          ? this._deleteThrough(connection, related, id, [])
+          : table._delete(connection, { [field.name]: id });
         promises.push(
           promise.then(() => {
             if (related.throughField) {
-              return this.createThrough(related, id, args);
+              return this._createThrough(connection, related, id, args);
             }
             // create: [{parent: {id: 2}, name: 'Apple'}, ...]
             const docs = toArray(args).map(arg => ({
@@ -585,13 +741,13 @@ export class Table {
               ...arg
             }));
             if (field.isUnique()) {
-              return this._disconnectUnique(field, id).then(() =>
-                table.create(docs[0])
+              return this._disconnectUnique(connection, field, id).then(() =>
+                table._create(connection, docs[0])
               );
             } else {
               return Promise.all(
                 docs.map(doc => {
-                  table.create(doc);
+                  table._create(connection, doc);
                 })
               );
             }
@@ -605,29 +761,19 @@ export class Table {
     return Promise.all(promises).then(() => Promise.resolve());
   }
 
-  _disconnectUnique(field: SimpleField, id: Value): Promise<any> {
+  _disconnectUnique(
+    connection: Connection,
+    field: SimpleField,
+    id: Value
+  ): Promise<any> {
     const table = this.db.table(field.model);
     return field.column.nullable
-      ? table.update({ [field.name]: null }, { [field.name]: id })
-      : table.delete({ [field.name]: id });
+      ? table._update(connection, { [field.name]: null }, { [field.name]: id })
+      : table._delete(connection, { [field.name]: id });
   }
 
-  // Aggregate functions
-  count(filter?: Filter): Promise<number> {
-    let sql = `select count(1) as result from ${this._name()}`;
-
-    if (filter) {
-      sql += ` where ${this._where(filter)}`;
-    }
-
-    return new Promise<number>(resolve => {
-      this.db.engine.query(sql).then(rows => {
-        resolve(parseInt(rows[0].result));
-      });
-    });
-  }
-
-  connectThrough(
+  _connectThrough(
+    connection: Connection,
     related: RelatedField,
     value: Value,
     args: Document[]
@@ -635,8 +781,8 @@ export class Table {
     const table = this.db.table(related.throughField.referencedField.model);
     const mapping = this.db.table(related.throughField.model);
     const promises = args.map(arg =>
-      table.get(arg).then(row =>
-        mapping.create({
+      table._get(connection, arg).then(row =>
+        mapping._create(connection, {
           [related.referencingField.name]: value,
           [related.throughField.name]: row[table.model.keyField().name]
         })
@@ -645,7 +791,8 @@ export class Table {
     return Promise.all(promises);
   }
 
-  createThrough(
+  private _createThrough(
+    connection: Connection,
     related: RelatedField,
     value: Value,
     args: Document[]
@@ -653,8 +800,8 @@ export class Table {
     const table = this.db.table(related.throughField.referencedField.model);
     const mapping = this.db.table(related.throughField.model);
     const promises = args.map(arg =>
-      table.create(arg).then(row =>
-        mapping.create({
+      table._create(connection, arg).then(row =>
+        mapping._create(connection, {
           [related.referencingField.name]: value,
           [related.throughField.name]: row[table.model.keyField().name]
         })
@@ -663,7 +810,8 @@ export class Table {
     return Promise.all(promises);
   }
 
-  upsertThrough(
+  private _upsertThrough(
+    connection: Connection,
     related: RelatedField,
     value: Value,
     args: Document[]
@@ -671,17 +819,20 @@ export class Table {
     const table = this.db.table(related.throughField.referencedField.model);
     const mapping = this.db.table(related.throughField.model);
     const promises = args.map(arg =>
-      table.upsert(arg.create as Document, arg.update as Document).then(row =>
-        mapping.upsert({
-          [related.referencingField.name]: value,
-          [related.throughField.name]: row[table.model.keyField().name]
-        })
-      )
+      table
+        ._upsert(connection, arg.create as Document, arg.update as Document)
+        .then(row =>
+          mapping._upsert(connection, {
+            [related.referencingField.name]: value,
+            [related.throughField.name]: row[table.model.keyField().name]
+          })
+        )
     );
     return Promise.all(promises);
   }
 
-  updateThrough(
+  private _updateThrough(
+    connection: Connection,
     related: RelatedField,
     value: Value,
     args: Document[]
@@ -704,12 +855,15 @@ export class Table {
           ...(arg.where as object)
         };
       }
-      return this.db.table(model).modify(arg.data as Document, where);
+      return this.db
+        .table(model)
+        ._modify(connection, arg.data as Document, where);
     });
     return Promise.all(promises);
   }
 
-  deleteThrough(
+  _deleteThrough(
+    connection: Connection,
     related: RelatedField,
     value: Value,
     args: Document[]
@@ -717,7 +871,7 @@ export class Table {
     const mapping = this.db.table(related.throughField.model);
     const table = this.db.table(related.throughField.referencedField.model);
     return mapping
-      .select('*', {
+      ._select(connection, '*', {
         where: {
           [related.referencingField.name]: value,
           [related.throughField.name]: args
@@ -728,21 +882,22 @@ export class Table {
         const values = rows.map(
           row => row[related.throughField.name][table.model.keyField().name]
         );
-        return mapping.delete(rows).then(() =>
-          table.delete({
+        return mapping._delete(connection, rows).then(() =>
+          table._delete(connection, {
             [table.model.keyField().name]: values
           })
         );
       });
   }
 
-  disconnectThrough(
+  _disconnectThrough(
+    connection: Connection,
     related: RelatedField,
     value: Value,
     args: Document[]
   ): Promise<any> {
     const mapping = this.db.table(related.throughField.model);
-    return mapping.delete({
+    return mapping._delete(connection, {
       [related.referencingField.name]: value,
       [related.throughField.name]: args
     });
@@ -845,10 +1000,6 @@ export function toDocument(row: Row, model: Model): Document {
   return result;
 }
 
-export function rowsToCamel(rows: Row[], model: Model): Row[] {
-  return rows.map(row => toDocument(row, model));
-}
-
 function isEmpty(value: Value | Record | any) {
   if (value === undefined) {
     return true;
@@ -864,9 +1015,11 @@ function isEmpty(value: Value | Record | any) {
   return false;
 }
 
+type FieldValue = Value | Record;
+
 export class Record {
   __table: Table;
-  __data: Row;
+  __data: { [key: string]: FieldValue };
   __state: FlushState;
 
   constructor(table: Table) {
@@ -875,17 +1028,19 @@ export class Record {
     this.__state = new FlushState();
   }
 
-  get(name: string): Value | undefined {
+  get(name: string): FieldValue | undefined {
     return this.__data[name];
   }
 
-  delete(): Promise<any> {
-    const filter = this.__table.model.getUniqueFields(this.__data);
-    return this.__table.delete(filter);
-  }
-
   save(): Promise<any> {
-    return flushRecord(this);
+    return this.__table.db.pool.getConnection().then(connection =>
+      connection.transaction(() =>
+        flushRecord(connection, this).then(result => {
+          connection.release();
+          return result;
+        })
+      )
+    );
   }
 
   update(data: Row = {}): Promise<any> {
@@ -894,6 +1049,11 @@ export class Record {
     }
     this.__state.method = FlushMethod.UPDATE;
     return this.save();
+  }
+
+  delete(): Promise<any> {
+    const filter = this.__table.model.getUniqueFields(this.__data);
+    return this.__table.delete(filter);
   }
 
   __dirty(): boolean {
@@ -948,7 +1108,7 @@ export class Record {
 
   __getValue(name: string): Value {
     if (this.__data[name] instanceof Record) {
-      let parent = this.__data[name];
+      let parent = this.__data[name] as Record;
       while (parent.__state.merged) {
         parent = parent.__state.merged;
       }

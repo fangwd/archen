@@ -1,4 +1,4 @@
-import { Connection } from './connection';
+import { Connection } from '.';
 import { SchemaInfo, TableInfo, ColumnInfo, ConstraintInfo } from '../model';
 
 export function getInformationSchema(

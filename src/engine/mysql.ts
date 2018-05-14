@@ -1,15 +1,65 @@
-import { Connection, TransactionCallback, QueryCounter } from './connection';
+import {
+  Connection,
+  TransactionCallback,
+  QueryCounter,
+  ConnectionPool
+} from '.';
 
 import mysql = require('mysql');
 
-class MySQL implements Connection {
-  type: string = 'mysql';
-  queryCounter: QueryCounter = new QueryCounter();
-
-  private connection: mysql.Connection;
+class _ConnectionPool extends ConnectionPool {
+  private pool: any;
 
   constructor(options) {
-    this.connection = mysql.createConnection(options);
+    super();
+    this.pool = mysql.createPool(options);
+  }
+
+  getConnection(): Promise<Connection> {
+    return new Promise((resolve, reject) => {
+      return this.pool.getConnection((error, connection) => {
+        if (error) reject(Error(error));
+        resolve(new _Connection(connection, true));
+      });
+    });
+  }
+
+  close(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      return this.pool.end(error => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+
+  escape(value: string): string {
+    return mysql.escape(value);
+  }
+
+  escapeId(name: string) {
+    return mysql.escapeId(name);
+  }
+}
+
+class _Connection extends Connection {
+  dialect: string = 'mysql';
+  connection: any;
+  queryCounter: QueryCounter = new QueryCounter();
+
+  private pool: _ConnectionPool;
+
+  constructor(options, connected?: boolean) {
+    super();
+    if (connected) {
+      this.connection = options;
+    } else {
+      this.connection = mysql.createConnection(options);
+    }
+  }
+
+  release() {
+    this.connection.release();
   }
 
   query(sql: string): Promise<any[] | void> {
@@ -38,16 +88,16 @@ class MySQL implements Connection {
         try {
           promise = callback(this);
         } catch (error) {
-          return this.connection.rollback(function() {
+          return this.connection.rollback(() => {
             reject(error);
           });
         }
         if (promise instanceof Promise) {
           return promise
             .then(result =>
-              this.connection.commit(function(error) {
+              this.connection.commit(error => {
                 if (error) {
-                  return this.conn.rollback(function() {
+                  return this.connection.rollback(() => {
                     reject(error);
                   });
                 } else {
@@ -56,7 +106,7 @@ class MySQL implements Connection {
               })
             )
             .catch(reason =>
-              this.connection.rollback(function() {
+              this.connection.rollback(() => {
                 reject(reason);
               })
             );
@@ -87,7 +137,7 @@ class MySQL implements Connection {
 
   disconnect(): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.connection.end(function(err) {
+      this.connection.end(err => {
         if (err) reject(err);
         else resolve();
       });
@@ -103,6 +153,11 @@ class MySQL implements Connection {
   }
 }
 
-export default function createConnection(options): Connection {
-  return new MySQL(options);
-}
+export default {
+  createConnectionPool: (options): ConnectionPool => {
+    return new _ConnectionPool(options);
+  },
+  createConnection: (options): Connection => {
+    return new _Connection(options);
+  }
+};
