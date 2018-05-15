@@ -233,22 +233,14 @@ function flushTable(
     });
   }
 
-  return new Promise((resolve, reject) => {
-    function __try() {
-      return _flushTable(connection, table, perfect)
-        .then(number => resolve(number))
-        .catch(error => {
-          if (!isIntegrityError(error)) return reject(error);
-          for (let i = 0; i < table.recordList.length; i++) {
-            const record = table.recordList[i];
-            const state = states[i];
-            record.__data = { ...state.data };
-            record.__state = state.state.clone();
-          }
-          __try();
-        });
+  return _flushTable(connection, table, perfect).catch(error => {
+    for (let i = 0; i < table.recordList.length; i++) {
+      const record = table.recordList[i];
+      const state = states[i];
+      record.__data = { ...state.data };
+      record.__state = state.state.clone();
     }
-    __try();
+    throw error;
   });
 }
 
@@ -457,9 +449,30 @@ export function flushDatabaseB(connection: Connection, db: Database) {
 }
 
 export function flushDatabase(connection: Connection, db: Database) {
-  return flushDatabaseA(connection, db).then(() =>
-    flushDatabaseB(connection, db)
-  );
+  return new Promise((resolve, reject) => {
+    const _flush = () => {
+      connection.transaction(() => {
+        flushDatabaseA(connection, db)
+          .then(() =>
+            flushDatabaseB(connection, db).then(() => {
+              connection.commit().then(() => {
+                resolve();
+              });
+            })
+          )
+          .catch(error => {
+            connection.rollback().then(() => {
+              if (isIntegrityError(error)) {
+                setTimeout(_flush, Math.random() * 1000);
+              } else {
+                reject(error);
+              }
+            });
+          });
+      });
+    };
+    _flush();
+  });
 }
 
 function isIntegrityError(error) {

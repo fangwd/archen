@@ -236,7 +236,7 @@ test('flush #4', async done => {
   const schema = new Schema(helper.getExampleData());
 
   // 3 connections
-  const dbs = [...Array(1 /*3*/).keys()].map(x =>
+  const dbs = [...Array(3).keys()].map(x =>
     helper.connectToDatabase(NAME, schema)
   );
 

@@ -128,12 +128,10 @@ export class Database {
 
   flush() {
     return this.pool.getConnection().then(connection =>
-      connection.transaction(() =>
-        flushDatabase(connection, this).then(result => {
-          connection.release();
-          return connection;
-        })
-      )
+      flushDatabase(connection, this).then(result => {
+        connection.release();
+        return connection;
+      })
     );
   }
 

@@ -20,8 +20,8 @@ export interface ArchenConfig {
     schemaInfo: SchemaInfo;
   };
   schema?: SchemaConfig;
-  accessor: AccessorOptions;
-  graphql: SchemaBuilderOptions;
+  accessor?: AccessorOptions;
+  graphql?: SchemaBuilderOptions;
 }
 
 type ConnectionMap = { [key: string]: ConnectionPool };

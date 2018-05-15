@@ -37,8 +37,8 @@ export interface SchemaConfig {
 interface ClosureTableConfig {
   name: string;
   fields?: {
-    ancestor: string;
-    descendant: string;
+    ancestor?: string;
+    descendant?: string;
     depth?: string;
   };
 }
@@ -257,6 +257,19 @@ export class Model {
     return count;
   }
 
+  getOtherForeignKeyField(field: ForeignKeyField): ForeignKeyField {
+    const model = field.referencedField.model;
+    for (const item of this.fields) {
+      if (item instanceof ForeignKeyField) {
+        if (item.referencedField.model === model) {
+          if (item !== field) {
+            return item;
+          }
+        }
+      }
+    }
+  }
+
   getForeignKeyOf(model: Model): ForeignKeyField {
     for (const field of this.fields) {
       if (field instanceof ForeignKeyField) {
@@ -298,11 +311,23 @@ export class Model {
     }
   }
 
+  isClosureField(field: ForeignKeyField) {
+    const closureTable = field.referencedField.model.config.closureTable;
+    if (closureTable && closureTable.name === field.model.table.name) {
+      const fields = Object.assign(
+        { ancestor: 'ancestor', descendant: 'descendant' },
+        closureTable.fields
+      );
+      return field.name === fields.ancestor || field.name === fields.descendant;
+    }
+    return false;
+  }
+
   resolveRelatedFields() {
     const fieldCount = this.fields.length;
     for (let i = 0; i < fieldCount; i++) {
       const field = this.fields[i];
-      if (field instanceof ForeignKeyField) {
+      if (field instanceof ForeignKeyField && !this.isClosureField(field)) {
         const relatedField = new RelatedField(field);
         relatedField.model.addField(relatedField);
         field.relatedField = relatedField;
@@ -312,7 +337,7 @@ export class Model {
 
   private addField(field: Field) {
     if (field.name in this.fieldMap) {
-      throw Error(`Duplicate field name: ${field.name}`);
+      throw Error(`Duplicate field name: ${field.displayName()}`);
     }
 
     let column: ColumnInfo;
@@ -424,7 +449,13 @@ export class RelatedField extends Field {
 
     if (!this.name) {
       if (this.throughField) {
-        this.name = this.throughField.referencedField.model.pluralName;
+        if (field.model.getForeignKeyCount(this.model) === 1) {
+          this.name = this.throughField.referencedField.model.pluralName;
+        } else {
+          this.name =
+            field.model.getOtherForeignKeyField(field).name +
+            toPascalCase(this.throughField.referencedField.model.pluralName);
+        }
       } else if (field.isUnique()) {
         this.name = lcfirst(field.model.name);
       } else {
@@ -439,11 +470,15 @@ export class RelatedField extends Field {
 
   // Example: UserOrder, CategoryCategoryAncestor
   getPascalName(plural?: boolean) {
-    if (this.throughField) {
-      const model = this.throughField.referencedField.model;
-      return `${this.model.name}${pluralise(model.name)}`;
-    }
     const model = this.referencingField.model;
+    if (this.throughField) {
+      if (model.getForeignKeyCount(this.model) === 1) {
+        const model = this.throughField.referencedField.model;
+        return `${this.model.name}${pluralise(model.name)}`;
+      } else {
+        return toPascalCase(this.throughField.relatedField.name);
+      }
+    }
     if (model.getForeignKeyCount(this.model) === 1) {
       return `${this.model.name}${plural ? pluralise(model.name) : model.name}`;
     }
