@@ -640,15 +640,6 @@ export class GraphQLSchemaBuilder {
               field.referencingField.model.name
             ];
 
-            if (field.referencingField.uniqueKey) {
-              connectType = new GraphQLInputObjectType({
-                name: getConnectChildTypeName(field),
-                fields() {
-                  return getFieldsExclude(inputFieldsConnectMap, field);
-                }
-              });
-            }
-
             filterType = this.filterInputTypeMapEx[model.name][field.name];
           }
 
@@ -751,10 +742,8 @@ export class GraphQLSchemaBuilder {
                     set: { type: new GraphQLList(createType) },
                     upsert: { type: new GraphQLList(upsertType) },
                     update: { type: new GraphQLList(updateType) },
-                    delete: { type: new GraphQLList(connectType) },
-                    deleteMany: { type: new GraphQLList(filterType) },
-                    disconnect: { type: new GraphQLList(connectType) },
-                    disconnectMany: { type: new GraphQLList(filterType) }
+                    delete: { type: new GraphQLList(filterType) },
+                    disconnect: { type: new GraphQLList(filterType) }
                   };
                 }
               })
