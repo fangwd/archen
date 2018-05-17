@@ -17,17 +17,30 @@ function buildFilter(
 ): string {
   const info = fields[index];
   const name = info.field.column.name;
-  const lhs = `${dialect.escapeId(info.alias)}.${dialect.escapeId(name)}`;
-  const rhs = dialect.escape(_toSnake(info.value, info.field) + '');
-  const where = `${lhs} ${info.desc ? '<' : '>'} ${rhs}`;
+
+  const col = `${dialect.escapeId(info.alias)}.${dialect.escapeId(name)}`;
+  const val = dialect.escape(_toSnake(info.value, info.field));
+  let where;
+  if (info.desc) {
+    if (info.value !== null) {
+      where = `${col} is null or ${col} < ${val}`;
+    }
+  } else {
+    if (info.value === null) {
+      where = `${col} is not null`;
+    } else {
+      where = `${col} > ${val}`;
+    }
+  }
 
   if (index + 1 === fields.length) {
     return where;
   }
 
   const next = buildFilter(dialect, fields, index + 1);
+  const equal = info.value === null ? `${col} is null` : `${col}=${val}`;
 
-  return `${where} or (${lhs}=${rhs} and ${next})`;
+  return where ? `${where} or (${equal} and ${next})` : `${equal} and ${next}`;
 }
 
 export interface CursorQueryOptions {
@@ -42,7 +55,16 @@ export interface CursorQueryOptions {
 export function cursorQuery(table: Table, options: CursorQueryOptions) {
   const model = table.model;
 
-  let orderBy = model.primaryKey.fields.map(field => field.name);
+  let desc = '';
+  if (options.orderBy) {
+    const name = options.orderBy[options.orderBy.length - 1];
+    const parts = name.split(/\s+/);
+    if (parts.length > 1 && /desc/i.test(parts[1])) {
+      desc = ' desc';
+    }
+  }
+
+  let orderBy = model.primaryKey.fields.map(field => field.name + desc);
 
   if (options.orderBy) {
     orderBy = [...options.orderBy, ...orderBy];
@@ -83,19 +105,16 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
   const promises: Promise<any>[] = [
     table.select('*', selectOptions, builder).then(rows => {
       const keys = orderBy.map(s => s.split(/\s+/)[0].replace(/\./g, '__'));
-      return rows.map(row => ({
-        ...toDocument(row, model),
-        __cursor: encodeCursor(keys.map(key => row[key]))
-      }));
+      return rows.map(row => {
+        const doc = toDocument(row, model);
+        doc.__cursor = encodeCursor(keys.map(key => doc[key]));
+        return doc;
+      });
     })
   ];
 
   if (options.withTotal) {
-    promises.push(
-      table
-        .select('count(*)', selectOptions, builder)
-        .then(rows => rows[0]['count(*)'])
-    );
+    promises.push(table.count(selectOptions.where));
   }
 
   return Promise.all(promises).then(result => ({
