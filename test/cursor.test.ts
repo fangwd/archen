@@ -1,4 +1,4 @@
-import { Schema } from '../src/model';
+import { Schema } from 'datalink';
 
 import {
   cursorQuery,

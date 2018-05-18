@@ -10,11 +10,12 @@ const options = {
       host: 'localhost',
       user: 'root',
       password: 'secret',
-      database: 'example',
+      database: 'twe',
       timezone: 'Z',
       connectionLimit: 10
     }
   },
+  /*
   schema: {
     models: [
       {
@@ -42,6 +43,7 @@ const options = {
       }
     ]
   },
+  */
   graphql: {
     getAccessor: context => context.loader
   }

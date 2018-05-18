@@ -1,16 +1,18 @@
 import { Accessor, AccessorOptions, encodeFilter } from './accessor';
-import { Schema, SchemaInfo, SchemaConfig } from './model';
 import { GraphQLSchemaBuilder, SchemaBuilderOptions } from './schema';
-import { Database } from './database';
 
 import {
-  ConnectionInfo,
-  createConnection,
-  createConnectionPool,
+  Schema,
+  SchemaInfo,
+  SchemaConfig,
+  getInformationSchema,
+  Database,
   Connection,
   ConnectionPool,
-  getInformationSchema
-} from './engine';
+  ConnectionInfo,
+  createConnectionPool
+} from 'datalink';
+
 import { GraphQLSchema } from 'graphql';
 
 export interface ArchenConfig {
@@ -59,8 +61,8 @@ export class Archen {
 
   getAccessor(connectionInfo?: ConnectionInfo): Accessor {
     const database = new Database(
-      this.schema,
-      this.getConnectionPool(connectionInfo)
+      this.getConnectionPool(connectionInfo),
+      this.schema
     );
     return new Accessor(database, this.config.accessor);
   }

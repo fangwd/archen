@@ -6,14 +6,18 @@ import {
   SimpleField,
   ForeignKeyField,
   Field,
-  RelatedField
-} from './model';
+  RelatedField,
+  Database,
+  Table,
+  Document,
+  Filter,
+  SelectOptions,
+  ConnectionPool,
+  Row,
+  Value,
+  QueryBuilder
+} from 'datalink';
 
-import { Database, Table, Document, Filter, SelectOptions } from './database';
-
-import { ConnectionPool, Row, Value } from './engine';
-import { QueryBuilder } from './filter';
-import { toArray } from './misc';
 import { cursorQuery } from './cursor';
 
 interface LoaderEntry {

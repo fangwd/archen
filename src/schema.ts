@@ -24,12 +24,8 @@ import {
   ForeignKeyField,
   RelatedField,
   Field,
-  SchemaConfig
-} from './model';
-
-import { Accessor } from './accessor';
-
-import {
+  SchemaConfig,
+  toPascalCase,
   AND,
   OR,
   NOT,
@@ -43,9 +39,11 @@ import {
   NULL,
   SOME,
   NONE
-} from './filter';
+} from 'datalink';
 
-import { toPascalCase, firstOf } from './misc';
+import { Accessor } from './accessor';
+
+import { firstOf } from './misc';
 
 interface ObjectTypeMap {
   [key: string]: GraphQLObjectType;

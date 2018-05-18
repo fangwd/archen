@@ -3,8 +3,7 @@ import * as helper from './helper';
 
 import { GraphQLSchemaBuilder } from '../src/schema';
 import { Accessor } from '../src/accessor';
-import { Schema, SchemaConfig } from '../src/model';
-import { Database } from '../src/database';
+import { Schema, SchemaConfig, Database } from 'datalink';
 import { arch } from 'os';
 
 const NAME = 'schema';

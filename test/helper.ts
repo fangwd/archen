@@ -6,10 +6,10 @@ import {
   Connection,
   createConnection,
   createConnectionPool,
-  ConnectionPool
-} from '../src/engine';
-import { Schema } from '../src/model';
-import { Database } from '../src/database';
+  ConnectionPool,
+  Schema,
+  Database
+} from 'datalink';
 
 const DB_NAME = process.env.DB_NAME || 'archen_test';
 const DB_TYPE = process.env.DB_TYPE || 'sqlite3';
@@ -196,7 +196,7 @@ export function connectToDatabase(name: string, schema?: Schema): Database {
     schema = new Schema(getExampleData());
   }
   const pool = createTestConnectionPool(name);
-  return new Database(schema, pool);
+  return new Database(pool, schema);
 }
 
 export function getId(length: number = 8) {

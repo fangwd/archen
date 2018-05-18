@@ -1,7 +1,16 @@
-import { QueryBuilder } from './filter';
-import { Model, SimpleField, UniqueKey, ForeignKeyField } from './model';
-import { Table, Filter, toDocument, _toSnake } from './database';
-import { Dialect, Value } from './engine';
+import {
+  QueryBuilder,
+  Model,
+  SimpleField,
+  UniqueKey,
+  ForeignKeyField,
+  Table,
+  Filter,
+  toDocument,
+  toRow,
+  Dialect,
+  Value
+} from 'datalink';
 
 interface FieldInfo {
   alias: string;
@@ -19,7 +28,7 @@ function buildFilter(
   const name = info.field.column.name;
 
   const col = `${dialect.escapeId(info.alias)}.${dialect.escapeId(name)}`;
-  const val = dialect.escape(_toSnake(info.value, info.field));
+  const val = dialect.escape(toRow(info.value, info.field));
   let where;
   if (info.desc) {
     if (info.value !== null) {
@@ -107,7 +116,7 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
       const keys = orderBy.map(s => s.split(/\s+/)[0].replace(/\./g, '__'));
       return rows.map(row => {
         const doc = toDocument(row, model);
-        doc.__cursor = encodeCursor(keys.map(key => doc[key]));
+        doc.__cursor = encodeCursor(keys.map(key => row[key]));
         return doc;
       });
     })

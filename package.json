@@ -1,22 +1,14 @@
 {
   "name": "archen",
-  "version": "1.0.2",
-  "description": "Archen - Add GraphQL API to your existing database",
+  "version": "1.1.0",
+  "description": "Archen - Add GraphQL API to your existing applications",
   "main": "./dist/index.js",
   "files": [
     "dist/accessor.js",
-    "dist/database.js",
-    "dist/engine",
-    "dist/filter.js",
     "dist/index.js",
     "dist/misc.js",
-    "dist/model.js",
     "dist/schema.js",
-    "dist/flush.js",
     "dist/cursor.js",
-    "dist/tree.js",
-    "bin/archen.js",
-    "src",
     "LICENSE",
     "package.json",
     "README.md"
@@ -24,6 +16,7 @@
   "author": "Weidong Fang",
   "license": "MIT",
   "dependencies": {
+    "sqlit": ">=1.0.1",
     "dataloader": "^1.4.0",
     "graphql": "^0.13.1"
   },
@@ -51,9 +44,18 @@
       "^.+\\.tsx?$": "ts-jest"
     },
     "testRegex": "/test/.+\\.test.ts",
-    "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ],
     "collectCoverage": false,
-    "collectCoverageFrom": ["src/**/*.ts"],
+    "collectCoverageFrom": [
+      "src/**/*.ts"
+    ],
     "verbose": true
   }
 }
