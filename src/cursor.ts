@@ -10,7 +10,7 @@ import {
   toRow,
   Dialect,
   Value
-} from 'datalink';
+} from 'sqlit';
 
 interface FieldInfo {
   alias: string;

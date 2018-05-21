@@ -11,7 +11,7 @@ import {
   ConnectionPool,
   ConnectionInfo,
   createConnectionPool
-} from 'datalink';
+} from 'sqlit';
 
 import { GraphQLSchema } from 'graphql';
 

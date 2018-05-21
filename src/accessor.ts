@@ -16,7 +16,7 @@ import {
   Row,
   Value,
   QueryBuilder
-} from 'datalink';
+} from 'sqlit';
 
 import { cursorQuery } from './cursor';
 

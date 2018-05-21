@@ -9,7 +9,7 @@ import {
   ConnectionPool,
   Schema,
   Database
-} from 'datalink';
+} from 'sqlit';
 
 const DB_NAME = process.env.DB_NAME || 'archen_test';
 const DB_TYPE = process.env.DB_TYPE || 'sqlite3';

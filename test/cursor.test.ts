@@ -1,4 +1,4 @@
-import { Schema } from 'datalink';
+import { Schema } from 'sqlit';
 
 import {
   cursorQuery,

@@ -39,7 +39,7 @@ import {
   NULL,
   SOME,
   NONE
-} from 'datalink';
+} from 'sqlit';
 
 import { Accessor } from './accessor';
 

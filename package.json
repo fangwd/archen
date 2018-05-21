@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Archen - Add GraphQL API to your existing applications",
   "main": "./dist/index.js",
   "files": [
@@ -16,9 +16,9 @@
   "author": "Weidong Fang",
   "license": "MIT",
   "dependencies": {
-    "sqlit": ">=1.0.1",
     "dataloader": "^1.4.0",
-    "graphql": "^0.13.1"
+    "graphql": "^0.13.1",
+    "sqlit": ">=1.0.2"
   },
   "repository": {
     "type": "git",
