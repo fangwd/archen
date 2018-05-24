@@ -69,9 +69,9 @@ export class Accessor {
     const table = this.db.table(field.model);
 
     const loader = new DataLoader<Value, Row | Row[]>((keys: Value[]) => {
-      const where = Object.assign(key.where || {}, { [field.name]: keys });
-      const options = Object.assign(key || {}, { where });
-      return this.before('SELECT', table, options).then(options =>
+      const where = Object.assign({}, key.where || {}, { [field.name]: keys });
+      const options = Object.assign({}, key || {}, { where });
+      return this.before('SELECT', table, options).then((options) =>
         table.select('*', options).then(rows =>
           this.after('SELECT', table, { options, rows }).then(result => {
             const rows = result.rows;
