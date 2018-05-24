@@ -55,12 +55,16 @@ const app = express();
 
 app.get('/', (req, res) => res.send('Hello World!'));
 
+app.use(function(req, res, next) {
+  req.loader = archen.getAccessor();
+  next();
+});
+
 app.use(
   '/graphql',
   graphqlHTTP((request, response, params) => ({
     schema: archen.graphql.getSchema(),
     rootValue: archen.graphql.getRootValue(),
-    context: { loader: archen.getAccessor() },
     pretty: false,
     graphiql: true,
     formatError: error => ({

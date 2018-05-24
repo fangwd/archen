@@ -71,7 +71,7 @@ export class Accessor {
     const loader = new DataLoader<Value, Row | Row[]>((keys: Value[]) => {
       const where = Object.assign(key.where || {}, { [field.name]: keys });
       const options = Object.assign(key || {}, { where });
-      return this.before('SELECT', table, options).then(() =>
+      return this.before('SELECT', table, options).then(options =>
         table.select('*', options).then(rows =>
           this.after('SELECT', table, { options, rows }).then(result => {
             const rows = result.rows;
@@ -296,6 +296,14 @@ export class Accessor {
   }
 
   before(event, table: Table | Model, data): Promise<any> {
+    if (Array.isArray(data)) {
+      data = [...data];
+    } else if (data && typeof data === 'object') {
+      data = { ...data };
+      if (data.where) {
+        data.where = JSON.parse(JSON.stringify(data.where));
+      }
+    }
     return this.runCallback(this.options.callbacks.onQuery, event, table, data);
   }
 
