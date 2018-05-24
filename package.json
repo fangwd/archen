@@ -1,9 +1,14 @@
 {
   "name": "archen",
-  "version": "1.1.3",
+  "version": "1.1.5",
   "description": "Archen - Add GraphQL API to your existing applications",
   "main": "./dist/index.js",
-  "files": ["dist", "LICENSE", "package.json", "README.md"],
+  "files": [
+    "dist",
+    "LICENSE",
+    "package.json",
+    "README.md"
+  ],
   "author": "Weidong Fang",
   "license": "MIT",
   "dependencies": {
@@ -35,9 +40,18 @@
       "^.+\\.tsx?$": "ts-jest"
     },
     "testRegex": "/test/.+\\.test.ts",
-    "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ],
     "collectCoverage": false,
-    "collectCoverageFrom": ["src/**/*.ts"],
+    "collectCoverageFrom": [
+      "src/**/*.ts"
+    ],
     "verbose": true
   }
 }
