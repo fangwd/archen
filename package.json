@@ -12,7 +12,7 @@
     "express-graphql": "^0.6.12",
     "graphql": "^0.13.1",
     "mysql": "^2.15.0",
-    "sqlit": ">=1.0.2"
+    "sqlit": ">=1.1.0"
   },
   "repository": {
     "type": "git",
@@ -37,7 +37,7 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "/test/twe\\.test.ts",
+    "testRegex": "/test/.+\\.test.ts",
     "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
     "collectCoverage": false,
     "collectCoverageFrom": ["src/**/*.ts"],
