@@ -60,7 +60,7 @@ test('onQuery - filter', done => {
     options.where = {
       and: [options.where, { firstName: 'Alice' }]
     };
-    return true;
+    return options;
   };
 
   getAliceBob({ onQuery }).then(rows => {
