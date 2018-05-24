@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Archen - Add GraphQL API to your existing applications",
   "main": "./dist/index.js",
   "files": [
@@ -17,7 +17,10 @@
   "license": "MIT",
   "dependencies": {
     "dataloader": "^1.4.0",
+    "express": "^4.16.3",
+    "express-graphql": "^0.6.12",
     "graphql": "^0.13.1",
+    "mysql": "^2.15.0",
     "sqlit": ">=1.0.2"
   },
   "repository": {
@@ -43,7 +46,7 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "/test/.+\\.test.ts",
+    "testRegex": "/test/twe\\.test.ts",
     "moduleFileExtensions": [
       "ts",
       "tsx",
