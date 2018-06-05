@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Archen - Add GraphQL API to your existing applications",
   "main": "./dist/index.js",
   "files": [
