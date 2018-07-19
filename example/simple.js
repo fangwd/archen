@@ -33,6 +33,6 @@ archen.getSchemaInfo().then(() => {
   }`;
 
   graphql(schema, query, rootValue, { accessor }).then(response => {
-    console.log(response);
+    console.log(JSON.stringify(response, null, 2));
   });
 });
