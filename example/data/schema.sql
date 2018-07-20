@@ -114,7 +114,7 @@ create table `store_product` (
   store_id integer,
   product_id integer,
   price float,
-  constraint unique (store_id, product_id),
+  unique (store_id, product_id),
   foreign key (store_id) references store(id),
   foreign key (product_id) references product(id)
 );

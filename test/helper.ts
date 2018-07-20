@@ -17,6 +17,9 @@ const DB_TYPE = process.env.DB_TYPE || 'sqlite3';
 const SCHEMA = fs.readFileSync('example/data/schema.sql').toString();
 const DATA = fs.readFileSync('example/data/data.sql').toString();
 
+// increase the default jasmine timeout interval (5s)
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 100000;
+
 function createSQLite3Database(name): Promise<void> {
   const sqlite3 = require('sqlite3');
   const filename = `${DB_NAME}_${name}.db`;
@@ -69,8 +72,9 @@ function dropSQLite3Database(name): Promise<void> {
 }
 
 function createSQLite3Connection(name: string): Connection {
+  const sqlite3 = require('sqlite3');
   const filename = `${DB_NAME}_${name}.db`;
-  return createConnection('sqlite3', { filename });
+  return new sqlite3.Database(filename, sqlite3.OPEN_READWRITE);
 }
 
 function createMySQLDatabase(name: string, data = true): Promise<any> {
@@ -162,19 +166,19 @@ export function getExampleData() {
 }
 
 export function createDatabase(name: string, data = true): Promise<any> {
-  return process.env.DB_TYPE === 'mysql'
+  return DB_TYPE === 'mysql'
     ? createMySQLDatabase(name, data)
     : createSQLite3Database(name);
 }
 
 export function dropDatabase(name: string): Promise<any> {
-  return process.env.DB_TYPE === 'mysql'
+  return DB_TYPE === 'mysql'
     ? dropMySQLDatabase(name)
     : dropSQLite3Database(name);
 }
 
 export function createTestConnection(name: string): Connection {
-  return process.env.DB_TYPE === 'mysql'
+  return DB_TYPE === 'mysql'
     ? createMySQLConnection(name)
     : createSQLite3Connection(name);
 }
@@ -195,6 +199,7 @@ export function connectToDatabase(name: string, schema?: Schema): Database {
   if (!schema) {
     schema = new Schema(getExampleData());
   }
+  // TODO: add support for sqlite3
   const pool = createTestConnectionPool(name);
   return new Database(pool, schema);
 }
