@@ -217,7 +217,11 @@ export class GraphQLSchemaBuilder {
           for (const op of [SOME, NONE]) {
             const name = field.name + '_' + op;
             filterInputFieldsMap[model.name][name] = {
-              type: this.filterInputTypeMapEx[model.name][field.name]
+              type: field.throughField
+                ? this.filterInputTypeMap[
+                    field.throughField.referencedField.model.name
+                  ]
+                : this.filterInputTypeMapEx[model.name][field.name]
             };
           }
         }
