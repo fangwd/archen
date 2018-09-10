@@ -672,7 +672,7 @@ export class GraphQLSchemaBuilder {
             fields() {
               return {
                 data: { type: updateFields },
-                where: { type: connectType }
+                where: { type: filterType }
               };
             }
           });
