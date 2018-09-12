@@ -517,9 +517,10 @@ function createRelatedFieldData() {
   // [0, 1, 2], [2, 3, 4]
   for (let i = 0; i < 2; i++) {
     for (let j = 0; j < 3; j++) {
-      db
-        .table('user_group')
-        .append({ user: users[i * 2 + j], group: groups[i] });
+      db.table('user_group').append({
+        user: users[i * 2 + j],
+        group: groups[i]
+      });
     }
   }
 
