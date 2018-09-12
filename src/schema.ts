@@ -87,7 +87,7 @@ export interface SchemaBuilderOptions {
 }
 
 const DEFAULT_OPTIONS = {
-  getAccessor: context => context.accessor
+  getAccessor: context => context
 };
 
 export class GraphQLSchemaBuilder {

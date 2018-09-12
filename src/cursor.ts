@@ -115,9 +115,8 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
     table.select('*', selectOptions, builder).then(rows => {
       const keys = orderBy.map(s => s.split(/\s+/)[0].replace(/\./g, '__'));
       return rows.map(row => {
-        const doc = toDocument(row, model);
-        doc.__cursor = encodeCursor(keys.map(key => row[key]));
-        return doc;
+        row.__cursor = encodeCursor(keys.map(key => row[key]));
+        return row;
       });
     })
   ];
