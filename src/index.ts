@@ -13,8 +13,6 @@ import {
   createConnectionPool
 } from 'sqlit';
 
-import { GraphQLSchema } from 'graphql';
-
 export interface ArchenConfig {
   database: {
     dialect: string;

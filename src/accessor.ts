@@ -1,9 +1,7 @@
 import DataLoader = require('dataloader');
 
 import {
-  Schema,
   Model,
-  SimpleField,
   ForeignKeyField,
   Field,
   RelatedField,
@@ -12,10 +10,8 @@ import {
   Document,
   Filter,
   SelectOptions,
-  ConnectionPool,
   Row,
-  Value,
-  QueryBuilder
+  Value
 } from 'sqlit';
 
 import { cursorQuery } from './cursor';
