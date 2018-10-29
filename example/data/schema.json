@@ -50,6 +50,30 @@
             ]
         },
         {
+            "name": "user_profile",
+            "columns": [
+                {
+                    "name": "user_id",
+                    "type": "integer",
+                    "nullable": false
+                }
+            ],
+            "constraints": [
+                {
+                    "columns": [
+                        "user_id"
+                    ],
+                    "references": {
+                        "table": "user",
+                        "columns": [
+                            "id"
+                        ]
+                    },
+                    "primaryKey": true
+                }
+            ]
+        },
+        {
             "name": "group",
             "columns": [
                 {

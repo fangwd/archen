@@ -6,6 +6,11 @@ create table user (
   status int
 );
 
+create table `user_profile` (
+  user_id integer primary key,
+  foreign key (user_id) references `user`(id)
+);
+
 create table `group` (
   id integer primary key auto_increment,
   name varchar(200) unique
