@@ -13,8 +13,7 @@ import {
   GraphQLSchema,
   GraphQLFieldConfigMap,
   SelectionSetNode,
-  GraphQLResolveInfo,
-  printSchema
+  GraphQLResolveInfo
 } from 'graphql';
 
 import {
@@ -24,8 +23,6 @@ import {
   ForeignKeyField,
   RelatedField,
   Field,
-  SchemaConfig,
-  toPascalCase,
   AND,
   OR,
   NOT,
@@ -108,6 +105,8 @@ export class GraphQLSchemaBuilder {
   constructor(domain: Schema, options?: SchemaBuilderOptions) {
     this.domain = domain;
     this.options = Object.assign({}, DEFAULT_OPTIONS, options);
+
+    createDummyFields(domain);
 
     this.createFilterInputTypes();
     this.createModelTypes();
@@ -423,7 +422,7 @@ export class GraphQLSchemaBuilder {
               type,
               args: {
                 where: { type: filterInputTypeMapEx[model.name][field.name] },
-                ...QueryOptions
+                ...(related.isUnique() ? {} : QueryOptions)
               },
               resolve(object, args, acc) {
                 return self
@@ -609,8 +608,6 @@ export class GraphQLSchemaBuilder {
       });
       inputTypesUpdateParent[model.name] = inputType;
     }
-
-    const inputFieldsConnectMap = this.inputFieldsConnectMap;
 
     for (const model of this.domain.models) {
       inputFieldsCreate[model.name] = {};
@@ -866,10 +863,6 @@ function getUpdateParentTypeName(model: Model) {
   return `Upsert${model.name}ParentInput`;
 }
 
-function getConnectChildTypeName(field: RelatedField): string {
-  return `Connect${field.getPascalName()}Input`;
-}
-
 function getCreateChildTypeName(field: RelatedField, one?: string): string {
   return `Create${one || ''}${field.getPascalName()}Input`;
 }
@@ -978,4 +971,18 @@ export function hasOnly(object: object, key: string): boolean {
     }
   }
   return false;
+}
+
+// Workaround for 'Type XX must define one or more fields'
+function createDummyFields(schema: Schema) {
+  for (const model of schema.models) {
+    if (model.fields.length === 1) {
+      const field = model.fields[0];
+      if (field instanceof ForeignKeyField) {
+        const column = { name: 'dummy', type: 'boolean', nullable: true };
+        const field = new SimpleField(model, column, {});
+        model.fields.push(field);
+      }
+    }
+  }
 }
