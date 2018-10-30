@@ -49,6 +49,11 @@ export class Archen {
     return this.getConnection(connectionInfo).then(connection => {
       const name = this.getDatabaseName(connectionInfo);
       return getInformationSchema(connection, name).then(schemaInfo => {
+        if (connectionInfo) {
+          for (const key in connectionInfo) {
+            this.config.database[key] = connectionInfo[key];
+          }
+        }
         this.config.database.schemaInfo = schemaInfo;
         this.buildGraphQLSchema();
         connection.release();
