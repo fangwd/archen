@@ -138,7 +138,7 @@ export class GraphQLSchemaBuilder {
       for (const field of model.fields) {
         if (field instanceof SimpleField) {
           if (!(field instanceof ForeignKeyField)) {
-            const type = getType(field.column.type);
+            const type = getType(field);
             filterInputFields[field.name] = { type: type };
             for (const op of [LT, LE, GE, GT, NE]) {
               const name = field.name + '_' + op;
@@ -363,7 +363,7 @@ export class GraphQLSchemaBuilder {
           };
         } else if (field instanceof SimpleField) {
           modelFields[field.name] = {
-            type: getType(field.column.type)
+            type: getType(field)
           };
         } else if (field instanceof RelatedField) {
           const relatedField = field as RelatedField;
@@ -625,7 +625,7 @@ export class GraphQLSchemaBuilder {
             type: getInputType(field)
           };
           inputFieldsUpdate[model.name][field.name] = {
-            type: getType(field.column.type)
+            type: getType(field)
           };
         } else if (field instanceof RelatedField) {
           let connectType, filterType;
@@ -883,10 +883,11 @@ function getUpsertChildTypeName(field: RelatedField): string {
   return `Upsert${field.getPascalName()}Input`;
 }
 
-function getType(type: string): GraphQLScalarType {
+function getType(field: SimpleField): GraphQLScalarType {
+  const type = field.config.userType || field.column.type;
   if (/char|text/i.test(type)) {
     return GraphQLString;
-  } else if (/^(big|long)?(int|long)/i.test(type)) {
+  } else if (/^(big|long|tiny)?(int|long)/i.test(type)) {
     return GraphQLInt;
   } else if (/float|double/i.test(type)) {
     return GraphQLFloat;
@@ -897,7 +898,7 @@ function getType(type: string): GraphQLScalarType {
 }
 
 function getInputType(field: SimpleField): GraphQLInputType {
-  const type = getType(field.column.type);
+  const type = getType(field);
   return field.column.nullable || field.column.autoIncrement
     ? type
     : new GraphQLNonNull(type);
