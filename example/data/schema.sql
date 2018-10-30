@@ -79,6 +79,7 @@ create table `order` (
   date_created datetime default current_timestamp,
   user_id integer default null,
   delivery_address_id integer default null,
+  is_deleted tinyint default 0,
   status int,
   foreign key (delivery_address_id) references delivery_address(id),
   foreign key (user_id) references user(id)

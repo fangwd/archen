@@ -487,6 +487,13 @@
                     "nullable": true
                 },
                 {
+                    "name": "is_deleted",
+                    "type": "tinyint",
+                    "nullable": true,
+                    "default": "0",
+                    "default_quotable": true
+                },
+                {
                     "name": "status",
                     "type": "int",
                     "nullable": true
