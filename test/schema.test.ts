@@ -674,6 +674,51 @@ mutation{
     });
 });
 
+test('user field type', done => {
+  expect.assertions(2);
+
+  const data = `
+mutation {
+  updateOrder(data: { isDeleted: true }, where: { id: 1 }) {
+    id
+    isDeleted
+  }
+}
+`;
+
+  const config = {
+    models: [
+      {
+        table: 'order',
+        fields: [
+          {
+            column: 'is_deleted',
+            userType: 'boolean'
+          }
+        ]
+      }
+    ]
+  };
+
+  const archen = createArchen(config);
+
+  graphql
+    .graphql(archen.schema, data, archen.rootValue, archen.accessor)
+    .then(row => {
+      const order = row.data.updateOrder;
+      expect(order.isDeleted).toBe(true);
+      const data2 = data.replace(/\btrue\b/, 'false');
+      console.log(data2);
+      graphql
+        .graphql(archen.schema, data2, archen.rootValue, archen.accessor)
+        .then(row => {
+          const order = row.data.updateOrder;
+          expect(order.isDeleted).toBe(false);
+          done();
+        });
+    });
+});
+
 function createArchen(config?: SchemaConfig) {
   const domain = new Schema(data, config);
   const db = helper.connectToDatabase(NAME);
