@@ -5,46 +5,45 @@ const getopt = require('sqlit/lib/getopt');
 
 const options = getopt(
   [
+    ['  ', '--config'],
     ['  ', '--dialect'],
     ['-h', '--host'],
     ['-u', '--user'],
     ['-p', '--password'],
     ['  ', '--database'],
     ['  ', '--listen'],
-    ['  ', '--export-graphql-schema']
+    ['  ', '--exportGraphqlSchema'],
+    ['  ', '--urlPath']
   ],
   {
     dialect: 'mysql',
     host: 'localhost',
     user: 'root',
     password: 'secret',
-    database: 'example',
-    listen: 3000
+    database: 'example'
   }
 );
 
-if (options.listen) {
+async function main() {
+  const archen = new Archen(getArchenConfig(options));
+
+  await archen.getSchemaInfo();
+
+  if (options.listen) {
+    startGraphqlServer(archen, options);
+  } else if (options.exportGraphqlSchema) {
+    require('fs').writeFileSync(
+      options.exportGraphqlSchema,
+      require('graphql').printSchema(archen.graphql.getSchema())
+    );
+    process.exit();
+  }
+}
+
+function startGraphqlServer(archen, options) {
   const express = require('express');
   const graphqlHTTP = require('express-graphql');
 
-  const config = {
-    database: {
-      dialect: options.dialect,
-      connection: {
-        host: options.host,
-        user: options.user,
-        password: options.password,
-        database: options.database,
-        timezone: 'Z',
-        connectionLimit: 2
-      }
-    },
-    graphql: {
-      getAccessor: context => context.loader
-    }
-  };
-
-  const archen = new Archen(config);
   const app = express();
 
   app.get('/', (req, res) => res.send('Hello World!'));
@@ -55,8 +54,7 @@ if (options.listen) {
   });
 
   app.use(
-    '/graphql',
-
+    options.urlPath || '/graphql',
     graphqlHTTP((request, response, params) => ({
       schema: archen.graphql.getSchema(),
       rootValue: archen.graphql.getRootValue(),
@@ -71,13 +69,28 @@ if (options.listen) {
     }))
   );
 
-  archen.getSchemaInfo().then(() => {
-    app.listen(options.listen);
-    if (options.exportGraphqlSchema) {
-      require('fs').writeFileSync(
-        options.exportGraphqlSchema,
-        require('graphql').printSchema(archen.graphql.getSchema())
-      );
-    }
-  });
+  app.listen(options.listen);
 }
+
+function getArchenConfig(options) {
+  return options.config
+    ? require(require('path').resolve(process.cwd(), options.config))
+    : {
+        database: {
+          dialect: options.dialect,
+          connection: {
+            host: options.host,
+            user: options.user,
+            password: options.password,
+            database: options.database,
+            timezone: 'Z',
+            connectionLimit: 2
+          }
+        },
+        graphql: {
+          getAccessor: context => context.loader
+        }
+      };
+}
+
+main();
