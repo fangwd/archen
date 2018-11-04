@@ -217,6 +217,16 @@ export class Accessor {
     );
   }
 
+  updateMany(model: Model, data: Document, filter: Filter) {
+    return this.before('UPDATE', model, { data, filter }).then(result =>
+      this.db
+        .table(model)
+        .update(result.data, result.filter)
+        .then(row => this.after('UPDATE', model, { data, filter, row }))
+        .then(result => result.row)
+    );
+  }
+
   upsert(model: Model, create: Document, update: Document) {
     return this.before('UPSERT', model, { create, update }).then(result =>
       this.db
@@ -243,6 +253,16 @@ export class Accessor {
             )
           );
       })
+    );
+  }
+
+  deleteMany(model: Model, filter: Filter) {
+    const table = this.db.table(model);
+    return this.before('DELETE', table, { filter }).then(result =>
+      table
+        .delete(result.filter)
+        .then(result => this.after('DELETE', table, { filter, result }))
+        .then(result => result.result)
     );
   }
 

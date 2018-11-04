@@ -39,8 +39,8 @@ import {
 } from 'sqlit';
 
 import { Accessor } from './accessor';
-
 import { firstOf } from './misc';
+import { toPascalCase } from 'sqlit';
 
 interface ObjectTypeMap {
   [key: string]: GraphQLObjectType;
@@ -80,10 +80,12 @@ const PageInfoType = new GraphQLObjectType({
 });
 
 export interface SchemaBuilderOptions {
+  useWhereForGetOne?: boolean;
   getAccessor: (any) => Accessor;
 }
 
 const DEFAULT_OPTIONS = {
+  useWhereForGetOne: false,
   getAccessor: context => context
 };
 
@@ -527,11 +529,16 @@ export class GraphQLSchemaBuilder {
       const name = model.name.charAt(0).toLowerCase() + model.name.slice(1);
       queryFields[name] = {
         type: this.modelTypeMap[model.name],
-        args: { where: { type: this.inputTypesConnect[model.name] } }
+        args: this.options.useWhereForGetOne
+          ? { where: { type: this.inputTypesConnect[model.name] } }
+          : this.inputTypesConnect[model.name].getFields()
       };
 
       this.rootValue[name] = (args, acc) => {
-        return this.getAccessor(acc).get(model, args.where);
+        return this.getAccessor(acc).get(
+          model,
+          this.options.useWhereForGetOne ? args.where : args
+        );
       };
     }
 
@@ -775,6 +782,16 @@ export class GraphQLSchemaBuilder {
       };
     }
 
+    const databaseQueryResultType = new GraphQLObjectType({
+      name: 'DatabaseQueryResultType',
+      fields(): GraphQLFieldConfigMap<any, Accessor> {
+        return {
+          affectedRows: { type: GraphQLInt },
+          changedRows: { type: GraphQLInt }
+        };
+      }
+    });
+
     for (const model of this.domain.models) {
       const name = 'update' + model.name;
       mutationFields[name] = {
@@ -786,6 +803,20 @@ export class GraphQLSchemaBuilder {
       };
       this.rootValue[name] = (args, acc) => {
         return this.getAccessor(acc).update(model, args.data, args.where);
+      };
+    }
+
+    for (const model of this.domain.models) {
+      const name = 'update' + toPascalCase(model.pluralName);
+      mutationFields[name] = {
+        type: databaseQueryResultType,
+        args: {
+          where: { type: this.filterInputTypeMap[model.name] },
+          data: { type: inputTypesUpdate[model.name] }
+        }
+      };
+      this.rootValue[name] = (args, acc) => {
+        return this.getAccessor(acc).updateMany(model, args.data, args.where);
       };
     }
 
@@ -804,12 +835,28 @@ export class GraphQLSchemaBuilder {
       const name = 'delete' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
-        args: {
-          where: { type: this.inputTypesConnect[model.name] }
-        }
+        args: this.options.useWhereForGetOne
+          ? {
+              where: { type: this.inputTypesConnect[model.name] }
+            }
+          : this.inputTypesConnect[model.name].getFields()
       };
       this.rootValue[name] = (args, acc) => {
-        return this.getAccessor(acc).delete(model, args.where);
+        return this.getAccessor(acc).delete(
+          model,
+          this.options.useWhereForGetOne ? args.where : args
+        );
+      };
+    }
+
+    for (const model of this.domain.models) {
+      const name = 'delete' + toPascalCase(model.pluralName);
+      mutationFields[name] = {
+        type: databaseQueryResultType,
+        args: this.filterInputTypeMap[model.name].getFields()
+      };
+      this.rootValue[name] = (args, acc) => {
+        return this.getAccessor(acc).deleteMany(model, args);
       };
     }
 

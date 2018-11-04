@@ -17,7 +17,7 @@ export interface ArchenConfig {
   database: {
     dialect: string;
     connection: any;
-    schemaInfo: SchemaInfo;
+    schemaInfo?: SchemaInfo;
   };
   schema?: SchemaConfig;
   accessor?: AccessorOptions;
