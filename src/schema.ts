@@ -13,7 +13,8 @@ import {
   GraphQLSchema,
   GraphQLFieldConfigMap,
   SelectionSetNode,
-  GraphQLResolveInfo
+  GraphQLResolveInfo,
+  ResponsePath
 } from 'graphql';
 
 import {
@@ -350,11 +351,13 @@ export class GraphQLSchemaBuilder {
             resolve(obj, args, acc, info) {
               if (obj[field.name] === null) return null;
               const keyField = field.referencedField.model.keyField();
-              const fields = getQueryFields(info);
-              if (hasOnly(fields[field.name], keyField.name)) {
+              const fields = getQueryFields(
+                info,
+                info.fieldNodes[0].selectionSet
+              );
+              if (hasOnly(fields, keyField.name)) {
                 return obj[field.name];
               }
-              const key = field.referencedField.model.keyField().name;
               return self
                 .getAccessor(acc)
                 .load(
@@ -981,7 +984,10 @@ function getFieldsExclude(
   return fields;
 }
 
-export function getQueryFields(info: GraphQLResolveInfo) {
+export function getQueryFields(
+  info: GraphQLResolveInfo,
+  selectionSet?: SelectionSetNode
+) {
   function __getFields(selectionSet: SelectionSetNode, object = {}) {
     for (const selection of selectionSet.selections) {
       if (selection.kind === 'Field') {
@@ -999,7 +1005,7 @@ export function getQueryFields(info: GraphQLResolveInfo) {
     }
     return object;
   }
-  return __getFields(info.operation.selectionSet);
+  return __getFields(selectionSet || info.operation.selectionSet);
 }
 
 export function isEmpty(value: any) {
