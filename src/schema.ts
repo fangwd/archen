@@ -13,8 +13,7 @@ import {
   GraphQLSchema,
   GraphQLFieldConfigMap,
   SelectionSetNode,
-  GraphQLResolveInfo,
-  ResponsePath
+  GraphQLResolveInfo
 } from 'graphql';
 
 import {
@@ -380,12 +379,17 @@ export class GraphQLSchemaBuilder {
                 where: { type: this.filterInputTypeMap[referenced.model.name] },
                 ...QueryOptions
               },
-              resolve(obj, args, acc) {
+              resolve(obj, args, acc, info) {
+                const fields = getQueryFields(
+                  info,
+                  info.fieldNodes[0].selectionSet
+                );
                 return self
                   .getAccessor(acc)
                   .load(
                     { field: relatedField, ...args },
-                    obj[model.keyField().name]
+                    obj[model.keyField().name],
+                    fields
                   );
               }
             };

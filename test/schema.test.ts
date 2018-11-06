@@ -708,7 +708,6 @@ mutation {
       const order = row.data.updateOrder;
       expect(order.isDeleted).toBe(true);
       const data2 = data.replace(/\btrue\b/, 'false');
-      console.log(data2);
       graphql
         .graphql(archen.schema, data2, archen.rootValue, archen.accessor)
         .then(row => {

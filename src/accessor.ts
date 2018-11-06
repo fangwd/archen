@@ -15,6 +15,7 @@ import {
 } from 'sqlit';
 
 import { cursorQuery } from './cursor';
+import { hasOnly } from './schema';
 
 interface LoaderEntry {
   key: LoaderKey;
@@ -96,7 +97,7 @@ export class Accessor {
     return loader;
   }
 
-  getLoaderRelated(key: LoaderKey) {
+  getLoaderRelated(key: LoaderKey, fields: Document) {
     const keyCode = encodeLoaderKey(key);
 
     let entry = this.loaderMap[keyCode];
@@ -117,6 +118,14 @@ export class Accessor {
             const K1 = field.referencingField.name;
             const K2 = field.throughField.name;
             const K3 = field.throughField.referencedField.model.keyField().name;
+
+            if (hasOnly(fields, K3)) {
+              return keys.map(key =>
+                result.rows
+                  .filter(row => row[K1][K0] == key)
+                  .map(row => row[K2])
+              );
+            }
 
             const keySet = new Set(rows.map(row => row[K2][K3]));
 
@@ -188,10 +197,10 @@ export class Accessor {
     );
   }
 
-  load(key: LoaderKey, value: Value) {
+  load(key: LoaderKey, value: Value, fields?: Document) {
     let loader;
     if (key.field instanceof RelatedField) {
-      loader = this.getLoaderRelated(key);
+      loader = this.getLoaderRelated(key, fields);
     } else {
       loader = this.getLoader(key);
     }
