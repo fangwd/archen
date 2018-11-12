@@ -26,6 +26,8 @@ export interface ArchenConfig {
 
 type ConnectionMap = { [key: string]: ConnectionPool };
 
+const EMPTY_DATABASE = { dialect: '', connection: null };
+
 export class Archen {
   config: ArchenConfig;
   schema: Schema;
@@ -34,13 +36,15 @@ export class Archen {
   private connectionMap: ConnectionMap = {};
 
   constructor(config: ArchenConfig) {
-    this.config = config;
+    this.config = { ...config };
 
-    if (config.database.connection) {
+    this.config.database = { ...(this.config.database || EMPTY_DATABASE) };
+
+    if (this.config.database.connection) {
       this.getConnectionPool(config.database);
     }
 
-    if (config.database.schemaInfo) {
+    if (this.config.database.schemaInfo) {
       this.buildGraphQLSchema();
     }
   }
