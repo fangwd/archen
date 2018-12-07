@@ -114,3 +114,5 @@ function encodeConnectionInfo(connectionInfo: ConnectionInfo): string {
   if (!connectionInfo) throw Error('Empty');
   return JSON.stringify(encodeFilter(connectionInfo.connection));
 }
+
+export { Accessor };
