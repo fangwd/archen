@@ -6,7 +6,8 @@ import {
   Filter,
   toRow,
   Dialect,
-  Value
+  Value,
+  toCamelCase
 } from 'sqlit';
 
 interface FieldInfo {
@@ -110,7 +111,12 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
 
   const promises: Promise<any>[] = [
     table.select('*', selectOptions, builder).then(rows => {
-      const keys = orderBy.map(s => s.split(/\s+/)[0].replace(/\./g, '__'));
+      const keys = orderBy.map(s => {
+        const name = s.split(/\s+/)[0];
+        return name.indexOf('.') === -1
+          ? toCamelCase(name)
+          : name.replace(/\./g, '__');
+      });
       return rows.map(row => {
         row.__cursor = encodeCursor(keys.map(key => row[key]));
         return row;
