@@ -1,7 +1,5 @@
 const fs = require('fs');
 
-require('dotenv').config();
-
 import {
   Connection,
   createConnection,
