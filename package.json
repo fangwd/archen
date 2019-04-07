@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Archen - Add GraphQL API to your existing applications",
   "main": "./dist/index.js",
   "files": [
@@ -15,7 +15,7 @@
   "dependencies": {
     "dataloader": "^1.4.0",
     "graphql": "^0.13.2",
-    "sqlit": "^1.8.1"
+    "sqlit": "^1.9.0"
   },
   "repository": {
     "type": "git",
