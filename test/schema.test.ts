@@ -592,7 +592,7 @@ test('order by', done => {
 {
   orderItems(
       where: { quantity_gt: 1 },
-      orderBy: ["order.code desc", "order.user.email", "quantity"]
+      orderBy: ["-order.code", "order.user.email", "quantity"]
   ) {
     order {
       code

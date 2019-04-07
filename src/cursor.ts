@@ -65,13 +65,12 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
   let desc = '';
   if (options.orderBy) {
     const name = options.orderBy[options.orderBy.length - 1];
-    const parts = name.split(/\s+/);
-    if (parts.length > 1 && /desc/i.test(parts[1])) {
-      desc = ' desc';
+    if (name[0] === '-') {
+      desc = '-';
     }
   }
 
-  let orderBy = model.primaryKey.fields.map(field => field.name + desc);
+  let orderBy = model.primaryKey.fields.map(field => desc + field.name);
 
   if (options.orderBy) {
     orderBy = [...options.orderBy, ...orderBy];
@@ -83,8 +82,8 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
     if (options.cursor) {
       const values = decodeCursor(options.cursor);
       const fields = orderBy.map((entry, index) => {
-        const [path, direction] = entry.split(/\s+/);
-        const desc = direction && /^desc$/i.test(direction);
+        const [path, desc] =
+          entry[0] === '-' ? [entry.substr(1), true] : [entry, false];
         const match = /^(.+)\.([^\.]+)$/.exec(path);
         let alias, field;
         if (match) {
@@ -112,7 +111,7 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
   const promises: Promise<any>[] = [
     table.select('*', selectOptions, builder).then(rows => {
       const keys = orderBy.map(s => {
-        const name = s.split(/\s+/)[0];
+        const name = s.replace(/^-/, '');
         return name.indexOf('.') === -1
           ? toCamelCase(name)
           : name.replace(/\./g, '__');
@@ -143,7 +142,7 @@ export function decodeCursor(cursor) {
 }
 
 export function matchUniqueKey(model: Model, spec: string[]): string[] {
-  const names = spec.map(name => name.split(/\s+/)[0].split('.'));
+  const names = spec.map(name => name.replace(/^-/, '').split('.'));
   const fields = names.map(name => name[0]);
   for (const uniqueKey of model.uniqueKeys) {
     let success = true;

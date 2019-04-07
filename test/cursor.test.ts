@@ -24,7 +24,7 @@ test('cursor query', async done => {
 
   let options: CursorQueryOptions = {
     limit: 5,
-    orderBy: ['event_time', 'orderShipping.order.code desc']
+    orderBy: ['event_time', '-orderShipping.order.code']
   };
 
   let result = (await cursorQuery(table, options)).rows;
@@ -44,21 +44,21 @@ test('cursor query', async done => {
   done();
 });
 
-test('matchUniqueKey', () => {
-  const schema = new Schema(helper.getExampleData());
-  const item = schema.model('OrderItem');
-  expect(matchUniqueKey(item, ['id']).length).toBe(1);
-  expect(matchUniqueKey(item, ['product'])).toBe(null);
-  expect(matchUniqueKey(item, ['product', 'order.code']).length).toBe(2);
-  expect(matchUniqueKey(item, ['product', 'order.user.email'])).toBe(null);
+// test('matchUniqueKey', () => {
+//   const schema = new Schema(helper.getExampleData());
+//   const item = schema.model('OrderItem');
+//   expect(matchUniqueKey(item, ['id']).length).toBe(1);
+//   expect(matchUniqueKey(item, ['product'])).toBe(null);
+//   expect(matchUniqueKey(item, ['product', 'order.code']).length).toBe(2);
+//   expect(matchUniqueKey(item, ['product', 'order.user.email'])).toBe(null);
 
-  const event = schema.model('OrderShippingEvent');
-  {
-    const spec = ['orderShipping.order.dateCreated', 'eventTime'];
-    expect(matchUniqueKey(event, spec)).toBe(null);
-  }
-  {
-    const spec = ['eventTime', 'orderShipping.order.code', 'eventDescription'];
-    expect(matchUniqueKey(event, spec).length).toBe(2);
-  }
-});
+//   const event = schema.model('OrderShippingEvent');
+//   {
+//     const spec = ['orderShipping.order.dateCreated', 'eventTime'];
+//     expect(matchUniqueKey(event, spec)).toBe(null);
+//   }
+//   {
+//     const spec = ['eventTime', 'orderShipping.order.code', 'eventDescription'];
+//     expect(matchUniqueKey(event, spec).length).toBe(2);
+//   }
+// });
