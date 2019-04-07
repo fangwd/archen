@@ -7,6 +7,7 @@ Archen is a simple, flexible and fast GraphQL server for your existing databases
 # Usage
 
 You can try Archen by writing 0 lines of code:
+
 ```
 $ npm install express express-graphql mysql archen
 $ node_modules/archen/bin/archen.js --user root --password secret --database example --listen 3000
@@ -15,6 +16,12 @@ $ node_modules/archen/bin/archen.js --user root --password secret --database exa
 Now you can open a browser and go to http://localhost:3000/graphql to interact with an automatically generated GraphQL server by Archen.
 
 # Development
+
+## To run the tests
+
+```
+DB_USER=root DB_PASS=secret npm run test
+```
 
 ## Logging MySQL queries to file
 
@@ -28,6 +35,7 @@ SET global general_log = 1;
 
 To disable:
 SET global general_log = 0;
+
 ```
 SET global general_log = 0;
 ```
@@ -40,4 +48,3 @@ so to make it work for sqlite3:
 ```
 $ sed 's/\sauto_increment//ig' example/data/schema.sql
 ```
-
