@@ -529,7 +529,8 @@ export class GraphQLSchemaBuilder {
           model,
           args,
           model.pluralName,
-          firstOf(getQueryFields(info))
+          firstOf(getQueryFields(info)),
+          true
         );
       };
 

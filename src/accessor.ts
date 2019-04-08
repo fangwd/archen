@@ -175,11 +175,11 @@ export class Accessor {
   // args: { where, limit, offset, orderBy }
   query(model: Model, options: SelectOptions) {
     const table = this.db.table(model);
-    return this.before('SELECT', table, options).then(options =>
+    return this.before('SELECT', table, options, true).then(options =>
       table
         .select('*', options)
         .then(rows =>
-          this.after('SELECT', table, { rows, ...options }).then(
+          this.after('SELECT', table, { rows, ...options }, true).then(
             result => result.rows
           )
         )
@@ -188,11 +188,13 @@ export class Accessor {
 
   get(model: Model, filter: Document) {
     const table = this.db.table(model);
-    return this.before('GET', table, { filter }).then(result =>
+    return this.before('GET', table, { filter }, true).then(result =>
       table
         .get(result.filter)
         .then(row =>
-          this.after('GET', table, { filter, row }).then(result => result.row)
+          this.after('GET', table, { filter, row }, true).then(
+            result => result.row
+          )
         )
     );
   }
@@ -275,7 +277,7 @@ export class Accessor {
     );
   }
 
-  cursorQuery(model: Model, args, pluralName, fields?) {
+  cursorQuery(model: Model, args, pluralName, fields?, root?: boolean) {
     const table = this.db.table(model);
     const limit = args.first || this.options.defaultLimit;
 
@@ -287,10 +289,10 @@ export class Accessor {
       withTotal: !!(fields || {}).totalCount
     };
 
-    return this.before('SELECT', table, options).then(options =>
+    return this.before('SELECT', table, options, root).then(options =>
       cursorQuery(table, options).then(result => {
         const { rows, totalCount } = result;
-        return this.after('SELECT', table, { rows, ...options }).then(
+        return this.after('SELECT', table, { rows, ...options }, root).then(
           result => {
             let edges = result.rows.map(row => {
               const edge = {
@@ -320,20 +322,33 @@ export class Accessor {
     );
   }
 
-  before(event, table: Table | Model, data): Promise<any> {
-    return this.runCallback(this.options.callbacks.onQuery, event, table, data);
+  before(event, table: Table | Model, data, root?: boolean): Promise<any> {
+    return this.runCallback(
+      this.options.callbacks.onQuery,
+      event,
+      table,
+      data,
+      root
+    );
   }
 
-  after(event, table: Table | Model, data): Promise<any> {
+  after(event, table: Table | Model, data, root?: boolean): Promise<any> {
     return this.runCallback(
       this.options.callbacks.onResult,
       event,
       table,
-      data
+      data,
+      root
     );
   }
 
-  runCallback(callback, event, table: Table | Model, data): Promise<any> {
+  runCallback(
+    callback,
+    event,
+    table: Table | Model,
+    data,
+    root: boolean
+  ): Promise<any> {
     if (table instanceof Model) {
       table = this.db.table(table);
     }
@@ -353,7 +368,8 @@ export class Accessor {
           this.options.callbacks.context,
           event,
           table,
-          data
+          data,
+          root
         );
         if (result instanceof Promise) {
           result.then(__check);
