@@ -288,6 +288,7 @@ export class Accessor {
       cursor: args.after || null,
       withTotal: !!(fields || {}).totalCount
     };
+    console.log(fields);
 
     return this.before('SELECT', table, options, root).then(options =>
       cursorQuery(table, options).then(result => {

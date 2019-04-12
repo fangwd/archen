@@ -516,7 +516,9 @@ export class GraphQLSchemaBuilder {
         return this.getAccessor(acc).query(model, args);
       };
 
-      queryFields[`${model.pluralName}Connection`] = {
+      const fieldName = `${model.pluralName}Connection`;
+
+      queryFields[fieldName] = {
         type: this.connectionTypeMap[model.name],
         args: {
           where: { type: this.filterInputTypeMap[model.name] },
@@ -529,7 +531,7 @@ export class GraphQLSchemaBuilder {
           model,
           args,
           model.pluralName,
-          firstOf(getQueryFields(info)),
+          getQueryFields(info)[fieldName],
           true
         );
       };
