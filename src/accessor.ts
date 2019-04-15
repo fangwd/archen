@@ -5,14 +5,11 @@ import {
   ForeignKeyField,
   Field,
   RelatedField,
-  Database,
-  Table,
   Document,
-  Filter,
-  SelectOptions,
-  Row,
   Value
-} from 'sqlit';
+} from 'sqlex';
+
+import { Database, Table, Filter, SelectOptions, Row } from 'sqlit';
 
 import { cursorQuery } from './cursor';
 import { hasOnly } from './schema';
@@ -288,7 +285,6 @@ export class Accessor {
       cursor: args.after || null,
       withTotal: !!(fields || {}).totalCount
     };
-    console.log(fields);
 
     return this.before('SELECT', table, options, root).then(options =>
       cursorQuery(table, options).then(result => {

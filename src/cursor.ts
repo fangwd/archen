@@ -1,14 +1,5 @@
-import {
-  Model,
-  SimpleField,
-  ForeignKeyField,
-  Table,
-  Filter,
-  toRow,
-  Dialect,
-  Value,
-  toCamelCase
-} from 'sqlit';
+import { Model, SimpleField, ForeignKeyField, Value, toCamelCase } from 'sqlex';
+import { Table, Filter, toRow, Dialect } from 'sqlit';
 
 interface FieldInfo {
   alias: string;
@@ -56,7 +47,7 @@ export interface CursorQueryOptions {
   cursor?: string;
   limit?: number;
   before?: boolean;
-  withTotal: boolean;
+  withTotal?: boolean;
 }
 
 export function cursorQuery(table: Table, options: CursorQueryOptions) {

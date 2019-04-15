@@ -3,8 +3,8 @@ import * as helper from './helper';
 
 import { GraphQLSchemaBuilder } from '../src/schema';
 import { Accessor } from '../src/accessor';
-import { Schema, SchemaConfig, Database } from 'sqlit';
-import { arch } from 'os';
+import { Schema, Database as SchemaConfig } from 'sqlex';
+import { Database } from 'sqlit';
 
 const NAME = 'schema';
 
@@ -648,22 +648,6 @@ mutation{
 `;
 
   const archen = createArchen();
-
-  function _createItems(): Promise<any> {
-    return archen.db
-      .table('order')
-      .insert({ code })
-      .then(order => {
-        return archen.db
-          .table('order_item')
-          .insert({ order, product: 1, quantity: 10 })
-          .then(() => {
-            archen.db
-              .table('order_item')
-              .insert({ order, product: 2, quantity: 20 });
-          });
-      });
-  }
 
   graphql
     .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)

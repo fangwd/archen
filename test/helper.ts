@@ -5,9 +5,10 @@ import {
   createConnection,
   createConnectionPool,
   ConnectionPool,
-  Schema,
   Database
 } from 'sqlit';
+
+import { Schema } from 'sqlex';
 
 const DB_NAME = process.env.DB_NAME || 'archen_test';
 const DB_TYPE = process.env.DB_TYPE || 'sqlite3';

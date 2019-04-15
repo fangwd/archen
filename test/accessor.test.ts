@@ -1,7 +1,7 @@
 import { Accessor, encodeFilter } from '../src/accessor';
 
 import helper = require('./helper');
-import { Schema } from 'sqlit';
+import { Schema } from 'sqlex';
 import { GraphQLSchemaBuilder } from '../src/schema';
 
 import * as graphql from 'graphql';

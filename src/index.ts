@@ -1,10 +1,9 @@
 import { Accessor, AccessorOptions, encodeFilter } from './accessor';
 import { GraphQLSchemaBuilder, SchemaBuilderOptions } from './schema';
+import { Schema, Database as SchemaInfo } from 'sqlex';
+import { Schema as SchemaConfig } from 'sqlex/dist/config';
 
 import {
-  Schema,
-  SchemaInfo,
-  SchemaConfig,
   getInformationSchema,
   Database,
   Connection,
