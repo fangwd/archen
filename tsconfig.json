@@ -5,6 +5,7 @@
     "types": ["node", "graphql", "jest", "mysql"],
     "typeRoots": ["node_modules/@types"],
     "inlineSourceMap": true,
+    "declaration": true,
     "outDir": "dist",
     "lib": ["es6", "esnext.asynciterable"]
   },
