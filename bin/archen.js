@@ -60,7 +60,7 @@ function startGraphqlServer(archen, options) {
       rootValue: archen.graphql.getRootValue(),
       pretty: false,
       graphiql: true,
-      formatError: error => ({
+      customFormatErrorFn: error => ({
         message: error.message,
         locations: error.locations,
         stack: error.stack ? error.stack.split('\n') : [],
