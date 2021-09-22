@@ -175,7 +175,6 @@ function createMySQLDatabase(name: string, data = true): Promise<any> {
    .filter(line => line.trim())
    .map(line => line.replace(/\b(\d+-\d+-\d+)T(\d+:\d+:\d+\.\d+)Z\b/g, '$1 $2'))
   );
-console.log(lines.length)
   return serialise(line => {
     return new Promise((resolve, reject) => {
       db.query(line, (error, results, fields) => {
