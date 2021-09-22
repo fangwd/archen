@@ -3,8 +3,9 @@ import * as helper from './helper';
 
 import { GraphQLSchemaBuilder } from '../src/schema';
 import { Accessor } from '../src/accessor';
-import { Schema, Database as SchemaConfig } from 'sqlex';
-import { Database } from 'sqlit';
+import { Database } from 'sqlex';
+import { Schema as SchemaConfig } from 'sqlex/dist/config';
+import { Schema } from 'sqlex/dist/schema';
 
 const NAME = 'schema';
 
@@ -15,7 +16,7 @@ const data = helper.getExampleData();
 
 test('create schema', () => {
   const { schema } = createSchema(data);
-  require('fs').writeFileSync('schema.graphql', graphql.printSchema(schema));
+  // require('fs').writeFileSync('schema.graphql', graphql.printSchema(schema));
   expect(schema).not.toBe(undefined);
 });
 
@@ -52,6 +53,7 @@ mutation {
           expect(row.id).toBe(user.id);
           expect(row.email).toBe(EMAIL);
           expect(row.status).toBe(STATUS);
+          archen.shutdown();
           done();
         });
     });
@@ -106,8 +108,9 @@ mutation {
         })
         .then(rows => {
           expect(rows.length).toBe(2);
-          expect(rows[0].product.id).toBe(1);
-          expect(rows[1].product.id).toBe(3);
+          expect((rows[0].product as any).id).toBe(1);
+          expect((rows[1].product as any).id).toBe(3);
+          archen.shutdown();
           done();
         });
     });
@@ -136,12 +139,13 @@ mutation {
       code: 'test-002'
     })
     .then(order => {
-      expect(order.user.id).toBe(1);
+      expect((order.user as any).id).toBe(1);
       graphql
         .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
         .then(row => {
           const order = row.data.updateOrder;
           expect(order.user).toBe(null);
+          archen.shutdown();
           done();
         });
     });
@@ -175,6 +179,7 @@ mutation {
     .then(row => {
       const order = row.data.createOrder;
       expect(order.orderShipping.status).toBe(100);
+      archen.shutdown();
       done();
     });
 });
@@ -205,6 +210,7 @@ mutation {
       .then(row => {
         const order = row.data.updateOrder;
         expect(order.orderShipping.status).toBe(200);
+        archen.shutdown();
         done();
       });
   });
@@ -238,6 +244,7 @@ mutation {
     .then(row => {
       const order = row.data.createOrder;
       expect(order.orderShipping.status).toBe(2);
+      archen.shutdown();
       done();
     });
 });
@@ -272,6 +279,7 @@ mutation {
         .then(row => {
           const order = row.data.updateOrder;
           expect(order.orderShipping.status).toBe(STATUS_B);
+          archen.shutdown();
           done();
         });
     });
@@ -306,6 +314,7 @@ mutation {
       .then(row => {
         const order = row.data.updateOrder;
         expect(order.orderShipping.status).toBe(STATUS + 1);
+        archen.shutdown();
         done();
       });
   });
@@ -343,6 +352,7 @@ mutation {
       .then(row => {
         const order = row.data.updateOrder;
         expect(order.orderShipping.status).toBe(300);
+        archen.shutdown();
         done();
       });
   });
@@ -378,6 +388,7 @@ mutation {
     .then(row => {
       const order = row.data.createOrder;
       expect(order.orderShipping.status).toBe(100);
+      archen.shutdown();
       const DATA = `
 mutation {
   updateOrder(
@@ -394,12 +405,13 @@ mutation {
 }
 `;
       // To clear data loader which happens in practice
-      const archen = createArchen();
+      const archen2 = createArchen();
       graphql
-        .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
+        .graphql(archen2.schema, DATA, archen2.rootValue, archen2.accessor)
         .then(row => {
           const order = row.data.updateOrder;
           expect(order.orderShipping).toBe(null);
+          archen2.shutdown();
           done();
         });
     });
@@ -444,6 +456,7 @@ test('many to many #1', done => {
         p => p.categorySet.length > 0
       );
       expect(products.length).toBe(2);
+      archen.shutdown();
       done();
     });
 });
@@ -491,6 +504,7 @@ test('many to many #2', done => {
         p => p.categorySet.length > 0
       );
       expect(products.length).toBe(2);
+      archen.shutdown();
       done();
     });
 });
@@ -553,6 +567,7 @@ mutation {
         expect(p1.quantity).toBe(200);
         const p2 = order.orderItems.find(x => x.product.id === 2);
         expect(p2.quantity).toBe(20);
+        archen.shutdown();
         done();
       });
   });
@@ -579,6 +594,7 @@ mutation {
     .then(row => {
       const order = row.data.updateOrder;
       expect(order.dateCreated).toBe(date);
+      archen.shutdown();
       done();
     });
 });
@@ -622,6 +638,7 @@ test('order by', done => {
         }
       }
       expect(ordered).toBe(true);
+      archen.shutdown();
       done();
     });
 });
@@ -654,6 +671,7 @@ mutation{
     .then(result => {
       const order = result.data.updateOrder;
       expect(order.user.lastName).toBe('updated-last-name');
+      archen.shutdown();
       done();
     });
 });
@@ -697,6 +715,7 @@ mutation {
         .then(row => {
           const order = row.data.updateOrder;
           expect(order.isDeleted).toBe(false);
+          archen.shutdown();
           done();
         });
     });
@@ -708,7 +727,7 @@ function createArchen(config?: SchemaConfig) {
   const accessor = new Accessor(db);
   const { schema, rootValue } = createSchema(domain);
 
-  return { domain, db, accessor, schema, rootValue };
+  return { domain, db, accessor, schema, rootValue, shutdown: () => db.end() };
 }
 
 function createOrderAndShipping(

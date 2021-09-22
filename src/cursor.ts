@@ -1,5 +1,8 @@
-import { Model, SimpleField, ForeignKeyField, Value, toCamelCase } from 'sqlex';
-import { Table, Filter, toRow, Dialect } from 'sqlit';
+import {  Filter, Table } from 'sqlex';
+import { DialectEncoder } from 'sqlex/dist/engine';
+import { ForeignKeyField, Model, SimpleField } from 'sqlex/dist/schema';
+import { Value } from 'sqlex/dist/types';
+import { toCamelCase } from 'sqlex/dist/utils';
 
 interface FieldInfo {
   alias: string;
@@ -9,7 +12,7 @@ interface FieldInfo {
 }
 
 function buildFilter(
-  dialect: Dialect,
+  dialect: DialectEncoder,
   fields: FieldInfo[],
   index: number
 ): string {
@@ -17,23 +20,20 @@ function buildFilter(
   const name = info.field.column.name;
 
   const col = `${dialect.escapeId(info.alias)}.${dialect.escapeId(name)}`;
-  const val = dialect.escape(toRow(info.value, info.field));
+  const val = escapeFieldValue(dialect, info.field, info.value);
   let where;
   if (info.desc) {
-    if (info.value !== null) {
+    if (info.value !== null)
       where = `${col} is null or ${col} < ${val}`;
-    }
-  } else {
-    if (info.value === null) {
-      where = `${col} is not null`;
-    } else {
-      where = `${col} > ${val}`;
-    }
-  }
 
-  if (index + 1 === fields.length) {
+  } else
+    if (info.value === null)
+      where = `${col} is not null`;
+     else
+      where = `${col} > ${val}`;
+
+  if (index + 1 === fields.length)
     return where;
-  }
 
   const next = buildFilter(dialect, fields, index + 1);
   const equal = info.value === null ? `${col} is null` : `${col}=${val}`;
@@ -56,16 +56,15 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
   let desc = '';
   if (options.orderBy) {
     const name = options.orderBy[options.orderBy.length - 1];
-    if (name[0] === '-') {
+    if (name[0] === '-')
       desc = '-';
-    }
+
   }
 
   let orderBy = model.primaryKey.fields.map(field => desc + field.name);
 
-  if (options.orderBy) {
+  if (options.orderBy)
     orderBy = [...options.orderBy, ...orderBy];
-  }
 
   orderBy = matchUniqueKey(model, orderBy);
 
@@ -89,7 +88,7 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
           alias,
           field,
           desc,
-          value: values[index]
+          value: values[index],
         };
       });
       return buildFilter(table.db.pool, fields, 0);
@@ -111,16 +110,15 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
         row.__cursor = encodeCursor(keys.map(key => row[key]));
         return row;
       });
-    })
+    }),
   ];
 
-  if (options.withTotal) {
+  if (options.withTotal)
     promises.push(table.count(selectOptions.where));
-  }
 
   return Promise.all(promises).then(result => ({
     rows: result[0],
-    totalCount: result[1]
+    totalCount: result[1],
   }));
 }
 
@@ -147,8 +145,8 @@ export function matchUniqueKey(model: Model, spec: string[]): string[] {
       if (names[index].length > 1) {
         let key = field as ForeignKeyField;
         for (let i = 1; i < names[index].length; i++) {
-          let model = (key as ForeignKeyField).referencedField.model;
-          let field = model.field(names[index][i]);
+          const model = (key ).referencedField.model;
+          const field = model.field(names[index][i]);
           if (!field.isUnique()) {
             success = false;
             break;
@@ -159,9 +157,20 @@ export function matchUniqueKey(model: Model, spec: string[]): string[] {
       }
       lastIndex = lastIndex < index ? index : lastIndex;
     }
-    if (success) {
+    if (success)
       return spec.slice(0, lastIndex + 1);
-    }
+
   }
   return null;
 }
+
+function escapeFieldValue( dialect: DialectEncoder, field:SimpleField,  value: string | number | boolean | Date): string{
+      if (/int|float|double|number/i.test(field.column.type))
+          return +(value as number) + '';
+
+        if (/date|time/i.test(field.column.type))
+          return dialect.escapeDate(new Date(value as string));
+
+        return dialect.escape(value as string);
+}
+

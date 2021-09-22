@@ -1,5 +1,6 @@
-import { Schema } from 'sqlex';
 
+import { Database } from 'sqlex';
+import { Schema } from 'sqlex/dist/schema';
 import {
   cursorQuery,
   encodeCursor,
@@ -15,12 +16,12 @@ const NAME = 'cursor';
 beforeAll(() => helper.createDatabase(NAME));
 afterAll(() => helper.dropDatabase(NAME));
 
-test('cursor query', async done => {
+test('cursor query', async () => {
   const db = helper.connectToDatabase(NAME);
   const table = db.table('order_shipping_event');
 
   // 5 users, 5 orders each, dated from 1/1/2018, each with 5 events
-  await helper.createOrderShippingEvents(db);
+  await createOrderShippingEvents(db);
 
   let options: CursorQueryOptions = {
     limit: 5,
@@ -30,7 +31,7 @@ test('cursor query', async done => {
   let result = (await cursorQuery(table, options)).rows;
   let cursor = decodeCursor(result.slice(-1)[0].__cursor);
   expect(result.length).toBe(5);
-  expect(cursor[1]).toBe('eve-1');
+  expect(cursor[1].trim()).toBe('eve-1');
   expect(new Date(cursor[0]).getDay()).toBe(1);
 
   options.cursor = encodeCursor(cursor);
@@ -38,10 +39,10 @@ test('cursor query', async done => {
   result = (await cursorQuery(table, options)).rows;
   cursor = decodeCursor(result.slice(-1)[0].__cursor);
 
-  expect(cursor[1]).toBe('david-1');
+  expect(cursor[1].trim()).toBe('david-1');
   expect(new Date(cursor[0]).getDay()).toBe(1);
 
-  done();
+  db.end();
 });
 
 test('matchUniqueKey', () => {
@@ -62,3 +63,48 @@ test('matchUniqueKey', () => {
     expect(matchUniqueKey(event, spec).length).toBe(2);
   }
 });
+
+function createOrderShippingEvents(db: Database) {
+  const users = ['alice', 'bob', 'charlie', 'david', 'eve'].map(name =>
+    db.table('user').append({ email: name, firstName: name })
+  );
+
+  const products = ['apple', 'banana', 'carrot'].map(name =>
+    db.table('product').append({ name, sku: name })
+  );
+
+  for (const user of users) {
+    for (let i = 0; i < 5; i++) {
+      const order = db.table('order').append({
+        user,
+        dateCreated: new Date(2018, 0, i + 1),
+        code: `${user.email}-${i + 1}`,
+        status: i
+      });
+
+      products.forEach((product, index) => {
+        const item = db.table('order_item').append({
+          order,
+          product,
+          quantity: 3 - index
+        });
+      });
+
+      const shipping = db
+        .table('order_shipping')
+        .append({ order, status: 5 - i });
+
+      for (let j = 0; j < 5; j++) {
+        db.table('order_shipping_event').append({
+          orderShipping: shipping,
+          eventTime: new Date(2018, 0, j + 1),
+          eventDescription: `Event for order ${user.email}-${i + 1} #(${j + 1})`
+        });
+      }
+    }
+  }
+
+  const dates = [1, 2, 3, 4, 5].map(day => new Date(2018, 1, day));
+
+  return db.flush();
+}

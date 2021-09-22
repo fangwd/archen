@@ -1,10 +1,10 @@
 import { Accessor, encodeFilter } from '../src/accessor';
 
 import helper = require('./helper');
-import { Schema } from 'sqlex';
 import { GraphQLSchemaBuilder } from '../src/schema';
 
 import * as graphql from 'graphql';
+import { Schema } from 'sqlex/dist/schema';
 
 const NAME = 'accessor';
 
@@ -58,7 +58,7 @@ test('onQuery - true', done => {
 test('onQuery - filter', done => {
   const onQuery = (data, action, table, options) => {
     options.where = {
-      and: [options.where, { firstName: 'Alice' }]
+      and: [options.where, { firstName: 'alice' }]
     };
     return options;
   };
@@ -95,7 +95,7 @@ test('onResult', done => {
         return row;
       });
     return new Promise(resolve => {
-      setTimeout(() => resolve(), 200);
+      setTimeout(() => resolve(undefined), 200);
     });
   };
 
@@ -107,19 +107,7 @@ test('onResult', done => {
   });
 });
 
-function getAliceBob(callbacks) {
-  const db = helper.connectToDatabase(NAME);
-
-  const accessor = new Accessor(db, { callbacks });
-  const field = db.table('user').model.field('email');
-
-  const alice = accessor.load({ field }, 'alice');
-  const bob = accessor.load({ field }, 'bob');
-
-  return Promise.all([alice, bob]);
-}
-
-test('get', async done => {
+test('get', async () => {
   expect.assertions(2);
 
   const options = {
@@ -152,17 +140,15 @@ test('get', async done => {
 
   await accessor.create(model, { email });
 
-  accessor.get(model, { email }).then(async row => {
-    expect(row.fake).toBe(true);
-    await accessor.update(model, { status: 200 }, { email });
-    accessor.get(model, { email }).then(row => {
-      expect(row.status).toBe(500);
-      done();
-    });
-  });
+  const row = await accessor.get(model, { email });
+  expect(row.fake).toBe(true);
+  await accessor.update(model, { status: 200 }, { email });
+  const row2 = await accessor.get(model, { email });
+  expect(row2.status).toBe(500);
+  db.end();
 });
 
-test('query', async done => {
+test('query', async () => {
   const options = {
     callbacks: {
       onQuery: (context, event, table, data) => {
@@ -191,15 +177,14 @@ test('query', async done => {
   const model = db.model('group');
   const accessor = new Accessor(db, options);
 
-  accessor.query(model, { where: { name_like: '%1%' } }).then(async rows => {
-    expect(rows.length).toBe(2);
-    expect(rows[0].name.endsWith('*')).toBe(true);
-    expect(rows[1].name.endsWith('*')).toBe(true);
-    done();
-  });
+  const rows = await accessor.query(model, { where: { name_like: '%1%' } });
+  expect(rows.length).toBe(2);
+  expect(rows[0].name.endsWith('*')).toBe(true);
+  expect(rows[1].name.endsWith('*')).toBe(true);
+  db.end();
 });
 
-test('cursorQuery', async done => {
+test('cursorQuery', async () => {
   const options = {
     callbacks: {
       onQuery: (context, event, table, data) => {
@@ -228,44 +213,13 @@ test('cursorQuery', async done => {
   const model = db.model('group');
   const accessor = new Accessor(db, options);
 
-  accessor
-    .cursorQuery(model, { where: { name_like: '%1%' } }, model.pluralName)
-    .then(async result => {
-      const edges = result.edges;
-      expect(edges.length).toBe(2);
-      expect(edges[0].node.name.endsWith('*')).toBe(true);
-      expect(edges[1].node.name.endsWith('*')).toBe(true);
-      done();
-    });
+  const result = await accessor.cursorQuery(model, { where: { name_like: '%1%' } }, model.pluralName);
+  const edges = result.edges;
+  expect(edges.length).toBe(2);
+  expect(edges[0].node.name.endsWith('*')).toBe(true);
+  expect(edges[1].node.name.endsWith('*')).toBe(true);
+  db.end();
 });
-
-const options = {
-  models: [
-    {
-      table: 'product_category',
-      fields: [
-        {
-          column: 'category_id',
-          throughField: 'product_id'
-        },
-        {
-          column: 'product_id',
-          throughField: 'category_id',
-          relatedName: 'categorySet'
-        }
-      ]
-    },
-    {
-      table: 'user_group',
-      fields: [
-        {
-          column: 'user_id',
-          throughField: 'group_id'
-        }
-      ]
-    }
-  ]
-};
 
 test('related', done => {
   const db = helper.connectToDatabase(NAME);
@@ -337,11 +291,12 @@ test('related', done => {
     ];
     expect(names.length).toBe(1);
     expect(names[0].endsWith('$')).toBe(true);
+    db.end();
     done();
   });
 });
 
-test('create', done => {
+test('create', async () => {
   const options = {
     callbacks: {
       onQuery: (context, event, table, data) => {
@@ -358,14 +313,13 @@ test('create', done => {
   };
   const db = helper.connectToDatabase(NAME);
   const accessor = new Accessor(db, options);
-  accessor.create(db.model('user'), { email: helper.getId() }).then(row => {
-    expect(row.status).toBe(200);
-    expect(row.firstName).toBe('John');
-    done();
-  });
+  const row = await accessor.create(db.model('user'), { email: helper.getId() });
+  expect(row.status).toBe(200);
+  expect(row.firstName).toBe('John');
+  db.end();
 });
 
-test('update', async done => {
+test('update', async () => {
   const options = {
     callbacks: {
       onQuery: (context, event, table, data) => {
@@ -391,19 +345,16 @@ test('update', async done => {
   const model = db.model('user');
 
   const user = await accessor.create(model, { email: helper.getId() });
-  accessor
-    .update(model, { lastName: 'Doe' }, { email: user.email })
-    .then(async row => {
-      expect(row.status).toBe(200);
-      expect(row.firstName).toBe('John');
-      expect(row.lastName).toBe('Doe');
-      const record = await accessor.get(model, { email: user.email });
-      expect(record.firstName).toBe(null);
-      done();
-    });
+  const row = await accessor.update(model, { lastName: 'Doe' }, { email: user.email });
+  expect(row.status).toBe(200);
+  expect(row.firstName).toBe('John');
+  expect(row.lastName).toBe('Doe');
+  const record = await accessor.get(model, { email: user.email });
+  expect(record.firstName).toBe(null);
+  db.end();
 });
 
-test('upsert', async done => {
+test('upsert', async () => {
   expect.assertions(5);
 
   const options = {
@@ -431,33 +382,20 @@ test('upsert', async done => {
 
   const email = helper.getId();
 
-  function _create() {
-    return accessor
-      .upsert(model, { email }, { firstName: 'Jane' })
-      .then(async row => {
-        expect(row.status).toBe(200);
-        expect(row.firstName).toBe('John');
-        const record = await accessor.get(model, { email });
-        expect(record.firstName).toBe(null);
-      });
-  }
+  const row = await accessor.upsert(model, { email }, { firstName: 'Jane' });
+  expect(row.status).toBe(200);
+  expect(row.firstName).toBe('John');
+  const record = await accessor.get(model, { email });
+  expect(record.firstName).toBe(null);
 
-  function _update() {
-    return accessor
-      .upsert(model, { email }, { firstName: 'Jane' })
-      .then(async row => {
-        expect(row.firstName).toBe('John');
-        const record = await accessor.get(model, { email });
-        expect(record.firstName).toBe('Jane');
-      });
-  }
-
-  _create()
-    .then(() => _update())
-    .then(() => done());
+  const row2 = await accessor.upsert(model, { email }, { firstName: 'Jane' });
+  expect(row2.firstName).toBe('John');
+  const record2 = await accessor.get(model, { email });
+  expect(record2.firstName).toBe('Jane');
+  db.end();
 });
 
-test('delete', async done => {
+test('delete', async () => {
   expect.assertions(2);
 
   const options = {
@@ -490,15 +428,27 @@ test('delete', async done => {
 
   await accessor.create(model, { email });
 
-  accessor.delete(model, { email }).then(async row => {
-    expect(row.fake).toBe(true);
-    await accessor.update(model, { status: 200 }, { email });
-    accessor.delete(model, { email }).then(row => {
-      expect(row.status).toBe(500);
-      done();
-    });
-  });
+  const row = await accessor.delete(model, { email });
+  expect(row.fake).toBe(true);
+  await accessor.update(model, { status: 200 }, { email });
+  const row2 = await accessor.delete(model, { email });
+  expect(row2.status).toBe(500);
+  db.end();
 });
+
+async function getAliceBob(callbacks) {
+  const db = helper.connectToDatabase(NAME);
+
+  const accessor = new Accessor(db, { callbacks });
+  const field = db.table('user').model.field('email');
+
+  const alice = accessor.load({ field }, 'alice@example.com');
+  const bob = accessor.load({ field }, 'bob@example.com');
+
+  const result = await Promise.all([alice, bob]);
+  db.end();
+  return result;
+}
 
 function createRelatedFieldData() {
   const schema = new Schema(helper.getExampleData(), options);
@@ -506,7 +456,7 @@ function createRelatedFieldData() {
 
   // 5 users
   const users = ['alice', 'bob', 'charlie', 'david', 'eve'].map(name =>
-    db.table('user').append({ email: name, firstName: name })
+    db.table('user').append({ email: name+'@example.com', firstName: name })
   );
 
   // 3 groups
@@ -536,5 +486,33 @@ function createRelatedFieldData() {
     db.table('user_group').append({ user: users[j], group });
   }
 
-  return db.flush();
+  return db.flush().then(() => db.end())
 }
+
+const options = {
+  models: [
+    {
+      table: 'product_category',
+      fields: [
+        {
+          column: 'category_id',
+          throughField: 'product_id'
+        },
+        {
+          column: 'product_id',
+          throughField: 'category_id',
+          relatedName: 'categorySet'
+        }
+      ]
+    },
+    {
+      table: 'user_group',
+      fields: [
+        {
+          column: 'user_id',
+          throughField: 'group_id'
+        }
+      ]
+    }
+  ]
+};

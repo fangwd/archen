@@ -8,7 +8,7 @@ create table user (
 
 create table `user_profile` (
   user_id integer primary key,
-  foreign key (user_id) references `user`(id)
+  foreign key (user_id) references user(id)
 );
 
 create table `group` (

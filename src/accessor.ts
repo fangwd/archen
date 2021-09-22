@@ -1,15 +1,7 @@
-import DataLoader = require('dataloader');
-
-import {
-  Model,
-  ForeignKeyField,
-  Field,
-  RelatedField,
-  Document,
-  Value
-} from 'sqlex';
-
-import { Database, Table, Filter, SelectOptions, Row } from 'sqlit';
+import * as DataLoader from 'dataloader';
+import { Database, Filter, Row, SelectOptions, Table } from 'sqlex';
+import { Field, ForeignKeyField, Model, RelatedField } from 'sqlex/dist/schema';
+import { Document, Value } from 'sqlex/dist/types';
 
 import { cursorQuery } from './cursor';
 import { hasOnly } from './schema';
@@ -17,13 +9,6 @@ import { hasOnly } from './schema';
 interface LoaderEntry {
   key: LoaderKey;
   loader: DataLoader<Value, Document | Document[]>;
-}
-
-interface ConnectionSelectOptions {
-  orderBy?: [string];
-  after?: string;
-  first?: number;
-  where?: Filter;
 }
 
 type Callback = (context: any, event: string, table: Table, data: any) => any;
@@ -40,7 +25,7 @@ export interface AccessorOptions {
 
 const DEFAULT_OPTIONS = {
   defaultLimit: 100,
-  callbacks: {}
+  callbacks: {},
 };
 export class Accessor {
   db: Database;
@@ -55,7 +40,7 @@ export class Accessor {
 
   getLoader(key: LoaderKey) {
     const keyCode = encodeLoaderKey(key);
-    let entry = this.loaderMap[keyCode];
+    const entry = this.loaderMap[keyCode];
 
     if (entry) return entry.loader;
 
@@ -71,19 +56,19 @@ export class Accessor {
             const rows = result.rows;
             function __equal(row, key) {
               const value = row[field.name];
-              if (field instanceof ForeignKeyField) {
+              if (field instanceof ForeignKeyField)
                 return (
                   value[field.referencedField.model.keyField().name] === key
                 );
-              } else {
+               else
                 return value === key;
-              }
+
             }
-            if (field.isUnique()) {
+            if (field.isUnique())
               return keys.map(k => rows.find(r => __equal(r, k)));
-            } else {
+             else
               return keys.map(k => rows.filter(r => __equal(r, k)));
-            }
+
           })
         )
       );
@@ -97,7 +82,7 @@ export class Accessor {
   getLoaderRelated(key: LoaderKey, fields: Document) {
     const keyCode = encodeLoaderKey(key);
 
-    let entry = this.loaderMap[keyCode];
+    const entry = this.loaderMap[keyCode];
 
     if (entry) return entry.loader;
 
@@ -116,19 +101,18 @@ export class Accessor {
             const K2 = field.throughField.name;
             const K3 = field.throughField.referencedField.model.keyField().name;
 
-            if (hasOnly(fields, K3)) {
+            if (hasOnly(fields, K3))
               return keys.map(key =>
                 result.rows
                   .filter(row => row[K1][K0] == key)
                   .map(row => row[K2])
               );
-            }
 
             const keySet = new Set(rows.map(row => row[K2][K3]));
 
             const options = {
               ...key,
-              where: { [K3]: [...keySet] as string[], ...(key.where || {}) }
+              where: { [K3]: [...keySet] as string[], ...(key.where || {}) },
             };
 
             const table = this.db.table(
@@ -146,12 +130,12 @@ export class Accessor {
                     }, {});
                     const keyMap: any = rows.reduce((map, row) => {
                       const key = row[K1][K0];
-                      if (!map[key]) {
+                      if (!map[key])
                         map[key] = [];
-                      }
-                      if (docMap[row[K2][K3]]) {
+
+                      if (docMap[row[K2][K3]])
                         (map[key] as any[]).push(docMap[row[K2][K3]]);
-                      }
+
                       return map;
                     }, {});
                     return keys.map(key => keyMap[key as string] || []);
@@ -198,11 +182,11 @@ export class Accessor {
 
   load(key: LoaderKey, value: Value, fields?: Document) {
     let loader;
-    if (key.field instanceof RelatedField) {
+    if (key.field instanceof RelatedField)
       loader = this.getLoaderRelated(key, fields);
-    } else {
+     else
       loader = this.getLoader(key);
-    }
+
     return value ? loader.load(value) : null;
   }
 
@@ -283,7 +267,7 @@ export class Accessor {
       orderBy: args.orderBy,
       limit: limit + 1,
       cursor: args.after || null,
-      withTotal: !!(fields || {}).totalCount
+      withTotal: !!(fields || {}).totalCount,
     };
 
     return this.before('SELECT', table, options, root).then(options =>
@@ -294,7 +278,7 @@ export class Accessor {
             let edges = result.rows.map(row => {
               const edge = {
                 node: { ...row },
-                cursor: row.__cursor
+                cursor: row.__cursor,
               };
               delete edge.node.__cursor;
               return edge;
@@ -304,14 +288,14 @@ export class Accessor {
             const pageInfo = {
               startCursor: firstEdge ? firstEdge.cursor : null,
               endCursor: lastEdge ? lastEdge.cursor : null,
-              hasNextPage: edges.length === limit + 1
+              hasNextPage: edges.length === limit + 1,
             };
             edges = edges.length > limit ? edges.slice(0, -1) : edges;
             return {
               totalCount,
               edges,
               pageInfo,
-              [pluralName]: edges.map(edge => edge.node)
+              [pluralName]: edges.map(edge => edge.node),
             };
           }
         );
@@ -346,18 +330,18 @@ export class Accessor {
     data,
     root: boolean
   ): Promise<any> {
-    if (table instanceof Model) {
+    if (table instanceof Model)
       table = this.db.table(table);
-    }
+
     return new Promise((resolve, reject) => {
       if (!callback) return resolve(data);
       try {
         function __check(result) {
-          if (result === false) {
+          if (result === false)
             return reject('Forbidden');
-          } else if (result === undefined) {
+           else if (result === undefined)
             result = data;
-          }
+
           resolve(result);
         }
         const result = callback.call(
@@ -368,11 +352,11 @@ export class Accessor {
           data,
           root
         );
-        if (result instanceof Promise) {
+        if (result instanceof Promise)
           result.then(__check);
-        } else {
+         else
           __check(result);
-        }
+
       } catch (error) {
         reject(error);
       }
@@ -391,14 +375,14 @@ function encodeLoaderKey(key: LoaderKey): string {
     key.where ? encodeFilter(key.where) : null,
     key.orderBy || null,
     key.limit || 0,
-    key.offset || 0
+    key.offset || 0,
   ]);
 }
 
 export function encodeFilter(filter) {
-  if (Array.isArray(filter)) {
+  if (Array.isArray(filter))
     return [0, filter.map(entry => encodeFilter(entry))];
-  }
+
   if (filter && typeof filter === 'object' && !(filter instanceof Date)) {
     const keys = Object.keys(filter).sort();
     return [1, keys.map(key => [key, encodeFilter(filter[key])])];

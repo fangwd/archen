@@ -1,6 +1,6 @@
 {
   "name": "archen",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Archen - Add GraphQL API to your existing applications",
   "main": "./dist/index.js",
   "files": [
@@ -13,46 +13,25 @@
   "author": "Weidong Fang",
   "license": "MIT",
   "dependencies": {
-    "dataloader": "^1.4.0",
-    "graphql": "^0.13.2",
-    "sqlit": "^1.9.5"
+    "dataloader": "^2.0.0",
+    "graphql": "^15.5.3",
+    "sqlex": "^2.4.3"
   },
   "repository": {
     "type": "git",
     "url": "http://github.com/fangwd/archen.git"
   },
   "devDependencies": {
-    "@types/graphql": "^0.12.5",
-    "@types/jest": "^22.2.0",
-    "@types/mysql": "^2.15.4",
-    "@types/node": "^9.4.7",
-    "jest": "^22.4.1",
-    "mysql": "^2.16.0",
-    "ts-jest": "^22.4.1",
-    "typescript": "*"
+    "@types/jest": "^27.0.1",
+    "jest": "^27.2.1",
+    "mysql": "^2.18.1",
+    "pg": "^8.7.1",
+    "sqlite3": "^5.0.2",
+    "ts-jest": "^27.0.5",
+    "typescript": "^4.4.3"
   },
   "scripts": {
-    "test": "DB_TYPE=mysql jest",
+    "test": "jest",
     "build": "tsc"
-  },
-  "jest": {
-    "testURL": "http://localhost/",
-    "transform": {
-      "^.+\\.tsx?$": "ts-jest"
-    },
-    "testRegex": "/test/.+\\.test.ts",
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "jsx",
-      "json",
-      "node"
-    ],
-    "collectCoverage": false,
-    "collectCoverageFrom": [
-      "src/**/*.ts"
-    ],
-    "verbose": false
   }
 }
