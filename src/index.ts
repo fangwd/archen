@@ -1,20 +1,20 @@
-import {
-  Connection,
-  ConnectionInfo,
-  ConnectionPool,
-  createConnectionPool,
-  Database,
-  getInformationSchema,
-} from 'sqlex';
+import { ConnectionInfo, ConnectionPool, Database } from 'sqlex';
 import { Database as SchemaInfo } from 'sqlex/dist/types';
-import { Accessor, AccessorOptions, encodeFilter } from './accessor';
+import { Accessor, AccessorOptions } from './accessor';
 import { GraphQLSchemaBuilder, SchemaBuilderOptions } from './schema';
 import { Schema as SchemaConfig } from 'sqlex/dist/config';
 import { Schema } from 'sqlex/dist/schema';
+import { Maybe } from 'graphql/jsutils/Maybe';
+import {
+  graphql,
+  GraphQLFieldResolver,
+  GraphQLTypeResolver,
+  printError,
+} from 'graphql';
 
 export interface ArchenConfig {
   database: {
-    connection: ConnectionInfo;
+    connection: ConnectionPool | ConnectionInfo;
     schemaInfo?: SchemaInfo;
   };
   schema?: SchemaConfig;
@@ -22,89 +22,63 @@ export interface ArchenConfig {
   graphql?: SchemaBuilderOptions;
 }
 
-type ConnectionMap = { [key: string]: ConnectionPool };
-
-const EMPTY_DATABASE = { dialect: '', connection: null };
-
 export class Archen {
   config: ArchenConfig;
-  schema: Schema;
-  graphql: GraphQLSchemaBuilder;
-
-  private connectionMap: ConnectionMap = {};
+  accessor!: Accessor;
+  schema!: Schema;
+  graphql!: GraphQLSchemaBuilder;
 
   constructor(config: ArchenConfig) {
-    this.config = { ...config };
-
-    this.config.database = { ...(this.config.database || EMPTY_DATABASE) };
-
-    if (this.config.database.connection)
-      this.getConnectionPool(config.database.connection);
-
-    if (this.config.database.schemaInfo) this.buildGraphQLSchema();
-  }
-
-  async getSchemaInfo(connectionInfo?: ConnectionInfo): Promise<SchemaInfo> {
-    const connection = await this.getConnection(connectionInfo);
-    const name = this.getDatabaseName(connectionInfo);
-    const schemaInfo = await getInformationSchema(connection, name);
-    if (connectionInfo)
-      for (const key in connectionInfo)
-        this.config.database[key] = connectionInfo[key];
-
-    this.config.database.schemaInfo = schemaInfo;
-    this.buildGraphQLSchema();
-    connection.release();
-    return schemaInfo;
-  }
-
-  getAccessor(connectionInfo?: ConnectionInfo): Accessor {
-    const database = new Database(
-      this.getConnectionPool(connectionInfo),
-      this.schema
-    );
-    return new Accessor(database, this.config.accessor);
-  }
-
-  private getConnection(connectionInfo?: ConnectionInfo): Promise<Connection> {
-    return this.getConnectionPool(connectionInfo).getConnection();
-  }
-
-  private getConnectionPool(connectionInfo?: ConnectionInfo): ConnectionPool {
-    if (!(connectionInfo || this.config.database))
-      throw Error('No connection info');
-
-    const key = encodeConnectionInfo(connectionInfo);
-    let pool = this.connectionMap[key];
-    if (!pool) {
-      connectionInfo = connectionInfo || this.config.database.connection;
-      pool = createConnectionPool(
-        connectionInfo.dialect,
-        connectionInfo.connection
-      );
-      this.connectionMap[key] = pool;
+    this.config = config;
+    const schemaInfo = config.database.schemaInfo;
+    if (schemaInfo) {
+      this.bootstrap(schemaInfo);
     }
-    return pool;
   }
 
-  private buildGraphQLSchema() {
-    this.schema = new Schema(
-      this.config.database.schemaInfo,
-      this.config.schema
-    );
+  async bootstrap(schemaInfo?: SchemaInfo) {
+    if (!schemaInfo) {
+      const database = new Database(this.config.database.connection);
+      await database.buildSchema(this.config.schema);
+      this.schema = database.schema;
+      this.accessor = new Accessor(database, this.config.accessor);
+    } else {
+      this.schema = new Schema(schemaInfo, this.config.schema);
+      this.accessor = new Accessor(
+        new Database(this.config.database.connection, this.schema),
+        this.config.accessor
+      );
+    }
     this.graphql = new GraphQLSchemaBuilder(this.schema, this.config.graphql);
   }
 
-  private getDatabaseName(connectionInfo?: ConnectionInfo): string {
-    connectionInfo = connectionInfo || this.config.database.connection;
-    const connection = connectionInfo.connection;
-    return (connection.name || connection.database) as string;
+  async query<T>(args: QueryArgs, dataKey?: string) {
+    const { data, errors } = await graphql({
+      schema: this.graphql.getSchema(),
+      rootValue: this.graphql.getRootValue(),
+      contextValue: this.accessor,
+      ...args,
+    });
+    if (errors) {
+      const message = errors.map((error) => printError(error)).join('\n');
+      throw new Error(message);
+    }
+    return (dataKey ? data[dataKey] : data) as T;
+  }
+
+  shutdown() {
+    if (this.accessor) {
+      return this.accessor.db.end();
+    }
   }
 }
 
-function encodeConnectionInfo(connectionInfo: ConnectionInfo): string {
-  if (!connectionInfo) throw Error('Empty');
-  return JSON.stringify(encodeFilter(connectionInfo.connection));
+export interface QueryArgs {
+  source: string;
+  variableValues?: Maybe<{ [key: string]: any }>;
+  operationName?: Maybe<string>;
+  fieldResolver?: Maybe<GraphQLFieldResolver<any, any>>;
+  typeResolver?: Maybe<GraphQLTypeResolver<any, any>>;
 }
 
 export { Accessor };

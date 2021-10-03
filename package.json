@@ -15,7 +15,7 @@
   "dependencies": {
     "dataloader": "^2.0.0",
     "graphql": "^15.5.3",
-    "sqlex": "^2.4.3"
+    "sqlex": "^2.5.0"
   },
   "repository": {
     "type": "git",
