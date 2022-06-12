@@ -104,10 +104,23 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
         const name = s.replace(/^-/, '');
         return name.indexOf('.') === -1
           ? toCamelCase(name)
-          : name.replace(/\./g, '__');
+          : name.split('.')
       });
       return rows.map(row => {
-        row.__cursor = encodeCursor(keys.map(key => row[key]));
+        const cursor = [];
+        for (const key of keys) {
+          if (typeof key === 'string') {
+            cursor.push(row[key])
+          }
+          else {
+            let value: any = row;
+            for (let i = 0; i < key.length; i++) {
+              value = value[key[i]]
+            }
+            cursor.push(value);
+          }
+        }
+        row.__cursor = encodeCursor(cursor);
         return row;
       });
     }),

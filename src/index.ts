@@ -11,6 +11,7 @@ import {
   GraphQLTypeResolver,
   printError,
 } from 'graphql';
+import { OperatorMap } from 'sqlex/dist/filter';
 
 export interface ArchenConfig {
   database: {
@@ -32,20 +33,20 @@ export class Archen {
     this.config = config;
     const schemaInfo = config.database.schemaInfo;
     if (schemaInfo) {
-      this.bootstrap(schemaInfo);
+      this.bootstrap(schemaInfo, config.graphql.operators);
     }
   }
 
-  async bootstrap(schemaInfo?: SchemaInfo) {
+  async bootstrap(schemaInfo?: SchemaInfo, operators?: OperatorMap) {
     if (!schemaInfo) {
-      const database = new Database(this.config.database.connection);
+      const database = new Database(this.config.database.connection, undefined, operators);
       await database.buildSchema(this.config.schema);
       this.schema = database.schema;
       this.accessor = new Accessor(database, this.config.accessor);
     } else {
       this.schema = new Schema(schemaInfo, this.config.schema);
       this.accessor = new Accessor(
-        new Database(this.config.database.connection, this.schema),
+        new Database(this.config.database.connection, this.schema, operators),
         this.config.accessor
       );
     }

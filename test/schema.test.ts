@@ -546,7 +546,7 @@ mutation {
     return archen.db
       .table('order')
       .insert({ code })
-      .then(order => {
+      .then((order :any) => {
         return archen.db
           .table('order_item')
           .insert({ order, product: 1, quantity: 10 })
@@ -721,6 +721,22 @@ mutation {
     });
 });
 
+test('like', async () => {
+  const archen = createArchen();
+  const DATA = `
+{
+  groups(where: { name_ilike: "adm%" }) {
+    name
+  }
+}
+`;
+
+  const result = await graphql.graphql(archen.schema, DATA, archen.rootValue, archen.accessor);
+  const group = result.data.groups[0];
+  expect(group.name).toBe('ADMIN');
+  archen.shutdown();
+});
+
 function createArchen(config?: SchemaConfig) {
   const domain = new Schema(data, config);
   const db = helper.connectToDatabase(NAME);
@@ -738,7 +754,7 @@ function createOrderAndShipping(
   return db
     .table('order')
     .insert({ code })
-    .then(order => {
+    .then((order: any) => {
       return db
         .table('order_shipping')
         .insert({ order, status })
