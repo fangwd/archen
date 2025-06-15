@@ -1,6 +1,6 @@
 import { Accessor, encodeFilter } from '../src/accessor';
 
-import helper = require('./helper');
+import * as  helper from './helper';
 import { GraphQLSchemaBuilder } from '../src/schema';
 
 import * as graphql from 'graphql';
@@ -281,8 +281,8 @@ test('related', done => {
       }
     }
 `;
-  graphql.graphql(schema, DATA, rootValue, accessor).then(result => {
-    const users = result.data.users;
+  graphql.graphql({schema, source:DATA, rootValue, contextValue: accessor}).then(result => {
+    const users = result.data!.users as any;
     const names = [
       ...users.reduce((result, user) => {
         user.groups.forEach(group => result.add(group.name));

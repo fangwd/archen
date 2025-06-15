@@ -14,9 +14,7 @@ const options = getopt(
     ['  ', '--port'],
     ['  ', '--database'],
     ['  ', '--schemaInfo'],
-    ['  ', '--listen'],
     ['  ', '--exportGraphqlSchema'],
-    ['  ', '--urlPath']
   ],
   {
     dialect: 'mysql',
@@ -33,9 +31,7 @@ async function main() {
 
   await archen.bootstrap();
 
-  if (options.listen) {
-    startGraphqlServer(archen, options);
-  } else if (options.exportGraphqlSchema) {
+if (options.exportGraphqlSchema) {
     require('fs').writeFileSync(
       options.exportGraphqlSchema,
       require('graphql').printSchema(archen.graphql.getSchema())
@@ -44,37 +40,6 @@ async function main() {
   }
 }
 
-function startGraphqlServer(archen, options) {
-  const express = require('express');
-  const { graphqlHTTP } = require('express-graphql');
-
-  const app = express();
-
-  app.get('/', (req, res) => res.send('Hello World!'));
-
-  app.use(function(req, res, next) {
-    req.loader = archen.accessor;
-    next();
-  });
-
-  app.use(
-    options.urlPath || '/graphql',
-    graphqlHTTP((request, response, params) => ({
-      schema: archen.graphql.getSchema(),
-      rootValue: archen.graphql.getRootValue(),
-      pretty: false,
-      graphiql: true,
-      customFormatErrorFn: error => ({
-        message: error.message,
-        locations: error.locations,
-        stack: error.stack ? error.stack.split('\n') : [],
-        path: error.path
-      })
-    }))
-  );
-
-  app.listen(options.listen);
-}
 
 function getArchenConfig(options) {
   let schemaInfo;

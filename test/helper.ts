@@ -156,7 +156,7 @@ export async function dropPostgresDatabase(name: string): Promise<void> {
 }
 
 function createMySQLDatabase(name: string, data = true): Promise<any> {
-  const mysql = require('mysql');
+  const mysql = require('mysql2');
   const database = `${DB_NAME}_${name}`;
 
   const db = mysql.createConnection({
@@ -186,7 +186,7 @@ function createMySQLDatabase(name: string, data = true): Promise<any> {
 }
 
 function dropMySQLDatabase(name: string): Promise<void> {
-  const mysql = require('mysql');
+  const mysql = require('mysql2');
   const database = `${DB_NAME}_${name}`;
 
   const db = mysql.createConnection({
@@ -206,7 +206,7 @@ function dropMySQLDatabase(name: string): Promise<void> {
 
 function createMySQLConnection(name: string): Connection {
   const database = `${DB_NAME}_${name}`;
-  return createConnection('mysql', {
+  return createConnection('mysql2', {
     host: DB_HOST,
     user: DB_USER,
     password: DB_PASS,

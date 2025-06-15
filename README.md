@@ -7,8 +7,6 @@ Archen is a simple, flexible and fast GraphQL library written in Typescript.
 # Usage
 
 Archen is ridiculously easy to use. In the simplest form, it requires nothing more than the details to connect to an existing database. Below is an example to add GraphQL API to a MySQL database:
-
-
 ```js
 const { Archen } = require('archen');
 
@@ -41,16 +39,9 @@ const result = await archen.query({ source });
 // console.log(result.users);
 ```
 
-## Command line
+## Demo App
 
-Archen provides a command line tool that lets you add GraphQL API to your existing databases without writing any code:
-
-```
-$ npm install express express-graphql mysql archen
-$ node_modules/archen/bin/archen.js --user root --password secret --database example --listen 3000
-```
-
-Now you can open a browser and go to http://localhost:3000/graphql to interact with an automatically generated GraphQL server by Archen.
+See [example](./example) folder for a demo app using Next.js.
 
 # Configuration
 
