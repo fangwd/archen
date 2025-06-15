@@ -10,7 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "archen": "^2.1.2",
+    "archen": "^3.0.0",
     "graphiql": "^4.1.2",
     "mysql2": "^3.14.1",
     "next": "15.1.7",
