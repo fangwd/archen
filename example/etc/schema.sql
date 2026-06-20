@@ -3,7 +3,8 @@ create table user (
   email varchar(200) unique,
   first_name varchar(30),
   last_name varchar(100),
-  status int
+  status int,
+  meta json
 );
 
 create table `user_profile` (

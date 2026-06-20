@@ -1,13 +1,19 @@
-Archen is a simple, flexible and fast GraphQL library written in Typescript.
+Archen is a simple, flexible and fast GraphQL library written in TypeScript. It
+turns an existing relational database into a full GraphQL API — queries,
+mutations, relations, cursor pagination and aggregates — generated from your
+tables and foreign keys.
 
-# Installation
+## Install
 
-`$ npm install archen`
+```sh
+npm install archen
+# plus a driver: mysql2 | pg | sqlite3
+```
 
-# Usage
+## Quick example
 
-Archen is ridiculously easy to use. In the simplest form, it requires nothing more than the details to connect to an existing database. Below is an example to add GraphQL API to a MySQL database:
-
+In the simplest form, archen needs nothing more than the details to connect to
+an existing database — it introspects the schema for you.
 
 ```js
 const { Archen } = require('archen');
@@ -15,101 +21,70 @@ const { Archen } = require('archen');
 const archen = new Archen({
   database: {
     connection: {
-      dialect: 'postgres',
-      connection: {
-        user: 'root',
-        password: 'secret',
-        database: 'example'
-      }
-    }
-  }
+      dialect: 'mysql',
+      connection: { user: 'root', password: 'secret', database: 'example' },
+    },
+  },
 });
 
 await archen.bootstrap();
 
-const source = `
-  query {
-    users {
-      id
-      email
+const data = await archen.query({
+  source: `
+    query {
+      users(where: { status: 1 }, limit: 10) {
+        id
+        email
+        orders { code }
+      }
     }
-  }
-`;
-
-const result = await archen.query({ source });
-
-// console.log(result.users);
+  `,
+});
 ```
 
-## Command line
+New here? Start with the **[Getting started](./docs/getting-started.md)** guide.
 
-Archen provides a command line tool that lets you add GraphQL API to your existing databases without writing any code:
+## Documentation
 
-```
-$ npm install express express-graphql mysql archen
-$ node_modules/archen/bin/archen.js --user root --password secret --database example --listen 3000
-```
+**Getting started**
+- [Getting started](./docs/getting-started.md) — install, bootstrap, first query and mutation
 
-Now you can open a browser and go to http://localhost:3000/graphql to interact with an automatically generated GraphQL server by Archen.
+**Guides**
+- [Configuration](./docs/configuration.md) — connection, introspection vs. explicit schema, options
+- [Querying](./docs/querying.md) — lists, single rows, ordering, limits, selecting relations
+- [Filtering](./docs/filtering.md) — operators, `and`/`or`/`not`, foreign-key and relation filters
+- [Pagination](./docs/pagination.md) — cursor-based connections (`first`/`after`, `last`/`before`)
+- [Mutations](./docs/mutations.md) — create/update/upsert/delete and nested relation writes
+- [Relations](./docs/relations.md) — foreign keys, one-to-one, one-to-many, many-to-many
 
-# Configuration
+**Advanced**
+- [Aggregates](./docs/aggregates.md) — `count`/`sum`/`avg`/`min`/`max` and `groupBy`
+- [JSON fields](./docs/json-fields.md) — filtering into `json`/`jsonb` columns
+- [Access control](./docs/access-control.md) — which models and operations are exposed
+- [Hooks](./docs/hooks.md) — `onQuery`/`onResult`/`onError` for auth, scoping and auditing
+- [Error handling](./docs/error-handling.md) — `GraphQLQueryError` and structured errors
+- [Typed queries (codegen)](./docs/codegen.md) — export SDL and get typed `query()` calls
+- [Accessor API](./docs/accessor.md) — the programmatic layer and per-request context
 
-Archen can be configured using an [`ArchenConfig`](https://github.com/fangwd/archen/blob/master/src/index.ts) object.
+## Demo app
 
-## Exporting models to GraphQL API
+See the [`example`](./example) folder for a Next.js app that serves the generated
+API behind a GraphiQL explorer.
 
-By default, archen exports all models and fields to the GraphQL API. To stop a model from being exported, add an entry in `graphql.models` field and set it to false. The following config shows how to export all models except for `User`:
+## Development
 
-```js
-{
-  graphql: {
-    models: {
-      User: false
-    }
-  }
-}
-```
+### Running tests
 
-Setting `graphql.allowAll` to `false` stops all models being exported to the API by default. The following config exports only `Product` and `Category` to the API:
+```sh
+# SQLite
+DB_TYPE=sqlite3 npm test
 
-```js
-{
-  graphql: {
-    allowAll: false,
-    models: {
-      Product: true,
-      Category: true
-    }
-  }
-}
-```
+# PostgreSQL
+DB_TYPE=postgres DB_USER=postgres npm test
 
-## Customising accessibility
-
-The following config forbids creating `User` objects via the generated API:
-```js
-{
-  graphql: {
-    models: {
-      User: {
-        create: false,
-      },
-    }
-  }
-}
+# MySQL
+DB_TYPE=mysql DB_USER=root DB_PASS=secret npm test
 ```
 
-# Development
-
-## Running tests
-
-```
-# Test for SQLite
-$ DB_TYPE=sqlite3 npm run test
-
-# Test for Postgres
-$ DB_TYPE=postgres DB_USER=postgres npm run test
-
-# Test for MySQL
-$ DB_TYPE=mysql DB_USER=root DB_PASS=secret npm run test
-```
+Type-check (including the test suite) with `npm run typecheck`; build with
+`npm run build`.

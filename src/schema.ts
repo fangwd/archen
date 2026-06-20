@@ -13,7 +13,9 @@ import {
   GraphQLSchema,
   GraphQLFieldConfigMap,
   SelectionSetNode,
-  GraphQLResolveInfo
+  GraphQLResolveInfo,
+  Kind,
+  ValueNode
 } from 'graphql';
 
 import { AND, GE, GT, IN, LE, LIKE, ILIKE, LT, NE, NONE, NOT, NULL, OR, SOME } from 'sqlex';
@@ -22,6 +24,14 @@ import { toPascalCase, pluralise } from 'sqlex/dist/utils';
 
 import { Accessor } from './accessor';
 import { firstOf } from './misc';
+import {
+  ModelConfig,
+  isModelSelectable,
+  isModelCreatable,
+  isModelUpdatable,
+  isModelUpsertable,
+  isModelDeletable
+} from './config';
 
 interface ObjectTypeMap {
   [key: string]: GraphQLObjectType;
@@ -42,6 +52,8 @@ interface InputFieldsMap {
 const ConnectionOptions = {
   first: { type: GraphQLInt },
   after: { type: GraphQLString },
+  last: { type: GraphQLInt },
+  before: { type: GraphQLString },
   orderBy: { type: new GraphQLList(GraphQLString) }
 };
 
@@ -51,40 +63,85 @@ const QueryOptions = {
   orderBy: { type: new GraphQLList(GraphQLString) }
 };
 
+function parseJSONLiteral(ast: ValueNode, variables?: any): any {
+  switch (ast.kind) {
+    case Kind.STRING:
+    case Kind.BOOLEAN:
+    case Kind.ENUM:
+      return ast.value;
+    case Kind.INT:
+    case Kind.FLOAT:
+      return Number(ast.value);
+    case Kind.OBJECT: {
+      const value: { [key: string]: any } = {};
+      for (const field of ast.fields) {
+        value[field.name.value] = parseJSONLiteral(field.value, variables);
+      }
+      return value;
+    }
+    case Kind.LIST:
+      return ast.values.map(node => parseJSONLiteral(node, variables));
+    case Kind.NULL:
+      return null;
+    case Kind.VARIABLE:
+      return variables ? variables[ast.name.value] : undefined;
+    default:
+      return undefined;
+  }
+}
+
+const GraphQLJSON = new GraphQLScalarType({
+  name: 'JSON',
+  description: 'Arbitrary JSON value; used to filter into json/jsonb columns',
+  serialize: value => value,
+  parseValue: value => value,
+  parseLiteral: parseJSONLiteral
+});
+
 const PageInfoType = new GraphQLObjectType({
   name: 'PageInfo',
   fields: () => ({
     startCursor: { type: GraphQLString },
     endCursor: { type: GraphQLString },
-    hasNextPage: { type: GraphQLBoolean }
+    hasNextPage: { type: GraphQLBoolean },
+    hasPreviousPage: { type: GraphQLBoolean }
   })
 });
 
 export interface SchemaBuilderOptions {
   useWhereForGetOne?: boolean;
-  getAccessor: (any) => Accessor;
+  getAccessor: (context: any) => Accessor;
   operators?: {
     [key: string]: string;
-  }
+  };
+  // When false, models are not exported to the API unless explicitly enabled
+  // in `models`. Defaults to true.
+  allowAll?: boolean;
+  // Per-model export/accessibility config. `false` hides a model's root
+  // query/mutation fields; an object enables fine-grained control such as
+  // `{ create: false }`.
+  models?: { [name: string]: boolean | ModelConfig };
 }
 
 const DEFAULT_OPTIONS = {
   useWhereForGetOne: false,
-  getAccessor: context => context,
-  operators: {}
+  getAccessor: (context: any) => context,
+  operators: {},
+  allowAll: true,
+  models: {} as { [name: string]: boolean | ModelConfig }
 };
 
 export class GraphQLSchemaBuilder {
   private domain: Schema;
   private schema: GraphQLSchema;
-  private rootValue = {};
+  private rootValue: { [key: string]: any } = {};
   private options: SchemaBuilderOptions;
 
   private modelTypeMap: ObjectTypeMap = {};
   private connectionTypeMap: ObjectTypeMap = {};
 
   private filterInputTypeMap: InputTypeMap = {};
-  private filterInputTypeMapEx = {};
+  private filterInputTypeMapEx: { [key: string]: { [key: string]: GraphQLInputObjectType } } = {};
 
   private inputTypesConnect: InputTypeMap = {};
   private inputFieldsConnectMap: InputFieldsMap = {};
@@ -93,24 +150,32 @@ export class GraphQLSchemaBuilder {
     this.domain = domain;
     this.options = Object.assign({}, DEFAULT_OPTIONS, options);
 
-    createDummyFields(domain);
-
     this.createFilterInputTypes();
     this.createModelTypes();
 
     const queryFields = this.createQueryFields();
     const mutationFields = this.createMutationFields();
 
-    this.schema = new GraphQLSchema({
+    const schemaConfig: {
+      query: GraphQLObjectType;
+      mutation?: GraphQLObjectType;
+    } = {
       query: new GraphQLObjectType({
         name: 'Query',
         fields: queryFields
-      }),
-      mutation: new GraphQLObjectType({
+      })
+    };
+
+    // GraphQL forbids an empty Mutation type, so only attach one when at
+    // least one model exposes a write operation (e.g. a read-only API).
+    if (Object.keys(mutationFields).length) {
+      schemaConfig.mutation = new GraphQLObjectType({
         name: 'Mutation',
         fields: mutationFields
-      })
-    });
+      });
+    }
+
+    this.schema = new GraphQLSchema(schemaConfig);
   }
 
   createFilterInputTypes() {
@@ -126,6 +191,12 @@ export class GraphQLSchemaBuilder {
         if (field instanceof SimpleField) {
           if (!(field instanceof ForeignKeyField)) {
             const type = getType(field);
+            if (type === GraphQLJSON) {
+              // JSON columns take a nested filter object; the operators
+              // (_lt, _in, ...) are expressed within that object by sqlex.
+              filterInputFields[field.name] = { type };
+              continue;
+            }
             filterInputFields[field.name] = { type: type };
             for (const op of [LT, LE, GE, GT, NE]) {
               const name = field.name + '_' + op;
@@ -239,13 +310,13 @@ export class GraphQLSchemaBuilder {
 
   createModelTypes() {
     const modelTypeMap = this.modelTypeMap;
-    const modelTypeMapEx = {};
+    const modelTypeMapEx: { [key: string]: { [key: string]: any } } = {};
     const filterInputTypeMapEx = this.filterInputTypeMapEx;
 
     const modelFieldsMap: ObjectFieldsMap = {};
-    const modelFieldsMapEx = {};
+    const modelFieldsMapEx: { [key: string]: { [key: string]: any } } = {};
 
-    const connectionTypeMapEx = {};
+    const connectionTypeMapEx: { [key: string]: { [key: string]: any } } = {};
     const edgeModelTypeMap: ObjectTypeMap = {};
 
     const self = this;
@@ -336,7 +407,7 @@ export class GraphQLSchemaBuilder {
             type: modelTypeMap[field.referencedField.model.name],
             resolve(obj, args, acc, info) {
               if (obj[field.name] === null) return null;
-              const keyField = field.referencedField.model.keyField();
+              const keyField = field.referencedField.model.keyField()!;
               const fields = getQueryFields(
                 info,
                 info.fieldNodes[0].selectionSet
@@ -375,7 +446,7 @@ export class GraphQLSchemaBuilder {
                   .getAccessor(acc)
                   .load(
                     { field: relatedField, ...args },
-                    obj[model.keyField().name],
+                    obj[model.keyField()!.name],
                     fields
                   );
               }
@@ -388,14 +459,14 @@ export class GraphQLSchemaBuilder {
               },
               resolve(obj, args, acc, info) {
                 args.where = args.where || {};
-                const name = relatedField.throughField.relatedField.name;
-                if (relatedField.throughField.relatedField.throughField) {
+                const name = relatedField.throughField!.relatedField!.name;
+                if (relatedField.throughField!.relatedField!.throughField) {
                   args.where[name] = {
-                    [model.keyField().name]: obj[model.keyField().name]
+                    [model.keyField()!.name]: obj[model.keyField()!.name]
                   };
                 } else {
                   args.where[name] = {
-                    [field.referencingField.name]: obj[model.keyField().name]
+                    [field.referencingField.name]: obj[model.keyField()!.name]
                   };
                 }
                 return self
@@ -426,7 +497,7 @@ export class GraphQLSchemaBuilder {
                   .load(
                     { field: related, ...args },
                     object[related.referencedField.name]
-                  )
+                  )!
                   .then(rows => {
                     if (related.isUnique()) {
                       return Array.isArray(rows) ? rows[0] : rows;
@@ -469,28 +540,45 @@ export class GraphQLSchemaBuilder {
             modelFieldsMapEx[model.name][field.name] =
               modelFieldsMap[field.throughField.referencedField.model.name];
           } else {
-            modelFieldsMapEx[model.name][field.name] = {};
+            const exFields: GraphQLFieldConfigMap<any, Accessor> = {};
             const related = field.referencingField;
             for (const name in modelFieldsMap[related.model.name]) {
               if (name !== related.name) {
-                modelFieldsMapEx[model.name][field.name][name] =
-                  modelFieldsMap[related.model.name][name];
+                exFields[name] = modelFieldsMap[related.model.name][name];
               }
             }
+            // A one-to-one whose child holds only the back-reference projects
+            // to an empty type; keep the back-reference so the GraphQL type
+            // stays valid. (The input side is handled by getFieldsExclude.)
+            if (!Object.keys(exFields).length) {
+              exFields[related.name] =
+                modelFieldsMap[related.model.name][related.name];
+            }
+            modelFieldsMapEx[model.name][field.name] = exFields;
           }
         }
       }
     }
   }
 
-  getAccessor(context): Accessor {
+  getAccessor(context: any): Accessor {
     return this.options.getAccessor(context);
   }
 
+  private get allowAll(): boolean {
+    return this.options.allowAll !== false;
+  }
+
+  private modelConfig(model: Model) {
+    return this.options.models ? this.options.models[model.name] : undefined;
+  }
+
   createQueryFields() {
-    const queryFields = {};
+    const queryFields: GraphQLFieldConfigMap<any, Accessor> = {};
 
     for (const model of this.domain.models) {
+      if (!isModelSelectable(this.modelConfig(model), this.allowAll)) continue;
+
       queryFields[model.pluralName] = {
         type: new GraphQLList(this.modelTypeMap[model.name]),
         args: {
@@ -499,7 +587,7 @@ export class GraphQLSchemaBuilder {
         }
       };
 
-      this.rootValue[model.pluralName] = (args, acc, info) => {
+      this.rootValue[model.pluralName] = (args: any, acc: any, info: any) => {
         return this.getAccessor(acc).query(model, args);
       };
 
@@ -513,7 +601,7 @@ export class GraphQLSchemaBuilder {
         }
       };
 
-      this.rootValue[`${model.pluralName}Connection`] = (args, acc, info) => {
+      this.rootValue[`${model.pluralName}Connection`] = (args: any, acc: any, info: any) => {
         return this.getAccessor(acc).cursorQuery(
           model,
           args,
@@ -531,15 +619,90 @@ export class GraphQLSchemaBuilder {
           : this.inputTypesConnect[model.name].getFields()
       };
 
-      this.rootValue[name] = (args, acc) => {
+      this.rootValue[name] = (args: any, acc: any) => {
         return this.getAccessor(acc).get(
           model,
           this.options.useWhereForGetOne ? args.where : args
         );
       };
+
+      const aggName = `${model.pluralName}Aggregate`;
+      queryFields[aggName] = {
+        type: new GraphQLList(this.buildAggregateType(model)),
+        args: {
+          where: { type: this.filterInputTypeMap[model.name] },
+          groupBy: { type: new GraphQLList(GraphQLString) }
+        }
+      };
+      this.rootValue[aggName] = (args: any, acc: any, info: any) => {
+        return this.getAccessor(acc).aggregate(
+          model,
+          args,
+          firstOf(getQueryFields(info))
+        );
+      };
     }
 
     return queryFields;
+  }
+
+  // Builds `<Model>Aggregate { keys, count, sum, avg, min, max }`. sum/avg
+  // expose numeric columns; min/max and keys (the grouped column values) also
+  // expose strings. Sub-objects are omitted when a model has no fields of the
+  // relevant kind.
+  private buildAggregateType(model: Model): GraphQLObjectType {
+    const simple = model.fields.filter(
+      f => f instanceof SimpleField && !(f instanceof ForeignKeyField)
+    ) as SimpleField[];
+    const isNumeric = (f: SimpleField) =>
+      getType(f) === GraphQLInt || getType(f) === GraphQLFloat;
+    const numeric = simple.filter(isNumeric);
+    const scalar = simple.filter(
+      f => isNumeric(f) || getType(f) === GraphQLString
+    );
+
+    const numberType = numeric.length
+      ? new GraphQLObjectType({
+          name: `${model.name}NumberAggregate`,
+          fields: () => {
+            const fields: GraphQLFieldConfigMap<any, Accessor> = {};
+            for (const f of numeric) fields[f.name] = { type: GraphQLFloat };
+            return fields;
+          }
+        })
+      : undefined;
+
+    const scalarType = scalar.length
+      ? new GraphQLObjectType({
+          name: `${model.name}FieldAggregate`,
+          fields: () => {
+            const fields: GraphQLFieldConfigMap<any, Accessor> = {};
+            for (const f of scalar) fields[f.name] = { type: getType(f) };
+            return fields;
+          }
+        })
+      : undefined;
+
+    return new GraphQLObjectType({
+      name: `${model.name}Aggregate`,
+      fields: () => {
+        const fields: GraphQLFieldConfigMap<any, Accessor> = {
+          count: { type: GraphQLInt }
+        };
+        if (scalarType) {
+          fields.keys = { type: scalarType };
+        }
+        if (numberType) {
+          fields.sum = { type: numberType };
+          fields.avg = { type: numberType };
+        }
+        if (scalarType) {
+          fields.min = { type: scalarType };
+          fields.max = { type: scalarType };
+        }
+        return fields;
+      }
+    });
   }
 
   createMutationInputTypes() {
@@ -769,12 +932,13 @@ export class GraphQLSchemaBuilder {
     const mutationFields: GraphQLFieldConfigMap<any, Accessor> = {};
 
     for (const model of this.domain.models) {
+      if (!isModelCreatable(this.modelConfig(model), this.allowAll)) continue;
       const name = 'create' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: { data: { type: inputTypesCreate[model.name] } }
       };
-      this.rootValue[name] = (args, acc) => {
+      this.rootValue[name] = (args: any, acc: any) => {
         return this.getAccessor(acc).create(model, args.data);
       };
     }
@@ -790,6 +954,7 @@ export class GraphQLSchemaBuilder {
     });
 
     for (const model of this.domain.models) {
+      if (!isModelUpdatable(this.modelConfig(model), this.allowAll)) continue;
       const name = 'update' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
@@ -798,12 +963,13 @@ export class GraphQLSchemaBuilder {
           data: { type: inputTypesUpdate[model.name] }
         }
       };
-      this.rootValue[name] = (args, acc) => {
+      this.rootValue[name] = (args: any, acc: any) => {
         return this.getAccessor(acc).update(model, args.data, args.where);
       };
     }
 
     for (const model of this.domain.models) {
+      if (!isModelUpdatable(this.modelConfig(model), this.allowAll)) continue;
       const name = 'update' + toPascalCase(model.pluralName);
       mutationFields[name] = {
         type: databaseQueryResultType,
@@ -812,23 +978,25 @@ export class GraphQLSchemaBuilder {
           data: { type: inputTypesUpdate[model.name] }
         }
       };
-      this.rootValue[name] = (args, acc) => {
+      this.rootValue[name] = (args: any, acc: any) => {
         return this.getAccessor(acc).updateMany(model, args.data, args.where);
       };
     }
 
     for (const model of this.domain.models) {
+      if (!isModelUpsertable(this.modelConfig(model), this.allowAll)) continue;
       const name = 'upsert' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
         args: inputTypesUpsert[model.name].getFields()
       };
-      this.rootValue[name] = (args, acc) => {
+      this.rootValue[name] = (args: any, acc: any) => {
         return this.getAccessor(acc).upsert(model, args.create, args.update);
       };
     }
 
     for (const model of this.domain.models) {
+      if (!isModelDeletable(this.modelConfig(model), this.allowAll)) continue;
       const name = 'delete' + model.name;
       mutationFields[name] = {
         type: this.modelTypeMap[model.name],
@@ -838,7 +1006,7 @@ export class GraphQLSchemaBuilder {
             }
           : this.inputTypesConnect[model.name].getFields()
       };
-      this.rootValue[name] = (args, acc) => {
+      this.rootValue[name] = (args: any, acc: any) => {
         return this.getAccessor(acc).delete(
           model,
           this.options.useWhereForGetOne ? args.where : args
@@ -847,12 +1015,13 @@ export class GraphQLSchemaBuilder {
     }
 
     for (const model of this.domain.models) {
+      if (!isModelDeletable(this.modelConfig(model), this.allowAll)) continue;
       const name = 'delete' + toPascalCase(model.pluralName);
       mutationFields[name] = {
         type: databaseQueryResultType,
         args: this.filterInputTypeMap[model.name].getFields()
       };
-      this.rootValue[name] = (args, acc) => {
+      this.rootValue[name] = (args: any, acc: any) => {
         return this.getAccessor(acc).deleteMany(model, args);
       };
     }
@@ -934,7 +1103,7 @@ function getPascalName(field: RelatedField, plural?: boolean) {
       const model = field.throughField.referencedField.model;
       return `${field.model.name}${pluralise(model.name)}`;
     } else {
-      return toPascalCase(field.throughField.relatedField.name);
+      return toPascalCase(field.throughField.relatedField!.name);
     }
   }
   if (model.getForeignKeyCount(field.model) === 1) {
@@ -955,6 +1124,8 @@ function getType(field: SimpleField): GraphQLScalarType {
     return GraphQLFloat;
   } else if (/^bool/i.test(type)) {
     return GraphQLBoolean;
+  } else if (/json/i.test(type)) {
+    return GraphQLJSON;
   }
   return GraphQLString;
 }
@@ -966,8 +1137,8 @@ function getInputType(field: SimpleField): GraphQLInputType {
     : new GraphQLNonNull(type);
 }
 
-function _exclude(data, except: string | Field) {
-  const result = {};
+function _exclude(data: any, except: string | Field): { [key: string]: any } {
+  const result: { [key: string]: any } = {};
   if (except instanceof Field) {
     except = except.name;
   }
@@ -1000,7 +1171,7 @@ export function getQueryFields(
   info: GraphQLResolveInfo,
   selectionSet?: SelectionSetNode
 ) {
-  function __getFields(selectionSet: SelectionSetNode, object = {}) {
+  function __getFields(selectionSet: SelectionSetNode, object: { [key: string]: any } = {}) {
     for (const selection of selectionSet.selections) {
       if (selection.kind === 'Field') {
         const name = selection.name.value;
@@ -1037,18 +1208,4 @@ export function hasOnly(object: object, key: string): boolean {
     }
   }
   return false;
-}
-
-// Workaround for 'Type XX must define one or more fields'
-function createDummyFields(schema: Schema) {
-  for (const model of schema.models) {
-    if (model.fields.length === 1) {
-      const field = model.fields[0];
-      if (field instanceof ForeignKeyField) {
-        const column = { name: 'dummy', type: 'boolean', nullable: true };
-        const field = new SimpleField(model, column, {});
-        model.fields.push(field);
-      }
-    }
-  }
 }

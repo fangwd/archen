@@ -1,6 +1,6 @@
 import { Accessor, encodeFilter } from '../src/accessor';
 
-import helper = require('./helper');
+import * as  helper from './helper';
 import { GraphQLSchemaBuilder } from '../src/schema';
 
 import * as graphql from 'graphql';
@@ -37,7 +37,7 @@ test('onQuery - data', done => {
 
   const data = {};
 
-  const onQuery = (context, action, table, options) => {
+  const onQuery = (context: any, action: any, table: any, options: any) => {
     expect(context).toBe(data);
     return true;
   };
@@ -56,7 +56,7 @@ test('onQuery - true', done => {
 });
 
 test('onQuery - filter', done => {
-  const onQuery = (data, action, table, options) => {
+  const onQuery = (data: any, action: any, table: any, options: any) => {
     options.where = {
       and: [options.where, { firstName: 'alice' }]
     };
@@ -70,7 +70,10 @@ test('onQuery - filter', done => {
 });
 
 test('onQuery - false', done => {
+  expect.assertions(2);
   getAliceBob({ onQuery: () => Promise.resolve(false) }).catch(error => {
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe('Forbidden');
     done();
   });
 });
@@ -86,10 +89,10 @@ test('onQuery - throw', done => {
 });
 
 test('onResult', done => {
-  const onResult = (data, action, table, queryData) => {
+  const onResult = (data: any, action: any, table: any, queryData: any) => {
     queryData.rows = queryData.rows
-      .filter(row => /^alice/i.test(row.firstName))
-      .map(row => {
+      .filter((row: any) => /^alice/i.test(row.firstName))
+      .map((row: any) => {
         row = Object.assign(row);
         delete row.status;
         return row;
@@ -102,7 +105,7 @@ test('onResult', done => {
   getAliceBob({ onResult }).then(result => {
     const rows = result.filter(row => row != undefined);
     expect(rows.length).toBe(1);
-    expect(rows[0].status).toBe(undefined);
+    expect((rows[0] as any).status).toBe(undefined);
     done();
   });
 });
@@ -112,14 +115,14 @@ test('get', async () => {
 
   const options = {
     callbacks: {
-      onQuery: (context, event, table, data) => {
+      onQuery: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           if (event === 'GET') {
             data.filter.status = 200;
           }
         }
       },
-      onResult: (context, event, table, data) => {
+      onResult: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           if (event === 'GET') {
             if (data.row) {
@@ -151,7 +154,7 @@ test('get', async () => {
 test('query', async () => {
   const options = {
     callbacks: {
-      onQuery: (context, event, table, data) => {
+      onQuery: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'Group') {
           if (event === 'SELECT') {
             data.where = {
@@ -160,10 +163,10 @@ test('query', async () => {
           }
         }
       },
-      onResult: (context, event, table, data) => {
+      onResult: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'Group') {
           if (event === 'SELECT') {
-            data.rows = data.rows.map(row => ({
+            data.rows = data.rows.map((row: any) => ({
               ...row,
               name: row.name + '*'
             }));
@@ -184,10 +187,68 @@ test('query', async () => {
   db.end();
 });
 
+test('query - default limit caps unbounded reads', async () => {
+  const db = helper.connectToDatabase(NAME);
+  const model = db.model('user'); // 5 users exist
+  const accessor = new Accessor(db, { defaultLimit: 2 });
+
+  // No limit supplied -> capped at defaultLimit.
+  const capped = await accessor.query(model, {});
+  expect(capped.length).toBe(2);
+
+  // An explicit limit is honored.
+  const explicit = await accessor.query(model, { limit: 5 });
+  expect(explicit.length).toBe(5);
+
+  db.end();
+});
+
+test('onError', done => {
+  expect.assertions(3);
+  const db = helper.connectToDatabase(NAME);
+  const model = db.model('user');
+  const seen: any = {};
+  const accessor = new Accessor(db, {
+    callbacks: {
+      onQuery: () => {
+        throw new Error('boom');
+      },
+      onError: (_ctx: any, event: any, table: any, error: any) => {
+        seen.event = event;
+        seen.table = table.model.name;
+        seen.message = error.message;
+      }
+    }
+  });
+  accessor.query(model, {}).catch((error: any) => {
+    expect(seen.event).toBe('SELECT');
+    expect(seen.table).toBe('User');
+    expect(error.message).toBe('boom');
+    db.end();
+    done();
+  });
+});
+
+test('load - falsy key is not dropped', async () => {
+  const db = helper.connectToDatabase(NAME);
+  const accessor = new Accessor(db, {});
+  const field = db.table('user').model.field('id')!;
+
+  // 0 is a real key: it must reach the loader, not short-circuit to null.
+  const result = accessor.load({ field }, 0);
+  expect(result).not.toBeNull();
+  await result;
+
+  // null/undefined still short-circuits.
+  expect(accessor.load({ field }, null as any)).toBeNull();
+
+  db.end();
+});
+
 test('cursorQuery', async () => {
   const options = {
     callbacks: {
-      onQuery: (context, event, table, data) => {
+      onQuery: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'Group') {
           if (event === 'SELECT') {
             data.where = {
@@ -196,10 +257,10 @@ test('cursorQuery', async () => {
           }
         }
       },
-      onResult: (context, event, table, data) => {
+      onResult: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'Group') {
           if (event === 'SELECT') {
-            data.rows = data.rows.map(row => ({
+            data.rows = data.rows.map((row: any) => ({
               ...row,
               name: row.name + '*'
             }));
@@ -230,7 +291,7 @@ test('related', done => {
   const accessorOptions = {
     callbacks: {
       context: db,
-      onQuery: (context, event, table, data) => {
+      onQuery: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'UserGroup') {
           const where = data.where || {};
           data.where = {
@@ -238,18 +299,18 @@ test('related', done => {
           };
         }
       },
-      onResult: async (context, event, table, data) => {
+      onResult: async (context: any, event: any, table: any, data: any) => {
         // Exclude "group 1.1"
         if (table.model.name === 'UserGroup') {
           const rows = data.rows as any[];
           const promises = rows.map(row =>
-            loader.load({ field }, row.group.id)
+            loader.load({ field: field! }, row.group.id)
           );
           const groups = await Promise.all(promises);
           const result = [];
           for (const row of rows) {
-            const group = groups.find(group => group.id === row.group.id);
-            if (group.name.indexOf('1.1') === -1) {
+            const group = groups.find(group => (group as any).id === row.group.id);
+            if ((group as any).name.indexOf('1.1') === -1) {
               result.push(row);
             }
           }
@@ -257,8 +318,8 @@ test('related', done => {
         } else if (table.model.name === 'Group') {
           // Exclude "group 1.2.1"
           data.rows = data.rows
-            .filter(group => group.name.indexOf('1.2.1') === -1)
-            .map(group => ({ ...group, name: group.name + '$' }));
+            .filter((group: any) => group.name.indexOf('1.2.1') === -1)
+            .map((group: any) => ({ ...group, name: group.name + '$' }));
         }
       }
     }
@@ -281,11 +342,11 @@ test('related', done => {
       }
     }
 `;
-  graphql.graphql(schema, DATA, rootValue, accessor).then(result => {
-    const users = result.data.users;
+  graphql.graphql({schema, source:DATA, rootValue, contextValue: accessor}).then(result => {
+    const users = result.data!.users as any;
     const names = [
-      ...users.reduce((result, user) => {
-        user.groups.forEach(group => result.add(group.name));
+      ...users.reduce((result: any, user: any) => {
+        user.groups.forEach((group: any) => result.add(group.name));
         return result;
       }, new Set())
     ];
@@ -299,12 +360,12 @@ test('related', done => {
 test('create', async () => {
   const options = {
     callbacks: {
-      onQuery: (context, event, table, data) => {
+      onQuery: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           data.status = 200;
         }
       },
-      onResult: (context, event, table, data) => {
+      onResult: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           data.firstName = 'John';
         }
@@ -322,14 +383,14 @@ test('create', async () => {
 test('update', async () => {
   const options = {
     callbacks: {
-      onQuery: (context, event, table, data) => {
+      onQuery: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           if (event === 'UPDATE') {
             data.data.status = 200;
           }
         }
       },
-      onResult: (context, event, table, data) => {
+      onResult: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           if (event === 'UPDATE') {
             data.row.firstName = 'John';
@@ -359,14 +420,14 @@ test('upsert', async () => {
 
   const options = {
     callbacks: {
-      onQuery: (context, event, table, data) => {
+      onQuery: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           if (event === 'UPSERT') {
             data.create.status = 200;
           }
         }
       },
-      onResult: (context, event, table, data) => {
+      onResult: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           if (event === 'UPSERT') {
             data.row.firstName = 'John';
@@ -400,14 +461,14 @@ test('delete', async () => {
 
   const options = {
     callbacks: {
-      onQuery: (context, event, table, data) => {
+      onQuery: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           if (event === 'DELETE') {
             data.filter.status = 200;
           }
         }
       },
-      onResult: (context, event, table, data) => {
+      onResult: (context: any, event: any, table: any, data: any) => {
         if (table.model.name === 'User') {
           if (event === 'DELETE') {
             if (data.row) {
@@ -436,14 +497,14 @@ test('delete', async () => {
   db.end();
 });
 
-async function getAliceBob(callbacks) {
+async function getAliceBob(callbacks: any) {
   const db = helper.connectToDatabase(NAME);
 
   const accessor = new Accessor(db, { callbacks });
   const field = db.table('user').model.field('email');
 
-  const alice = accessor.load({ field }, 'alice@example.com');
-  const bob = accessor.load({ field }, 'bob@example.com');
+  const alice = accessor.load({ field: field! }, 'alice@example.com');
+  const bob = accessor.load({ field: field! }, 'bob@example.com');
 
   const result = await Promise.all([alice, bob]);
   db.end();

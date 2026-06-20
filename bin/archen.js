@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
+// Emit the generated GraphQL schema as SDL, so GraphQL codegen tools have a
+// static schema to read. See docs/codegen.md.
+
 const { Archen } = require('../dist');
 const getopt = require('sqlex/lib/getopt');
 const fs = require('fs');
+const path = require('path');
 
 const options = getopt(
   [
@@ -14,95 +18,63 @@ const options = getopt(
     ['  ', '--port'],
     ['  ', '--database'],
     ['  ', '--schemaInfo'],
-    ['  ', '--listen'],
-    ['  ', '--exportGraphqlSchema'],
-    ['  ', '--urlPath']
+    ['-o', '--out'],
+    ['  ', '--exportGraphqlSchema'], // alias for --out (kept for compatibility)
   ],
   {
     dialect: 'mysql',
     host: 'localhost',
     user: 'root',
     password: 'secret',
-    database: 'example'
+    database: 'example',
   }
 );
 
 async function main() {
-  const config = getArchenConfig(options);
-  const archen = new Archen(config);
-
+  const archen = new Archen(getArchenConfig(options));
   await archen.bootstrap();
 
-  if (options.listen) {
-    startGraphqlServer(archen, options);
-  } else if (options.exportGraphqlSchema) {
-    require('fs').writeFileSync(
-      options.exportGraphqlSchema,
-      require('graphql').printSchema(archen.graphql.getSchema())
-    );
-    process.exit();
+  const sdl = archen.printSchema();
+  const out = options.out || options.exportGraphqlSchema;
+  if (out) {
+    fs.writeFileSync(out, sdl);
+    process.stderr.write(`Wrote ${out}\n`);
+  } else {
+    process.stdout.write(sdl);
   }
-}
 
-function startGraphqlServer(archen, options) {
-  const express = require('express');
-  const { graphqlHTTP } = require('express-graphql');
-
-  const app = express();
-
-  app.get('/', (req, res) => res.send('Hello World!'));
-
-  app.use(function(req, res, next) {
-    req.loader = archen.accessor;
-    next();
-  });
-
-  app.use(
-    options.urlPath || '/graphql',
-    graphqlHTTP((request, response, params) => ({
-      schema: archen.graphql.getSchema(),
-      rootValue: archen.graphql.getRootValue(),
-      pretty: false,
-      graphiql: true,
-      customFormatErrorFn: error => ({
-        message: error.message,
-        locations: error.locations,
-        stack: error.stack ? error.stack.split('\n') : [],
-        path: error.path
-      })
-    }))
-  );
-
-  app.listen(options.listen);
+  await archen.shutdown();
 }
 
 function getArchenConfig(options) {
+  if (options.config) {
+    const mod = require(path.resolve(process.cwd(), options.config));
+    return mod.default || mod;
+  }
   let schemaInfo;
   if (options.schemaInfo) {
     schemaInfo = JSON.parse(fs.readFileSync(options.schemaInfo).toString());
   }
-  return options.config
-    ? require(require('path').resolve(process.cwd(), options.config))
-    : {
-        database: {
-          connection: {
-            dialect: options.dialect,
-            connection: {
-              host: options.host,
-              user: options.user,
-              port: options.port,
-              password: options.password,
-              database: options.database,
-              timezone: 'Z',
-              connectionLimit: 2
-            }
-          },
-          schemaInfo,
+  return {
+    database: {
+      connection: {
+        dialect: options.dialect,
+        connection: {
+          host: options.host,
+          user: options.user,
+          port: options.port,
+          password: options.password,
+          database: options.database,
+          timezone: 'Z',
+          connectionLimit: 2,
         },
-        graphql: {
-          getAccessor: context => context.loader
-        }
-      };
+      },
+      schemaInfo,
+    },
+  };
 }
 
-main();
+main().catch((err) => {
+  process.stderr.write(`${(err && err.stack) || err}\n`);
+  process.exit(1);
+});

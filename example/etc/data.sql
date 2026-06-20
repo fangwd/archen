@@ -1,7 +1,7 @@
-insert into user (id, email, first_name, last_name, status) values
-  (1, 'alice@example.com', 'Alice', 'Green', 1),
-  (2, 'bob@example.com', 'Bob', 'Brown', 0),
-  (3, 'grace@example.com', 'Grace', 'White', 1);
+insert into user (id, email, first_name, last_name, status, meta) values
+  (1, 'alice@example.com', 'Alice', 'Green', 1, '{"role": "admin", "age": 30, "vip": true, "opt_in": "news", "tags": ["vip", "early"], "address": {"city": "NYC", "zip": "10001"}}'),
+  (2, 'bob@example.com', 'Bob', 'Brown', 0, '{"role": "editor", "age": 17, "vip": false, "tags": ["beta"], "address": {"city": "LA", "zip": "90001"}}'),
+  (3, 'grace@example.com', 'Grace', 'White', 1, '{"role": "viewer", "age": 45, "vip": true, "tags": ["vip"], "address": {"city": "NYC", "zip": "10002"}}');
 insert into `group`(id, name) values
   (1, 'ADMIN'),
   (2, 'STAFF');

@@ -1,0 +1,2998 @@
+type Query {
+  users(where: FilterUserInput, limit: Int, offset: Int, orderBy: [String]): [User]
+  usersConnection(where: FilterUserInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): UserConnection
+  user(id: Int, email: String): User
+  usersAggregate(where: FilterUserInput, groupBy: [String]): [UserAggregate]
+  userProfiles(where: FilterUserProfileInput, limit: Int, offset: Int, orderBy: [String]): [UserProfile]
+  userProfilesConnection(where: FilterUserProfileInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): UserProfileConnection
+  userProfile(user: FindUserInput): UserProfile
+  userProfilesAggregate(where: FilterUserProfileInput, groupBy: [String]): [UserProfileAggregate]
+  groups(where: FilterGroupInput, limit: Int, offset: Int, orderBy: [String]): [Group]
+  groupsConnection(where: FilterGroupInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): GroupConnection
+  group(id: Int, name: String): Group
+  groupsAggregate(where: FilterGroupInput, groupBy: [String]): [GroupAggregate]
+  userGroups(where: FilterUserGroupInput, limit: Int, offset: Int, orderBy: [String]): [UserGroup]
+  userGroupsConnection(where: FilterUserGroupInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): UserGroupConnection
+  userGroup(id: Int, user: FindUserInput, group: FindGroupInput): UserGroup
+  userGroupsAggregate(where: FilterUserGroupInput, groupBy: [String]): [UserGroupAggregate]
+  categories(where: FilterCategoryInput, limit: Int, offset: Int, orderBy: [String]): [Category]
+  categoriesConnection(where: FilterCategoryInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryConnection
+  category(id: Int, name: String, parent: FindCategoryInput): Category
+  categoriesAggregate(where: FilterCategoryInput, groupBy: [String]): [CategoryAggregate]
+  categoryTrees(where: FilterCategoryTreeInput, limit: Int, offset: Int, orderBy: [String]): [CategoryTree]
+  categoryTreesConnection(where: FilterCategoryTreeInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryTreeConnection
+  categoryTree(id: Int, ancestor: FindCategoryInput, descendant: FindCategoryInput): CategoryTree
+  categoryTreesAggregate(where: FilterCategoryTreeInput, groupBy: [String]): [CategoryTreeAggregate]
+  products(where: FilterProductInput, limit: Int, offset: Int, orderBy: [String]): [Product]
+  productsConnection(where: FilterProductInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): ProductConnection
+  product(id: Int, sku: String): Product
+  productsAggregate(where: FilterProductInput, groupBy: [String]): [ProductAggregate]
+  productCategories(where: FilterProductCategoryInput, limit: Int, offset: Int, orderBy: [String]): [ProductCategory]
+  productCategoriesConnection(where: FilterProductCategoryInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): ProductCategoryConnection
+  productCategory(id: Int, product: FindProductInput, category: FindCategoryInput): ProductCategory
+  productCategoriesAggregate(where: FilterProductCategoryInput, groupBy: [String]): [ProductCategoryAggregate]
+  deliveryAddresses(where: FilterDeliveryAddressInput, limit: Int, offset: Int, orderBy: [String]): [DeliveryAddress]
+  deliveryAddressesConnection(where: FilterDeliveryAddressInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): DeliveryAddressConnection
+  deliveryAddress(id: Int, streetAddress: String, city: String, state: String, country: String): DeliveryAddress
+  deliveryAddressesAggregate(where: FilterDeliveryAddressInput, groupBy: [String]): [DeliveryAddressAggregate]
+  orders(where: FilterOrderInput, limit: Int, offset: Int, orderBy: [String]): [Order]
+  ordersConnection(where: FilterOrderInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderConnection
+  order(id: Int, code: String): Order
+  ordersAggregate(where: FilterOrderInput, groupBy: [String]): [OrderAggregate]
+  orderItems(where: FilterOrderItemInput, limit: Int, offset: Int, orderBy: [String]): [OrderItem]
+  orderItemsConnection(where: FilterOrderItemInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderItemConnection
+  orderItem(id: Int, order: FindOrderInput, product: FindProductInput): OrderItem
+  orderItemsAggregate(where: FilterOrderItemInput, groupBy: [String]): [OrderItemAggregate]
+  orderShippings(where: FilterOrderShippingInput, limit: Int, offset: Int, orderBy: [String]): [OrderShipping]
+  orderShippingsConnection(where: FilterOrderShippingInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderShippingConnection
+  orderShipping(order: FindOrderInput): OrderShipping
+  orderShippingsAggregate(where: FilterOrderShippingInput, groupBy: [String]): [OrderShippingAggregate]
+  orderShippingEvents(where: FilterOrderShippingEventInput, limit: Int, offset: Int, orderBy: [String]): [OrderShippingEvent]
+  orderShippingEventsConnection(where: FilterOrderShippingEventInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderShippingEventConnection
+  orderShippingEvent(id: Int, eventTime: String, orderShipping: FindOrderShippingInput): OrderShippingEvent
+  orderShippingEventsAggregate(where: FilterOrderShippingEventInput, groupBy: [String]): [OrderShippingEventAggregate]
+  stores(where: FilterStoreInput, limit: Int, offset: Int, orderBy: [String]): [Store]
+  storesConnection(where: FilterStoreInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): StoreConnection
+  store(id: Int, name: String): Store
+  storesAggregate(where: FilterStoreInput, groupBy: [String]): [StoreAggregate]
+  storeProducts(where: FilterStoreProductInput, limit: Int, offset: Int, orderBy: [String]): [StoreProduct]
+  storeProductsConnection(where: FilterStoreProductInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): StoreProductConnection
+  storeProduct(id: Int, store: FindStoreInput, product: FindProductInput): StoreProduct
+  storeProductsAggregate(where: FilterStoreProductInput, groupBy: [String]): [StoreProductAggregate]
+}
+
+type User {
+  id: Int
+  email: String
+  firstName: String
+  lastName: String
+  status: Int
+  meta: JSON
+  userProfile(where: FilterUserUserProfileInput): UserUserProfile
+  userGroups(where: FilterUserUserGroupInput, limit: Int, offset: Int, orderBy: [String]): [UserUserGroup]
+  userGroupsConnection(where: FilterUserUserGroupInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): UserUserGroupConnection
+  orders(where: FilterUserOrderInput, limit: Int, offset: Int, orderBy: [String]): [UserOrder]
+  ordersConnection(where: FilterUserOrderInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): UserOrderConnection
+}
+
+"""Arbitrary JSON value; used to filter into json/jsonb columns"""
+scalar JSON
+
+type UserUserProfile {
+  user: User
+}
+
+input FilterUserUserProfileInput {
+  and: [FilterUserUserProfileInput]
+  or: [FilterUserUserProfileInput]
+  not: [FilterUserUserProfileInput]
+}
+
+type UserUserGroup {
+  id: Int
+  group: Group
+  dateAdded: String
+}
+
+type Group {
+  id: Int
+  name: String
+  userGroups(where: FilterGroupUserGroupInput, limit: Int, offset: Int, orderBy: [String]): [GroupUserGroup]
+  userGroupsConnection(where: FilterGroupUserGroupInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): GroupUserGroupConnection
+}
+
+type GroupUserGroup {
+  id: Int
+  user: User
+  dateAdded: String
+}
+
+input FilterGroupUserGroupInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  dateAdded: String
+  dateAdded_lt: String
+  dateAdded_le: String
+  dateAdded_ge: String
+  dateAdded_gt: String
+  dateAdded_ne: String
+  dateAdded_null: Boolean
+  dateAdded_in: [String]
+  dateAdded_like: String
+  dateAdded_ilike: String
+  and: [FilterGroupUserGroupInput]
+  or: [FilterGroupUserGroupInput]
+  not: [FilterGroupUserGroupInput]
+  user: FilterUserInput
+}
+
+input FilterUserInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  email: String
+  email_lt: String
+  email_le: String
+  email_ge: String
+  email_gt: String
+  email_ne: String
+  email_null: Boolean
+  email_in: [String]
+  email_like: String
+  email_ilike: String
+  firstName: String
+  firstName_lt: String
+  firstName_le: String
+  firstName_ge: String
+  firstName_gt: String
+  firstName_ne: String
+  firstName_null: Boolean
+  firstName_in: [String]
+  firstName_like: String
+  firstName_ilike: String
+  lastName: String
+  lastName_lt: String
+  lastName_le: String
+  lastName_ge: String
+  lastName_gt: String
+  lastName_ne: String
+  lastName_null: Boolean
+  lastName_in: [String]
+  lastName_like: String
+  lastName_ilike: String
+  status: Int
+  status_lt: Int
+  status_le: Int
+  status_ge: Int
+  status_gt: Int
+  status_ne: Int
+  status_null: Boolean
+  status_in: [Int]
+  meta: JSON
+  and: [FilterUserInput]
+  or: [FilterUserInput]
+  not: [FilterUserInput]
+  userProfile_some: FilterUserUserProfileInput
+  userProfile_none: FilterUserUserProfileInput
+  userGroups_some: FilterUserUserGroupInput
+  userGroups_none: FilterUserUserGroupInput
+  orders_some: FilterUserOrderInput
+  orders_none: FilterUserOrderInput
+}
+
+input FilterUserUserGroupInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  dateAdded: String
+  dateAdded_lt: String
+  dateAdded_le: String
+  dateAdded_ge: String
+  dateAdded_gt: String
+  dateAdded_ne: String
+  dateAdded_null: Boolean
+  dateAdded_in: [String]
+  dateAdded_like: String
+  dateAdded_ilike: String
+  and: [FilterUserUserGroupInput]
+  or: [FilterUserUserGroupInput]
+  not: [FilterUserUserGroupInput]
+  group: FilterGroupInput
+}
+
+input FilterGroupInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  name: String
+  name_lt: String
+  name_le: String
+  name_ge: String
+  name_gt: String
+  name_ne: String
+  name_null: Boolean
+  name_in: [String]
+  name_like: String
+  name_ilike: String
+  and: [FilterGroupInput]
+  or: [FilterGroupInput]
+  not: [FilterGroupInput]
+  userGroups_some: FilterGroupUserGroupInput
+  userGroups_none: FilterGroupUserGroupInput
+}
+
+input FilterUserOrderInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  code: String
+  code_lt: String
+  code_le: String
+  code_ge: String
+  code_gt: String
+  code_ne: String
+  code_null: Boolean
+  code_in: [String]
+  code_like: String
+  code_ilike: String
+  dateCreated: String
+  dateCreated_lt: String
+  dateCreated_le: String
+  dateCreated_ge: String
+  dateCreated_gt: String
+  dateCreated_ne: String
+  dateCreated_null: Boolean
+  dateCreated_in: [String]
+  dateCreated_like: String
+  dateCreated_ilike: String
+  isDeleted: Int
+  isDeleted_lt: Int
+  isDeleted_le: Int
+  isDeleted_ge: Int
+  isDeleted_gt: Int
+  isDeleted_ne: Int
+  isDeleted_null: Boolean
+  isDeleted_in: [Int]
+  status: Int
+  status_lt: Int
+  status_le: Int
+  status_ge: Int
+  status_gt: Int
+  status_ne: Int
+  status_null: Boolean
+  status_in: [Int]
+  and: [FilterUserOrderInput]
+  or: [FilterUserOrderInput]
+  not: [FilterUserOrderInput]
+  deliveryAddress: FilterDeliveryAddressInput
+}
+
+input FilterDeliveryAddressInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  streetAddress: String
+  streetAddress_lt: String
+  streetAddress_le: String
+  streetAddress_ge: String
+  streetAddress_gt: String
+  streetAddress_ne: String
+  streetAddress_null: Boolean
+  streetAddress_in: [String]
+  streetAddress_like: String
+  streetAddress_ilike: String
+  city: String
+  city_lt: String
+  city_le: String
+  city_ge: String
+  city_gt: String
+  city_ne: String
+  city_null: Boolean
+  city_in: [String]
+  city_like: String
+  city_ilike: String
+  state: String
+  state_lt: String
+  state_le: String
+  state_ge: String
+  state_gt: String
+  state_ne: String
+  state_null: Boolean
+  state_in: [String]
+  state_like: String
+  state_ilike: String
+  country: String
+  country_lt: String
+  country_le: String
+  country_ge: String
+  country_gt: String
+  country_ne: String
+  country_null: Boolean
+  country_in: [String]
+  country_like: String
+  country_ilike: String
+  postalCode: String
+  postalCode_lt: String
+  postalCode_le: String
+  postalCode_ge: String
+  postalCode_gt: String
+  postalCode_ne: String
+  postalCode_null: Boolean
+  postalCode_in: [String]
+  postalCode_like: String
+  postalCode_ilike: String
+  and: [FilterDeliveryAddressInput]
+  or: [FilterDeliveryAddressInput]
+  not: [FilterDeliveryAddressInput]
+  orders_some: FilterDeliveryAddressOrderInput
+  orders_none: FilterDeliveryAddressOrderInput
+}
+
+input FilterDeliveryAddressOrderInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  code: String
+  code_lt: String
+  code_le: String
+  code_ge: String
+  code_gt: String
+  code_ne: String
+  code_null: Boolean
+  code_in: [String]
+  code_like: String
+  code_ilike: String
+  dateCreated: String
+  dateCreated_lt: String
+  dateCreated_le: String
+  dateCreated_ge: String
+  dateCreated_gt: String
+  dateCreated_ne: String
+  dateCreated_null: Boolean
+  dateCreated_in: [String]
+  dateCreated_like: String
+  dateCreated_ilike: String
+  isDeleted: Int
+  isDeleted_lt: Int
+  isDeleted_le: Int
+  isDeleted_ge: Int
+  isDeleted_gt: Int
+  isDeleted_ne: Int
+  isDeleted_null: Boolean
+  isDeleted_in: [Int]
+  status: Int
+  status_lt: Int
+  status_le: Int
+  status_ge: Int
+  status_gt: Int
+  status_ne: Int
+  status_null: Boolean
+  status_in: [Int]
+  and: [FilterDeliveryAddressOrderInput]
+  or: [FilterDeliveryAddressOrderInput]
+  not: [FilterDeliveryAddressOrderInput]
+  user: FilterUserInput
+}
+
+type GroupUserGroupConnection {
+  pageInfo: PageInfo
+  edges: [GroupUserGroupsEdge]
+  userGroups: [Group]
+}
+
+type PageInfo {
+  startCursor: String
+  endCursor: String
+  hasNextPage: Boolean
+  hasPreviousPage: Boolean
+}
+
+type GroupUserGroupsEdge {
+  node: GroupUserGroup
+  cursor: String
+}
+
+type UserUserGroupConnection {
+  pageInfo: PageInfo
+  edges: [UserUserGroupsEdge]
+  userGroups: [User]
+}
+
+type UserUserGroupsEdge {
+  node: UserUserGroup
+  cursor: String
+}
+
+type UserOrder {
+  id: Int
+  code: String
+  dateCreated: String
+  deliveryAddress: DeliveryAddress
+  isDeleted: Int
+  status: Int
+  orderItems(where: FilterOrderOrderItemInput, limit: Int, offset: Int, orderBy: [String]): [OrderOrderItem]
+  orderItemsConnection(where: FilterOrderOrderItemInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderOrderItemConnection
+  orderShipping(where: FilterOrderOrderShippingInput): OrderOrderShipping
+}
+
+type DeliveryAddress {
+  id: Int
+  streetAddress: String
+  city: String
+  state: String
+  country: String
+  postalCode: String
+  orders(where: FilterDeliveryAddressOrderInput, limit: Int, offset: Int, orderBy: [String]): [DeliveryAddressOrder]
+  ordersConnection(where: FilterDeliveryAddressOrderInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): DeliveryAddressOrderConnection
+}
+
+type DeliveryAddressOrder {
+  id: Int
+  code: String
+  dateCreated: String
+  user: User
+  isDeleted: Int
+  status: Int
+  orderItems(where: FilterOrderOrderItemInput, limit: Int, offset: Int, orderBy: [String]): [OrderOrderItem]
+  orderItemsConnection(where: FilterOrderOrderItemInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderOrderItemConnection
+  orderShipping(where: FilterOrderOrderShippingInput): OrderOrderShipping
+}
+
+type OrderOrderItem {
+  id: Int
+  product: Product
+  quantity: Float
+}
+
+type Product {
+  id: Int
+  sku: String
+  name: String
+  price: Float
+  stockQuantity: Float
+  status: Int
+  categories(where: FilterCategoryInput, limit: Int, offset: Int, orderBy: [String]): [Category]
+  categoriesConnection(where: FilterCategoryInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryConnection
+  orderItems(where: FilterProductOrderItemInput, limit: Int, offset: Int, orderBy: [String]): [ProductOrderItem]
+  orderItemsConnection(where: FilterProductOrderItemInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): ProductOrderItemConnection
+  storeProducts(where: FilterProductStoreProductInput, limit: Int, offset: Int, orderBy: [String]): [ProductStoreProduct]
+  storeProductsConnection(where: FilterProductStoreProductInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): ProductStoreProductConnection
+}
+
+type Category {
+  id: Int
+  name: String
+  description: String
+  parent: Category
+  categories(where: FilterCategoryCategoryInput, limit: Int, offset: Int, orderBy: [String]): [CategoryCategory]
+  categoriesConnection(where: FilterCategoryCategoryInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryCategoryConnection
+  ancestorCategoryTrees(where: FilterCategoryCategoryTreeAncestorInput, limit: Int, offset: Int, orderBy: [String]): [CategoryCategoryTreeAncestor]
+  ancestorCategoryTreesConnection(where: FilterCategoryCategoryTreeAncestorInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryCategoryTreeAncestorConnection
+  descendantCategoryTrees(where: FilterCategoryCategoryTreeDescendantInput, limit: Int, offset: Int, orderBy: [String]): [CategoryCategoryTreeDescendant]
+  descendantCategoryTreesConnection(where: FilterCategoryCategoryTreeDescendantInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryCategoryTreeDescendantConnection
+  products(where: FilterProductInput, limit: Int, offset: Int, orderBy: [String]): [Product]
+  productsConnection(where: FilterProductInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): ProductConnection
+}
+
+type CategoryCategory {
+  id: Int
+  name: String
+  description: String
+  categories(where: FilterCategoryCategoryInput, limit: Int, offset: Int, orderBy: [String]): [CategoryCategory]
+  categoriesConnection(where: FilterCategoryCategoryInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryCategoryConnection
+  ancestorCategoryTrees(where: FilterCategoryCategoryTreeAncestorInput, limit: Int, offset: Int, orderBy: [String]): [CategoryCategoryTreeAncestor]
+  ancestorCategoryTreesConnection(where: FilterCategoryCategoryTreeAncestorInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryCategoryTreeAncestorConnection
+  descendantCategoryTrees(where: FilterCategoryCategoryTreeDescendantInput, limit: Int, offset: Int, orderBy: [String]): [CategoryCategoryTreeDescendant]
+  descendantCategoryTreesConnection(where: FilterCategoryCategoryTreeDescendantInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): CategoryCategoryTreeDescendantConnection
+  products(where: FilterProductInput, limit: Int, offset: Int, orderBy: [String]): [Product]
+  productsConnection(where: FilterProductInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): ProductConnection
+}
+
+input FilterCategoryCategoryInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  name: String
+  name_lt: String
+  name_le: String
+  name_ge: String
+  name_gt: String
+  name_ne: String
+  name_null: Boolean
+  name_in: [String]
+  name_like: String
+  name_ilike: String
+  description: String
+  description_lt: String
+  description_le: String
+  description_ge: String
+  description_gt: String
+  description_ne: String
+  description_null: Boolean
+  description_in: [String]
+  description_like: String
+  description_ilike: String
+  and: [FilterCategoryCategoryInput]
+  or: [FilterCategoryCategoryInput]
+  not: [FilterCategoryCategoryInput]
+}
+
+type CategoryCategoryConnection {
+  pageInfo: PageInfo
+  edges: [CategoryCategoriesEdge]
+  categories: [Category]
+}
+
+type CategoryCategoriesEdge {
+  node: CategoryCategory
+  cursor: String
+}
+
+type CategoryCategoryTreeAncestor {
+  id: Int
+  descendant: Category
+  distance: Int
+}
+
+input FilterCategoryCategoryTreeAncestorInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  distance: Int
+  distance_lt: Int
+  distance_le: Int
+  distance_ge: Int
+  distance_gt: Int
+  distance_ne: Int
+  distance_null: Boolean
+  distance_in: [Int]
+  and: [FilterCategoryCategoryTreeAncestorInput]
+  or: [FilterCategoryCategoryTreeAncestorInput]
+  not: [FilterCategoryCategoryTreeAncestorInput]
+  descendant: FilterCategoryInput
+}
+
+input FilterCategoryInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  name: String
+  name_lt: String
+  name_le: String
+  name_ge: String
+  name_gt: String
+  name_ne: String
+  name_null: Boolean
+  name_in: [String]
+  name_like: String
+  name_ilike: String
+  description: String
+  description_lt: String
+  description_le: String
+  description_ge: String
+  description_gt: String
+  description_ne: String
+  description_null: Boolean
+  description_in: [String]
+  description_like: String
+  description_ilike: String
+  and: [FilterCategoryInput]
+  or: [FilterCategoryInput]
+  not: [FilterCategoryInput]
+  parent: FilterCategoryInput
+  categories_some: FilterCategoryCategoryInput
+  categories_none: FilterCategoryCategoryInput
+  ancestorCategoryTrees_some: FilterCategoryCategoryTreeAncestorInput
+  ancestorCategoryTrees_none: FilterCategoryCategoryTreeAncestorInput
+  descendantCategoryTrees_some: FilterCategoryCategoryTreeDescendantInput
+  descendantCategoryTrees_none: FilterCategoryCategoryTreeDescendantInput
+  products_some: FilterProductInput
+  products_none: FilterProductInput
+}
+
+input FilterCategoryCategoryTreeDescendantInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  distance: Int
+  distance_lt: Int
+  distance_le: Int
+  distance_ge: Int
+  distance_gt: Int
+  distance_ne: Int
+  distance_null: Boolean
+  distance_in: [Int]
+  and: [FilterCategoryCategoryTreeDescendantInput]
+  or: [FilterCategoryCategoryTreeDescendantInput]
+  not: [FilterCategoryCategoryTreeDescendantInput]
+  ancestor: FilterCategoryInput
+}
+
+input FilterProductInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  sku: String
+  sku_lt: String
+  sku_le: String
+  sku_ge: String
+  sku_gt: String
+  sku_ne: String
+  sku_null: Boolean
+  sku_in: [String]
+  sku_like: String
+  sku_ilike: String
+  name: String
+  name_lt: String
+  name_le: String
+  name_ge: String
+  name_gt: String
+  name_ne: String
+  name_null: Boolean
+  name_in: [String]
+  name_like: String
+  name_ilike: String
+  price: Float
+  price_lt: Float
+  price_le: Float
+  price_ge: Float
+  price_gt: Float
+  price_ne: Float
+  price_null: Boolean
+  price_in: [Float]
+  stockQuantity: Float
+  stockQuantity_lt: Float
+  stockQuantity_le: Float
+  stockQuantity_ge: Float
+  stockQuantity_gt: Float
+  stockQuantity_ne: Float
+  stockQuantity_null: Boolean
+  stockQuantity_in: [Float]
+  status: Int
+  status_lt: Int
+  status_le: Int
+  status_ge: Int
+  status_gt: Int
+  status_ne: Int
+  status_null: Boolean
+  status_in: [Int]
+  and: [FilterProductInput]
+  or: [FilterProductInput]
+  not: [FilterProductInput]
+  categories_some: FilterCategoryInput
+  categories_none: FilterCategoryInput
+  orderItems_some: FilterProductOrderItemInput
+  orderItems_none: FilterProductOrderItemInput
+  storeProducts_some: FilterProductStoreProductInput
+  storeProducts_none: FilterProductStoreProductInput
+}
+
+input FilterProductOrderItemInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  quantity: Float
+  quantity_lt: Float
+  quantity_le: Float
+  quantity_ge: Float
+  quantity_gt: Float
+  quantity_ne: Float
+  quantity_null: Boolean
+  quantity_in: [Float]
+  and: [FilterProductOrderItemInput]
+  or: [FilterProductOrderItemInput]
+  not: [FilterProductOrderItemInput]
+  order: FilterOrderInput
+}
+
+input FilterOrderInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  code: String
+  code_lt: String
+  code_le: String
+  code_ge: String
+  code_gt: String
+  code_ne: String
+  code_null: Boolean
+  code_in: [String]
+  code_like: String
+  code_ilike: String
+  dateCreated: String
+  dateCreated_lt: String
+  dateCreated_le: String
+  dateCreated_ge: String
+  dateCreated_gt: String
+  dateCreated_ne: String
+  dateCreated_null: Boolean
+  dateCreated_in: [String]
+  dateCreated_like: String
+  dateCreated_ilike: String
+  isDeleted: Int
+  isDeleted_lt: Int
+  isDeleted_le: Int
+  isDeleted_ge: Int
+  isDeleted_gt: Int
+  isDeleted_ne: Int
+  isDeleted_null: Boolean
+  isDeleted_in: [Int]
+  status: Int
+  status_lt: Int
+  status_le: Int
+  status_ge: Int
+  status_gt: Int
+  status_ne: Int
+  status_null: Boolean
+  status_in: [Int]
+  and: [FilterOrderInput]
+  or: [FilterOrderInput]
+  not: [FilterOrderInput]
+  user: FilterUserInput
+  deliveryAddress: FilterDeliveryAddressInput
+  orderItems_some: FilterOrderOrderItemInput
+  orderItems_none: FilterOrderOrderItemInput
+  orderShipping_some: FilterOrderOrderShippingInput
+  orderShipping_none: FilterOrderOrderShippingInput
+}
+
+input FilterOrderOrderItemInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  quantity: Float
+  quantity_lt: Float
+  quantity_le: Float
+  quantity_ge: Float
+  quantity_gt: Float
+  quantity_ne: Float
+  quantity_null: Boolean
+  quantity_in: [Float]
+  and: [FilterOrderOrderItemInput]
+  or: [FilterOrderOrderItemInput]
+  not: [FilterOrderOrderItemInput]
+  product: FilterProductInput
+}
+
+input FilterOrderOrderShippingInput {
+  status: Int
+  status_lt: Int
+  status_le: Int
+  status_ge: Int
+  status_gt: Int
+  status_ne: Int
+  status_null: Boolean
+  status_in: [Int]
+  and: [FilterOrderOrderShippingInput]
+  or: [FilterOrderOrderShippingInput]
+  not: [FilterOrderOrderShippingInput]
+}
+
+input FilterProductStoreProductInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  price: Float
+  price_lt: Float
+  price_le: Float
+  price_ge: Float
+  price_gt: Float
+  price_ne: Float
+  price_null: Boolean
+  price_in: [Float]
+  and: [FilterProductStoreProductInput]
+  or: [FilterProductStoreProductInput]
+  not: [FilterProductStoreProductInput]
+  store: FilterStoreInput
+}
+
+input FilterStoreInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  name: String
+  name_lt: String
+  name_le: String
+  name_ge: String
+  name_gt: String
+  name_ne: String
+  name_null: Boolean
+  name_in: [String]
+  name_like: String
+  name_ilike: String
+  and: [FilterStoreInput]
+  or: [FilterStoreInput]
+  not: [FilterStoreInput]
+  storeProducts_some: FilterStoreStoreProductInput
+  storeProducts_none: FilterStoreStoreProductInput
+}
+
+input FilterStoreStoreProductInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  price: Float
+  price_lt: Float
+  price_le: Float
+  price_ge: Float
+  price_gt: Float
+  price_ne: Float
+  price_null: Boolean
+  price_in: [Float]
+  and: [FilterStoreStoreProductInput]
+  or: [FilterStoreStoreProductInput]
+  not: [FilterStoreStoreProductInput]
+  product: FilterProductInput
+}
+
+type CategoryCategoryTreeAncestorConnection {
+  pageInfo: PageInfo
+  edges: [CategoryCategoryTreeAncestorsEdge]
+  ancestorCategoryTrees: [Category]
+}
+
+type CategoryCategoryTreeAncestorsEdge {
+  node: CategoryCategoryTreeAncestor
+  cursor: String
+}
+
+type CategoryCategoryTreeDescendant {
+  id: Int
+  ancestor: Category
+  distance: Int
+}
+
+type CategoryCategoryTreeDescendantConnection {
+  pageInfo: PageInfo
+  edges: [CategoryCategoryTreeDescendantsEdge]
+  descendantCategoryTrees: [Category]
+}
+
+type CategoryCategoryTreeDescendantsEdge {
+  node: CategoryCategoryTreeDescendant
+  cursor: String
+}
+
+type ProductConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [ProductEdge]
+  products: [Product]
+}
+
+type ProductEdge {
+  node: Product
+  cursor: String
+}
+
+type CategoryConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [CategoryEdge]
+  categories: [Category]
+}
+
+type CategoryEdge {
+  node: Category
+  cursor: String
+}
+
+type ProductOrderItem {
+  id: Int
+  order: Order
+  quantity: Float
+}
+
+type Order {
+  id: Int
+  code: String
+  dateCreated: String
+  user: User
+  deliveryAddress: DeliveryAddress
+  isDeleted: Int
+  status: Int
+  orderItems(where: FilterOrderOrderItemInput, limit: Int, offset: Int, orderBy: [String]): [OrderOrderItem]
+  orderItemsConnection(where: FilterOrderOrderItemInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderOrderItemConnection
+  orderShipping(where: FilterOrderOrderShippingInput): OrderOrderShipping
+}
+
+type OrderOrderItemConnection {
+  pageInfo: PageInfo
+  edges: [OrderOrderItemsEdge]
+  orderItems: [Order]
+}
+
+type OrderOrderItemsEdge {
+  node: OrderOrderItem
+  cursor: String
+}
+
+type OrderOrderShipping {
+  status: Int
+  orderShippingEvents(where: FilterOrderShippingOrderShippingEventInput, limit: Int, offset: Int, orderBy: [String]): [OrderShippingOrderShippingEvent]
+  orderShippingEventsConnection(where: FilterOrderShippingOrderShippingEventInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderShippingOrderShippingEventConnection
+}
+
+type OrderShippingOrderShippingEvent {
+  id: Int
+  eventTime: String
+  eventDescription: String
+}
+
+input FilterOrderShippingOrderShippingEventInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  eventTime: String
+  eventTime_lt: String
+  eventTime_le: String
+  eventTime_ge: String
+  eventTime_gt: String
+  eventTime_ne: String
+  eventTime_null: Boolean
+  eventTime_in: [String]
+  eventTime_like: String
+  eventTime_ilike: String
+  eventDescription: String
+  eventDescription_lt: String
+  eventDescription_le: String
+  eventDescription_ge: String
+  eventDescription_gt: String
+  eventDescription_ne: String
+  eventDescription_null: Boolean
+  eventDescription_in: [String]
+  eventDescription_like: String
+  eventDescription_ilike: String
+  and: [FilterOrderShippingOrderShippingEventInput]
+  or: [FilterOrderShippingOrderShippingEventInput]
+  not: [FilterOrderShippingOrderShippingEventInput]
+}
+
+type OrderShippingOrderShippingEventConnection {
+  pageInfo: PageInfo
+  edges: [OrderShippingOrderShippingEventsEdge]
+  orderShippingEvents: [OrderShipping]
+}
+
+type OrderShippingOrderShippingEventsEdge {
+  node: OrderShippingOrderShippingEvent
+  cursor: String
+}
+
+type OrderShipping {
+  order: Order
+  status: Int
+  orderShippingEvents(where: FilterOrderShippingOrderShippingEventInput, limit: Int, offset: Int, orderBy: [String]): [OrderShippingOrderShippingEvent]
+  orderShippingEventsConnection(where: FilterOrderShippingOrderShippingEventInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): OrderShippingOrderShippingEventConnection
+}
+
+type ProductOrderItemConnection {
+  pageInfo: PageInfo
+  edges: [ProductOrderItemsEdge]
+  orderItems: [Product]
+}
+
+type ProductOrderItemsEdge {
+  node: ProductOrderItem
+  cursor: String
+}
+
+type ProductStoreProduct {
+  id: Int
+  store: Store
+  price: Float
+}
+
+type Store {
+  id: Int
+  name: String
+  storeProducts(where: FilterStoreStoreProductInput, limit: Int, offset: Int, orderBy: [String]): [StoreStoreProduct]
+  storeProductsConnection(where: FilterStoreStoreProductInput, first: Int, after: String, last: Int, before: String, orderBy: [String]): StoreStoreProductConnection
+}
+
+type StoreStoreProduct {
+  id: Int
+  product: Product
+  price: Float
+}
+
+type StoreStoreProductConnection {
+  pageInfo: PageInfo
+  edges: [StoreStoreProductsEdge]
+  storeProducts: [Store]
+}
+
+type StoreStoreProductsEdge {
+  node: StoreStoreProduct
+  cursor: String
+}
+
+type ProductStoreProductConnection {
+  pageInfo: PageInfo
+  edges: [ProductStoreProductsEdge]
+  storeProducts: [Product]
+}
+
+type ProductStoreProductsEdge {
+  node: ProductStoreProduct
+  cursor: String
+}
+
+type DeliveryAddressOrderConnection {
+  pageInfo: PageInfo
+  edges: [DeliveryAddressOrdersEdge]
+  orders: [DeliveryAddress]
+}
+
+type DeliveryAddressOrdersEdge {
+  node: DeliveryAddressOrder
+  cursor: String
+}
+
+type UserOrderConnection {
+  pageInfo: PageInfo
+  edges: [UserOrdersEdge]
+  orders: [User]
+}
+
+type UserOrdersEdge {
+  node: UserOrder
+  cursor: String
+}
+
+type UserConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [UserEdge]
+  users: [User]
+}
+
+type UserEdge {
+  node: User
+  cursor: String
+}
+
+type UserAggregate {
+  count: Int
+  keys: UserFieldAggregate
+  sum: UserNumberAggregate
+  avg: UserNumberAggregate
+  min: UserFieldAggregate
+  max: UserFieldAggregate
+}
+
+type UserFieldAggregate {
+  id: Int
+  email: String
+  firstName: String
+  lastName: String
+  status: Int
+}
+
+type UserNumberAggregate {
+  id: Float
+  status: Float
+}
+
+type UserProfile {
+  user: User
+}
+
+input FilterUserProfileInput {
+  and: [FilterUserProfileInput]
+  or: [FilterUserProfileInput]
+  not: [FilterUserProfileInput]
+  user: FilterUserInput
+}
+
+type UserProfileConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [UserProfileEdge]
+  userProfiles: [UserProfile]
+}
+
+type UserProfileEdge {
+  node: UserProfile
+  cursor: String
+}
+
+input FindUserInput {
+  id: Int
+  email: String
+}
+
+type UserProfileAggregate {
+  count: Int
+}
+
+type GroupConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [GroupEdge]
+  groups: [Group]
+}
+
+type GroupEdge {
+  node: Group
+  cursor: String
+}
+
+type GroupAggregate {
+  count: Int
+  keys: GroupFieldAggregate
+  sum: GroupNumberAggregate
+  avg: GroupNumberAggregate
+  min: GroupFieldAggregate
+  max: GroupFieldAggregate
+}
+
+type GroupFieldAggregate {
+  id: Int
+  name: String
+}
+
+type GroupNumberAggregate {
+  id: Float
+}
+
+type UserGroup {
+  id: Int
+  user: User
+  group: Group
+  dateAdded: String
+}
+
+input FilterUserGroupInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  dateAdded: String
+  dateAdded_lt: String
+  dateAdded_le: String
+  dateAdded_ge: String
+  dateAdded_gt: String
+  dateAdded_ne: String
+  dateAdded_null: Boolean
+  dateAdded_in: [String]
+  dateAdded_like: String
+  dateAdded_ilike: String
+  and: [FilterUserGroupInput]
+  or: [FilterUserGroupInput]
+  not: [FilterUserGroupInput]
+  user: FilterUserInput
+  group: FilterGroupInput
+}
+
+type UserGroupConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [UserGroupEdge]
+  userGroups: [UserGroup]
+}
+
+type UserGroupEdge {
+  node: UserGroup
+  cursor: String
+}
+
+input FindGroupInput {
+  id: Int
+  name: String
+}
+
+type UserGroupAggregate {
+  count: Int
+  keys: UserGroupFieldAggregate
+  sum: UserGroupNumberAggregate
+  avg: UserGroupNumberAggregate
+  min: UserGroupFieldAggregate
+  max: UserGroupFieldAggregate
+}
+
+type UserGroupFieldAggregate {
+  id: Int
+  dateAdded: String
+}
+
+type UserGroupNumberAggregate {
+  id: Float
+}
+
+input FindCategoryInput {
+  id: Int
+  name: String
+  parent: FindCategoryInput
+}
+
+type CategoryAggregate {
+  count: Int
+  keys: CategoryFieldAggregate
+  sum: CategoryNumberAggregate
+  avg: CategoryNumberAggregate
+  min: CategoryFieldAggregate
+  max: CategoryFieldAggregate
+}
+
+type CategoryFieldAggregate {
+  id: Int
+  name: String
+  description: String
+}
+
+type CategoryNumberAggregate {
+  id: Float
+}
+
+type CategoryTree {
+  id: Int
+  ancestor: Category
+  descendant: Category
+  distance: Int
+}
+
+input FilterCategoryTreeInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  distance: Int
+  distance_lt: Int
+  distance_le: Int
+  distance_ge: Int
+  distance_gt: Int
+  distance_ne: Int
+  distance_null: Boolean
+  distance_in: [Int]
+  and: [FilterCategoryTreeInput]
+  or: [FilterCategoryTreeInput]
+  not: [FilterCategoryTreeInput]
+  ancestor: FilterCategoryInput
+  descendant: FilterCategoryInput
+}
+
+type CategoryTreeConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [CategoryTreeEdge]
+  categoryTrees: [CategoryTree]
+}
+
+type CategoryTreeEdge {
+  node: CategoryTree
+  cursor: String
+}
+
+type CategoryTreeAggregate {
+  count: Int
+  keys: CategoryTreeFieldAggregate
+  sum: CategoryTreeNumberAggregate
+  avg: CategoryTreeNumberAggregate
+  min: CategoryTreeFieldAggregate
+  max: CategoryTreeFieldAggregate
+}
+
+type CategoryTreeFieldAggregate {
+  id: Int
+  distance: Int
+}
+
+type CategoryTreeNumberAggregate {
+  id: Float
+  distance: Float
+}
+
+type ProductAggregate {
+  count: Int
+  keys: ProductFieldAggregate
+  sum: ProductNumberAggregate
+  avg: ProductNumberAggregate
+  min: ProductFieldAggregate
+  max: ProductFieldAggregate
+}
+
+type ProductFieldAggregate {
+  id: Int
+  sku: String
+  name: String
+  price: Float
+  stockQuantity: Float
+  status: Int
+}
+
+type ProductNumberAggregate {
+  id: Float
+  price: Float
+  stockQuantity: Float
+  status: Float
+}
+
+type ProductCategory {
+  id: Int
+  product: Product
+  category: Category
+}
+
+input FilterProductCategoryInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  and: [FilterProductCategoryInput]
+  or: [FilterProductCategoryInput]
+  not: [FilterProductCategoryInput]
+  product: FilterProductInput
+  category: FilterCategoryInput
+}
+
+type ProductCategoryConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [ProductCategoryEdge]
+  productCategories: [ProductCategory]
+}
+
+type ProductCategoryEdge {
+  node: ProductCategory
+  cursor: String
+}
+
+input FindProductInput {
+  id: Int
+  sku: String
+}
+
+type ProductCategoryAggregate {
+  count: Int
+  keys: ProductCategoryFieldAggregate
+  sum: ProductCategoryNumberAggregate
+  avg: ProductCategoryNumberAggregate
+  min: ProductCategoryFieldAggregate
+  max: ProductCategoryFieldAggregate
+}
+
+type ProductCategoryFieldAggregate {
+  id: Int
+}
+
+type ProductCategoryNumberAggregate {
+  id: Float
+}
+
+type DeliveryAddressConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [DeliveryAddressEdge]
+  deliveryAddresses: [DeliveryAddress]
+}
+
+type DeliveryAddressEdge {
+  node: DeliveryAddress
+  cursor: String
+}
+
+type DeliveryAddressAggregate {
+  count: Int
+  keys: DeliveryAddressFieldAggregate
+  sum: DeliveryAddressNumberAggregate
+  avg: DeliveryAddressNumberAggregate
+  min: DeliveryAddressFieldAggregate
+  max: DeliveryAddressFieldAggregate
+}
+
+type DeliveryAddressFieldAggregate {
+  id: Int
+  streetAddress: String
+  city: String
+  state: String
+  country: String
+  postalCode: String
+}
+
+type DeliveryAddressNumberAggregate {
+  id: Float
+}
+
+type OrderConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [OrderEdge]
+  orders: [Order]
+}
+
+type OrderEdge {
+  node: Order
+  cursor: String
+}
+
+type OrderAggregate {
+  count: Int
+  keys: OrderFieldAggregate
+  sum: OrderNumberAggregate
+  avg: OrderNumberAggregate
+  min: OrderFieldAggregate
+  max: OrderFieldAggregate
+}
+
+type OrderFieldAggregate {
+  id: Int
+  code: String
+  dateCreated: String
+  isDeleted: Int
+  status: Int
+}
+
+type OrderNumberAggregate {
+  id: Float
+  isDeleted: Float
+  status: Float
+}
+
+type OrderItem {
+  id: Int
+  order: Order
+  product: Product
+  quantity: Float
+}
+
+input FilterOrderItemInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  quantity: Float
+  quantity_lt: Float
+  quantity_le: Float
+  quantity_ge: Float
+  quantity_gt: Float
+  quantity_ne: Float
+  quantity_null: Boolean
+  quantity_in: [Float]
+  and: [FilterOrderItemInput]
+  or: [FilterOrderItemInput]
+  not: [FilterOrderItemInput]
+  order: FilterOrderInput
+  product: FilterProductInput
+}
+
+type OrderItemConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [OrderItemEdge]
+  orderItems: [OrderItem]
+}
+
+type OrderItemEdge {
+  node: OrderItem
+  cursor: String
+}
+
+input FindOrderInput {
+  id: Int
+  code: String
+}
+
+type OrderItemAggregate {
+  count: Int
+  keys: OrderItemFieldAggregate
+  sum: OrderItemNumberAggregate
+  avg: OrderItemNumberAggregate
+  min: OrderItemFieldAggregate
+  max: OrderItemFieldAggregate
+}
+
+type OrderItemFieldAggregate {
+  id: Int
+  quantity: Float
+}
+
+type OrderItemNumberAggregate {
+  id: Float
+  quantity: Float
+}
+
+input FilterOrderShippingInput {
+  status: Int
+  status_lt: Int
+  status_le: Int
+  status_ge: Int
+  status_gt: Int
+  status_ne: Int
+  status_null: Boolean
+  status_in: [Int]
+  and: [FilterOrderShippingInput]
+  or: [FilterOrderShippingInput]
+  not: [FilterOrderShippingInput]
+  order: FilterOrderInput
+  orderShippingEvents_some: FilterOrderShippingOrderShippingEventInput
+  orderShippingEvents_none: FilterOrderShippingOrderShippingEventInput
+}
+
+type OrderShippingConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [OrderShippingEdge]
+  orderShippings: [OrderShipping]
+}
+
+type OrderShippingEdge {
+  node: OrderShipping
+  cursor: String
+}
+
+type OrderShippingAggregate {
+  count: Int
+  keys: OrderShippingFieldAggregate
+  sum: OrderShippingNumberAggregate
+  avg: OrderShippingNumberAggregate
+  min: OrderShippingFieldAggregate
+  max: OrderShippingFieldAggregate
+}
+
+type OrderShippingFieldAggregate {
+  status: Int
+}
+
+type OrderShippingNumberAggregate {
+  status: Float
+}
+
+type OrderShippingEvent {
+  id: Int
+  orderShipping: OrderShipping
+  eventTime: String
+  eventDescription: String
+}
+
+input FilterOrderShippingEventInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  eventTime: String
+  eventTime_lt: String
+  eventTime_le: String
+  eventTime_ge: String
+  eventTime_gt: String
+  eventTime_ne: String
+  eventTime_null: Boolean
+  eventTime_in: [String]
+  eventTime_like: String
+  eventTime_ilike: String
+  eventDescription: String
+  eventDescription_lt: String
+  eventDescription_le: String
+  eventDescription_ge: String
+  eventDescription_gt: String
+  eventDescription_ne: String
+  eventDescription_null: Boolean
+  eventDescription_in: [String]
+  eventDescription_like: String
+  eventDescription_ilike: String
+  and: [FilterOrderShippingEventInput]
+  or: [FilterOrderShippingEventInput]
+  not: [FilterOrderShippingEventInput]
+  orderShipping: FilterOrderShippingInput
+}
+
+type OrderShippingEventConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [OrderShippingEventEdge]
+  orderShippingEvents: [OrderShippingEvent]
+}
+
+type OrderShippingEventEdge {
+  node: OrderShippingEvent
+  cursor: String
+}
+
+input FindOrderShippingInput {
+  order: FindOrderInput
+}
+
+type OrderShippingEventAggregate {
+  count: Int
+  keys: OrderShippingEventFieldAggregate
+  sum: OrderShippingEventNumberAggregate
+  avg: OrderShippingEventNumberAggregate
+  min: OrderShippingEventFieldAggregate
+  max: OrderShippingEventFieldAggregate
+}
+
+type OrderShippingEventFieldAggregate {
+  id: Int
+  eventTime: String
+  eventDescription: String
+}
+
+type OrderShippingEventNumberAggregate {
+  id: Float
+}
+
+type StoreConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [StoreEdge]
+  stores: [Store]
+}
+
+type StoreEdge {
+  node: Store
+  cursor: String
+}
+
+type StoreAggregate {
+  count: Int
+  keys: StoreFieldAggregate
+  sum: StoreNumberAggregate
+  avg: StoreNumberAggregate
+  min: StoreFieldAggregate
+  max: StoreFieldAggregate
+}
+
+type StoreFieldAggregate {
+  id: Int
+  name: String
+}
+
+type StoreNumberAggregate {
+  id: Float
+}
+
+type StoreProduct {
+  id: Int
+  store: Store
+  product: Product
+  price: Float
+}
+
+input FilterStoreProductInput {
+  id: Int
+  id_lt: Int
+  id_le: Int
+  id_ge: Int
+  id_gt: Int
+  id_ne: Int
+  id_null: Boolean
+  id_in: [Int]
+  price: Float
+  price_lt: Float
+  price_le: Float
+  price_ge: Float
+  price_gt: Float
+  price_ne: Float
+  price_null: Boolean
+  price_in: [Float]
+  and: [FilterStoreProductInput]
+  or: [FilterStoreProductInput]
+  not: [FilterStoreProductInput]
+  store: FilterStoreInput
+  product: FilterProductInput
+}
+
+type StoreProductConnection {
+  totalCount: Int
+  pageInfo: PageInfo
+  edges: [StoreProductEdge]
+  storeProducts: [StoreProduct]
+}
+
+type StoreProductEdge {
+  node: StoreProduct
+  cursor: String
+}
+
+input FindStoreInput {
+  id: Int
+  name: String
+}
+
+type StoreProductAggregate {
+  count: Int
+  keys: StoreProductFieldAggregate
+  sum: StoreProductNumberAggregate
+  avg: StoreProductNumberAggregate
+  min: StoreProductFieldAggregate
+  max: StoreProductFieldAggregate
+}
+
+type StoreProductFieldAggregate {
+  id: Int
+  price: Float
+}
+
+type StoreProductNumberAggregate {
+  id: Float
+  price: Float
+}
+
+type Mutation {
+  createUser(data: CreateUserInput): User
+  createUserProfile(data: CreateUserProfileInput): UserProfile
+  createGroup(data: CreateGroupInput): Group
+  createUserGroup(data: CreateUserGroupInput): UserGroup
+  createCategory(data: CreateCategoryInput): Category
+  createCategoryTree(data: CreateCategoryTreeInput): CategoryTree
+  createProduct(data: CreateProductInput): Product
+  createProductCategory(data: CreateProductCategoryInput): ProductCategory
+  createDeliveryAddress(data: CreateDeliveryAddressInput): DeliveryAddress
+  createOrder(data: CreateOrderInput): Order
+  createOrderItem(data: CreateOrderItemInput): OrderItem
+  createOrderShipping(data: CreateOrderShippingInput): OrderShipping
+  createOrderShippingEvent(data: CreateOrderShippingEventInput): OrderShippingEvent
+  createStore(data: CreateStoreInput): Store
+  createStoreProduct(data: CreateStoreProductInput): StoreProduct
+  updateUser(where: FindUserInput, data: UpdateUserInput): User
+  updateUserProfile(where: FindUserProfileInput, data: UpdateUserProfileInput): UserProfile
+  updateGroup(where: FindGroupInput, data: UpdateGroupInput): Group
+  updateUserGroup(where: FindUserGroupInput, data: UpdateUserGroupInput): UserGroup
+  updateCategory(where: FindCategoryInput, data: UpdateCategoryInput): Category
+  updateCategoryTree(where: FindCategoryTreeInput, data: UpdateCategoryTreeInput): CategoryTree
+  updateProduct(where: FindProductInput, data: UpdateProductInput): Product
+  updateProductCategory(where: FindProductCategoryInput, data: UpdateProductCategoryInput): ProductCategory
+  updateDeliveryAddress(where: FindDeliveryAddressInput, data: UpdateDeliveryAddressInput): DeliveryAddress
+  updateOrder(where: FindOrderInput, data: UpdateOrderInput): Order
+  updateOrderItem(where: FindOrderItemInput, data: UpdateOrderItemInput): OrderItem
+  updateOrderShipping(where: FindOrderShippingInput, data: UpdateOrderShippingInput): OrderShipping
+  updateOrderShippingEvent(where: FindOrderShippingEventInput, data: UpdateOrderShippingEventInput): OrderShippingEvent
+  updateStore(where: FindStoreInput, data: UpdateStoreInput): Store
+  updateStoreProduct(where: FindStoreProductInput, data: UpdateStoreProductInput): StoreProduct
+  updateUsers(where: FilterUserInput, data: UpdateUserInput): DatabaseQueryResultType
+  updateUserProfiles(where: FilterUserProfileInput, data: UpdateUserProfileInput): DatabaseQueryResultType
+  updateGroups(where: FilterGroupInput, data: UpdateGroupInput): DatabaseQueryResultType
+  updateUserGroups(where: FilterUserGroupInput, data: UpdateUserGroupInput): DatabaseQueryResultType
+  updateCategories(where: FilterCategoryInput, data: UpdateCategoryInput): DatabaseQueryResultType
+  updateCategoryTrees(where: FilterCategoryTreeInput, data: UpdateCategoryTreeInput): DatabaseQueryResultType
+  updateProducts(where: FilterProductInput, data: UpdateProductInput): DatabaseQueryResultType
+  updateProductCategories(where: FilterProductCategoryInput, data: UpdateProductCategoryInput): DatabaseQueryResultType
+  updateDeliveryAddresses(where: FilterDeliveryAddressInput, data: UpdateDeliveryAddressInput): DatabaseQueryResultType
+  updateOrders(where: FilterOrderInput, data: UpdateOrderInput): DatabaseQueryResultType
+  updateOrderItems(where: FilterOrderItemInput, data: UpdateOrderItemInput): DatabaseQueryResultType
+  updateOrderShippings(where: FilterOrderShippingInput, data: UpdateOrderShippingInput): DatabaseQueryResultType
+  updateOrderShippingEvents(where: FilterOrderShippingEventInput, data: UpdateOrderShippingEventInput): DatabaseQueryResultType
+  updateStores(where: FilterStoreInput, data: UpdateStoreInput): DatabaseQueryResultType
+  updateStoreProducts(where: FilterStoreProductInput, data: UpdateStoreProductInput): DatabaseQueryResultType
+  upsertUser(create: CreateUserInput, update: UpdateUserInput): User
+  upsertUserProfile(create: CreateUserProfileInput, update: UpdateUserProfileInput): UserProfile
+  upsertGroup(create: CreateGroupInput, update: UpdateGroupInput): Group
+  upsertUserGroup(create: CreateUserGroupInput, update: UpdateUserGroupInput): UserGroup
+  upsertCategory(create: CreateCategoryInput, update: UpdateCategoryInput): Category
+  upsertCategoryTree(create: CreateCategoryTreeInput, update: UpdateCategoryTreeInput): CategoryTree
+  upsertProduct(create: CreateProductInput, update: UpdateProductInput): Product
+  upsertProductCategory(create: CreateProductCategoryInput, update: UpdateProductCategoryInput): ProductCategory
+  upsertDeliveryAddress(create: CreateDeliveryAddressInput, update: UpdateDeliveryAddressInput): DeliveryAddress
+  upsertOrder(create: CreateOrderInput, update: UpdateOrderInput): Order
+  upsertOrderItem(create: CreateOrderItemInput, update: UpdateOrderItemInput): OrderItem
+  upsertOrderShipping(create: CreateOrderShippingInput, update: UpdateOrderShippingInput): OrderShipping
+  upsertOrderShippingEvent(create: CreateOrderShippingEventInput, update: UpdateOrderShippingEventInput): OrderShippingEvent
+  upsertStore(create: CreateStoreInput, update: UpdateStoreInput): Store
+  upsertStoreProduct(create: CreateStoreProductInput, update: UpdateStoreProductInput): StoreProduct
+  deleteUser(id: Int, email: String): User
+  deleteUserProfile(user: FindUserInput): UserProfile
+  deleteGroup(id: Int, name: String): Group
+  deleteUserGroup(id: Int, user: FindUserInput, group: FindGroupInput): UserGroup
+  deleteCategory(id: Int, name: String, parent: FindCategoryInput): Category
+  deleteCategoryTree(id: Int, ancestor: FindCategoryInput, descendant: FindCategoryInput): CategoryTree
+  deleteProduct(id: Int, sku: String): Product
+  deleteProductCategory(id: Int, product: FindProductInput, category: FindCategoryInput): ProductCategory
+  deleteDeliveryAddress(id: Int, streetAddress: String, city: String, state: String, country: String): DeliveryAddress
+  deleteOrder(id: Int, code: String): Order
+  deleteOrderItem(id: Int, order: FindOrderInput, product: FindProductInput): OrderItem
+  deleteOrderShipping(order: FindOrderInput): OrderShipping
+  deleteOrderShippingEvent(id: Int, eventTime: String, orderShipping: FindOrderShippingInput): OrderShippingEvent
+  deleteStore(id: Int, name: String): Store
+  deleteStoreProduct(id: Int, store: FindStoreInput, product: FindProductInput): StoreProduct
+  deleteUsers(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], email: String, email_lt: String, email_le: String, email_ge: String, email_gt: String, email_ne: String, email_null: Boolean, email_in: [String], email_like: String, email_ilike: String, firstName: String, firstName_lt: String, firstName_le: String, firstName_ge: String, firstName_gt: String, firstName_ne: String, firstName_null: Boolean, firstName_in: [String], firstName_like: String, firstName_ilike: String, lastName: String, lastName_lt: String, lastName_le: String, lastName_ge: String, lastName_gt: String, lastName_ne: String, lastName_null: Boolean, lastName_in: [String], lastName_like: String, lastName_ilike: String, status: Int, status_lt: Int, status_le: Int, status_ge: Int, status_gt: Int, status_ne: Int, status_null: Boolean, status_in: [Int], meta: JSON, and: [FilterUserInput], or: [FilterUserInput], not: [FilterUserInput], userProfile_some: FilterUserUserProfileInput, userProfile_none: FilterUserUserProfileInput, userGroups_some: FilterUserUserGroupInput, userGroups_none: FilterUserUserGroupInput, orders_some: FilterUserOrderInput, orders_none: FilterUserOrderInput): DatabaseQueryResultType
+  deleteUserProfiles(and: [FilterUserProfileInput], or: [FilterUserProfileInput], not: [FilterUserProfileInput], user: FilterUserInput): DatabaseQueryResultType
+  deleteGroups(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], name: String, name_lt: String, name_le: String, name_ge: String, name_gt: String, name_ne: String, name_null: Boolean, name_in: [String], name_like: String, name_ilike: String, and: [FilterGroupInput], or: [FilterGroupInput], not: [FilterGroupInput], userGroups_some: FilterGroupUserGroupInput, userGroups_none: FilterGroupUserGroupInput): DatabaseQueryResultType
+  deleteUserGroups(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], dateAdded: String, dateAdded_lt: String, dateAdded_le: String, dateAdded_ge: String, dateAdded_gt: String, dateAdded_ne: String, dateAdded_null: Boolean, dateAdded_in: [String], dateAdded_like: String, dateAdded_ilike: String, and: [FilterUserGroupInput], or: [FilterUserGroupInput], not: [FilterUserGroupInput], user: FilterUserInput, group: FilterGroupInput): DatabaseQueryResultType
+  deleteCategories(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], name: String, name_lt: String, name_le: String, name_ge: String, name_gt: String, name_ne: String, name_null: Boolean, name_in: [String], name_like: String, name_ilike: String, description: String, description_lt: String, description_le: String, description_ge: String, description_gt: String, description_ne: String, description_null: Boolean, description_in: [String], description_like: String, description_ilike: String, and: [FilterCategoryInput], or: [FilterCategoryInput], not: [FilterCategoryInput], parent: FilterCategoryInput, categories_some: FilterCategoryCategoryInput, categories_none: FilterCategoryCategoryInput, ancestorCategoryTrees_some: FilterCategoryCategoryTreeAncestorInput, ancestorCategoryTrees_none: FilterCategoryCategoryTreeAncestorInput, descendantCategoryTrees_some: FilterCategoryCategoryTreeDescendantInput, descendantCategoryTrees_none: FilterCategoryCategoryTreeDescendantInput, products_some: FilterProductInput, products_none: FilterProductInput): DatabaseQueryResultType
+  deleteCategoryTrees(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], distance: Int, distance_lt: Int, distance_le: Int, distance_ge: Int, distance_gt: Int, distance_ne: Int, distance_null: Boolean, distance_in: [Int], and: [FilterCategoryTreeInput], or: [FilterCategoryTreeInput], not: [FilterCategoryTreeInput], ancestor: FilterCategoryInput, descendant: FilterCategoryInput): DatabaseQueryResultType
+  deleteProducts(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], sku: String, sku_lt: String, sku_le: String, sku_ge: String, sku_gt: String, sku_ne: String, sku_null: Boolean, sku_in: [String], sku_like: String, sku_ilike: String, name: String, name_lt: String, name_le: String, name_ge: String, name_gt: String, name_ne: String, name_null: Boolean, name_in: [String], name_like: String, name_ilike: String, price: Float, price_lt: Float, price_le: Float, price_ge: Float, price_gt: Float, price_ne: Float, price_null: Boolean, price_in: [Float], stockQuantity: Float, stockQuantity_lt: Float, stockQuantity_le: Float, stockQuantity_ge: Float, stockQuantity_gt: Float, stockQuantity_ne: Float, stockQuantity_null: Boolean, stockQuantity_in: [Float], status: Int, status_lt: Int, status_le: Int, status_ge: Int, status_gt: Int, status_ne: Int, status_null: Boolean, status_in: [Int], and: [FilterProductInput], or: [FilterProductInput], not: [FilterProductInput], categories_some: FilterCategoryInput, categories_none: FilterCategoryInput, orderItems_some: FilterProductOrderItemInput, orderItems_none: FilterProductOrderItemInput, storeProducts_some: FilterProductStoreProductInput, storeProducts_none: FilterProductStoreProductInput): DatabaseQueryResultType
+  deleteProductCategories(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], and: [FilterProductCategoryInput], or: [FilterProductCategoryInput], not: [FilterProductCategoryInput], product: FilterProductInput, category: FilterCategoryInput): DatabaseQueryResultType
+  deleteDeliveryAddresses(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], streetAddress: String, streetAddress_lt: String, streetAddress_le: String, streetAddress_ge: String, streetAddress_gt: String, streetAddress_ne: String, streetAddress_null: Boolean, streetAddress_in: [String], streetAddress_like: String, streetAddress_ilike: String, city: String, city_lt: String, city_le: String, city_ge: String, city_gt: String, city_ne: String, city_null: Boolean, city_in: [String], city_like: String, city_ilike: String, state: String, state_lt: String, state_le: String, state_ge: String, state_gt: String, state_ne: String, state_null: Boolean, state_in: [String], state_like: String, state_ilike: String, country: String, country_lt: String, country_le: String, country_ge: String, country_gt: String, country_ne: String, country_null: Boolean, country_in: [String], country_like: String, country_ilike: String, postalCode: String, postalCode_lt: String, postalCode_le: String, postalCode_ge: String, postalCode_gt: String, postalCode_ne: String, postalCode_null: Boolean, postalCode_in: [String], postalCode_like: String, postalCode_ilike: String, and: [FilterDeliveryAddressInput], or: [FilterDeliveryAddressInput], not: [FilterDeliveryAddressInput], orders_some: FilterDeliveryAddressOrderInput, orders_none: FilterDeliveryAddressOrderInput): DatabaseQueryResultType
+  deleteOrders(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], code: String, code_lt: String, code_le: String, code_ge: String, code_gt: String, code_ne: String, code_null: Boolean, code_in: [String], code_like: String, code_ilike: String, dateCreated: String, dateCreated_lt: String, dateCreated_le: String, dateCreated_ge: String, dateCreated_gt: String, dateCreated_ne: String, dateCreated_null: Boolean, dateCreated_in: [String], dateCreated_like: String, dateCreated_ilike: String, isDeleted: Int, isDeleted_lt: Int, isDeleted_le: Int, isDeleted_ge: Int, isDeleted_gt: Int, isDeleted_ne: Int, isDeleted_null: Boolean, isDeleted_in: [Int], status: Int, status_lt: Int, status_le: Int, status_ge: Int, status_gt: Int, status_ne: Int, status_null: Boolean, status_in: [Int], and: [FilterOrderInput], or: [FilterOrderInput], not: [FilterOrderInput], user: FilterUserInput, deliveryAddress: FilterDeliveryAddressInput, orderItems_some: FilterOrderOrderItemInput, orderItems_none: FilterOrderOrderItemInput, orderShipping_some: FilterOrderOrderShippingInput, orderShipping_none: FilterOrderOrderShippingInput): DatabaseQueryResultType
+  deleteOrderItems(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], quantity: Float, quantity_lt: Float, quantity_le: Float, quantity_ge: Float, quantity_gt: Float, quantity_ne: Float, quantity_null: Boolean, quantity_in: [Float], and: [FilterOrderItemInput], or: [FilterOrderItemInput], not: [FilterOrderItemInput], order: FilterOrderInput, product: FilterProductInput): DatabaseQueryResultType
+  deleteOrderShippings(status: Int, status_lt: Int, status_le: Int, status_ge: Int, status_gt: Int, status_ne: Int, status_null: Boolean, status_in: [Int], and: [FilterOrderShippingInput], or: [FilterOrderShippingInput], not: [FilterOrderShippingInput], order: FilterOrderInput, orderShippingEvents_some: FilterOrderShippingOrderShippingEventInput, orderShippingEvents_none: FilterOrderShippingOrderShippingEventInput): DatabaseQueryResultType
+  deleteOrderShippingEvents(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], eventTime: String, eventTime_lt: String, eventTime_le: String, eventTime_ge: String, eventTime_gt: String, eventTime_ne: String, eventTime_null: Boolean, eventTime_in: [String], eventTime_like: String, eventTime_ilike: String, eventDescription: String, eventDescription_lt: String, eventDescription_le: String, eventDescription_ge: String, eventDescription_gt: String, eventDescription_ne: String, eventDescription_null: Boolean, eventDescription_in: [String], eventDescription_like: String, eventDescription_ilike: String, and: [FilterOrderShippingEventInput], or: [FilterOrderShippingEventInput], not: [FilterOrderShippingEventInput], orderShipping: FilterOrderShippingInput): DatabaseQueryResultType
+  deleteStores(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], name: String, name_lt: String, name_le: String, name_ge: String, name_gt: String, name_ne: String, name_null: Boolean, name_in: [String], name_like: String, name_ilike: String, and: [FilterStoreInput], or: [FilterStoreInput], not: [FilterStoreInput], storeProducts_some: FilterStoreStoreProductInput, storeProducts_none: FilterStoreStoreProductInput): DatabaseQueryResultType
+  deleteStoreProducts(id: Int, id_lt: Int, id_le: Int, id_ge: Int, id_gt: Int, id_ne: Int, id_null: Boolean, id_in: [Int], price: Float, price_lt: Float, price_le: Float, price_ge: Float, price_gt: Float, price_ne: Float, price_null: Boolean, price_in: [Float], and: [FilterStoreProductInput], or: [FilterStoreProductInput], not: [FilterStoreProductInput], store: FilterStoreInput, product: FilterProductInput): DatabaseQueryResultType
+}
+
+input CreateUserInput {
+  id: Int
+  email: String
+  firstName: String
+  lastName: String
+  status: Int
+  meta: JSON
+  userProfile: CreateOneUserUserProfileInput
+  userGroups: CreateManyUserUserGroupsInput
+  orders: CreateManyUserOrdersInput
+}
+
+input CreateOneUserUserProfileInput {
+  connect: FindUserProfileInput
+  create: CreateUserUserProfileInput
+}
+
+input FindUserProfileInput {
+  user: FindUserInput
+}
+
+input CreateUserUserProfileInput {
+  user: CreateUserParentInput
+}
+
+input CreateUserParentInput {
+  connect: FindUserInput
+  create: CreateUserInput
+  upsert: UpsertUserInput
+}
+
+input UpsertUserInput {
+  create: CreateUserInput
+  update: UpdateUserInput
+}
+
+input UpdateUserInput {
+  id: Int
+  email: String
+  firstName: String
+  lastName: String
+  status: Int
+  meta: JSON
+  userProfile: UpdateOneUserUserProfileInput
+  userGroups: UpdateManyUserUserGroupsInput
+  orders: UpdateManyUserOrdersInput
+}
+
+input UpdateOneUserUserProfileInput {
+  connect: FindUserProfileInput
+  create: CreateUserUserProfileInput
+  upsert: UpsertUserUserProfileInput
+  update: UpdateUserUserProfileInput
+}
+
+input UpsertUserUserProfileInput {
+  create: CreateUserUserProfileInput
+  update: UpdateUserUserProfileInputFields
+}
+
+input UpdateUserUserProfileInputFields {
+  user: UpsertUserParentInput
+}
+
+input UpsertUserParentInput {
+  connect: FindUserInput
+  create: CreateUserInput
+  update: UpdateUserInput
+  upsert: UpsertUserInput
+}
+
+input UpdateUserUserProfileInput {
+  user: UpsertUserParentInput
+}
+
+input UpdateManyUserUserGroupsInput {
+  connect: [FindUserGroupInput]
+  create: [CreateUserUserGroupInput]
+  set: [CreateUserUserGroupInput]
+  upsert: [UpsertUserUserGroupInput]
+  update: [UpdateUserUserGroupInput]
+  delete: [FilterUserUserGroupInput]
+  disconnect: [FilterUserUserGroupInput]
+}
+
+input FindUserGroupInput {
+  id: Int
+  user: FindUserInput
+  group: FindGroupInput
+}
+
+input CreateUserUserGroupInput {
+  id: Int
+  group: CreateGroupParentInput
+  dateAdded: String
+}
+
+input CreateGroupParentInput {
+  connect: FindGroupInput
+  create: CreateGroupInput
+  upsert: UpsertGroupInput
+}
+
+input CreateGroupInput {
+  id: Int
+  name: String
+  userGroups: CreateManyGroupUserGroupsInput
+}
+
+input CreateManyGroupUserGroupsInput {
+  connect: [FindUserGroupInput]
+  create: [CreateGroupUserGroupInput]
+  upsert: [UpsertGroupUserGroupInput]
+}
+
+input CreateGroupUserGroupInput {
+  id: Int
+  user: CreateUserParentInput
+  dateAdded: String
+}
+
+input UpsertGroupUserGroupInput {
+  create: CreateGroupUserGroupInput
+  update: UpdateGroupUserGroupInputFields
+}
+
+input UpdateGroupUserGroupInputFields {
+  id: Int
+  user: UpsertUserParentInput
+  dateAdded: String
+}
+
+input UpsertGroupInput {
+  create: CreateGroupInput
+  update: UpdateGroupInput
+}
+
+input UpdateGroupInput {
+  id: Int
+  name: String
+  userGroups: UpdateManyGroupUserGroupsInput
+}
+
+input UpdateManyGroupUserGroupsInput {
+  connect: [FindUserGroupInput]
+  create: [CreateGroupUserGroupInput]
+  set: [CreateGroupUserGroupInput]
+  upsert: [UpsertGroupUserGroupInput]
+  update: [UpdateGroupUserGroupInput]
+  delete: [FilterGroupUserGroupInput]
+  disconnect: [FilterGroupUserGroupInput]
+}
+
+input UpdateGroupUserGroupInput {
+  data: UpdateGroupUserGroupInputFields
+  where: FilterGroupUserGroupInput
+}
+
+input UpsertUserUserGroupInput {
+  create: CreateUserUserGroupInput
+  update: UpdateUserUserGroupInputFields
+}
+
+input UpdateUserUserGroupInputFields {
+  id: Int
+  group: UpsertGroupParentInput
+  dateAdded: String
+}
+
+input UpsertGroupParentInput {
+  connect: FindGroupInput
+  create: CreateGroupInput
+  update: UpdateGroupInput
+  upsert: UpsertGroupInput
+}
+
+input UpdateUserUserGroupInput {
+  data: UpdateUserUserGroupInputFields
+  where: FilterUserUserGroupInput
+}
+
+input UpdateManyUserOrdersInput {
+  connect: [FindOrderInput]
+  create: [CreateUserOrderInput]
+  set: [CreateUserOrderInput]
+  upsert: [UpsertUserOrderInput]
+  update: [UpdateUserOrderInput]
+  delete: [FilterUserOrderInput]
+  disconnect: [FilterUserOrderInput]
+}
+
+input CreateUserOrderInput {
+  id: Int
+  code: String
+  dateCreated: String
+  deliveryAddress: CreateDeliveryAddressParentInput
+  isDeleted: Int
+  status: Int
+  orderItems: CreateManyOrderOrderItemsInput
+  orderShipping: CreateOneOrderOrderShippingInput
+}
+
+input CreateDeliveryAddressParentInput {
+  connect: FindDeliveryAddressInput
+  create: CreateDeliveryAddressInput
+  upsert: UpsertDeliveryAddressInput
+}
+
+input FindDeliveryAddressInput {
+  id: Int
+  streetAddress: String
+  city: String
+  state: String
+  country: String
+}
+
+input CreateDeliveryAddressInput {
+  id: Int
+  streetAddress: String!
+  city: String!
+  state: String!
+  country: String!
+  postalCode: String!
+  orders: CreateManyDeliveryAddressOrdersInput
+}
+
+input CreateManyDeliveryAddressOrdersInput {
+  connect: [FindOrderInput]
+  create: [CreateDeliveryAddressOrderInput]
+  upsert: [UpsertDeliveryAddressOrderInput]
+}
+
+input CreateDeliveryAddressOrderInput {
+  id: Int
+  code: String
+  dateCreated: String
+  user: CreateUserParentInput
+  isDeleted: Int
+  status: Int
+  orderItems: CreateManyOrderOrderItemsInput
+  orderShipping: CreateOneOrderOrderShippingInput
+}
+
+input CreateManyOrderOrderItemsInput {
+  connect: [FindOrderItemInput]
+  create: [CreateOrderOrderItemInput]
+  upsert: [UpsertOrderOrderItemInput]
+}
+
+input FindOrderItemInput {
+  id: Int
+  order: FindOrderInput
+  product: FindProductInput
+}
+
+input CreateOrderOrderItemInput {
+  id: Int
+  product: CreateProductParentInput
+  quantity: Float
+}
+
+input CreateProductParentInput {
+  connect: FindProductInput
+  create: CreateProductInput
+  upsert: UpsertProductInput
+}
+
+input CreateProductInput {
+  id: Int
+  sku: String
+  name: String
+  price: Float
+  stockQuantity: Float
+  status: Int
+  categories: CreateManyProductCategoriesInput
+  orderItems: CreateManyProductOrderItemsInput
+  storeProducts: CreateManyProductStoreProductsInput
+}
+
+input CreateManyProductCategoriesInput {
+  connect: [FindCategoryInput]
+  create: [CreateProductCategoriesInput]
+  upsert: [UpsertProductCategoriesInput]
+}
+
+input CreateProductCategoriesInput {
+  id: Int
+  name: String
+  description: String
+  parent: CreateCategoryParentInput
+  categories: CreateManyCategoryCategoriesInput
+  ancestorCategoryTrees: CreateManyCategoryCategoryTreeAncestorsInput
+  descendantCategoryTrees: CreateManyCategoryCategoryTreeDescendantsInput
+  products: CreateManyCategoryProductsInput
+}
+
+input CreateCategoryParentInput {
+  connect: FindCategoryInput
+  create: CreateCategoryInput
+  upsert: UpsertCategoryInput
+}
+
+input CreateCategoryInput {
+  id: Int
+  name: String
+  description: String
+  parent: CreateCategoryParentInput
+  categories: CreateManyCategoryCategoriesInput
+  ancestorCategoryTrees: CreateManyCategoryCategoryTreeAncestorsInput
+  descendantCategoryTrees: CreateManyCategoryCategoryTreeDescendantsInput
+  products: CreateManyCategoryProductsInput
+}
+
+input CreateManyCategoryCategoriesInput {
+  connect: [FindCategoryInput]
+  create: [CreateCategoryCategoryInput]
+  upsert: [UpsertCategoryCategoryInput]
+}
+
+input CreateCategoryCategoryInput {
+  id: Int
+  name: String
+  description: String
+  categories: CreateManyCategoryCategoriesInput
+  ancestorCategoryTrees: CreateManyCategoryCategoryTreeAncestorsInput
+  descendantCategoryTrees: CreateManyCategoryCategoryTreeDescendantsInput
+  products: CreateManyCategoryProductsInput
+}
+
+input CreateManyCategoryCategoryTreeAncestorsInput {
+  connect: [FindCategoryTreeInput]
+  create: [CreateCategoryCategoryTreeAncestorInput]
+  upsert: [UpsertCategoryCategoryTreeAncestorInput]
+}
+
+input FindCategoryTreeInput {
+  id: Int
+  ancestor: FindCategoryInput
+  descendant: FindCategoryInput
+}
+
+input CreateCategoryCategoryTreeAncestorInput {
+  id: Int
+  descendant: CreateCategoryParentInput
+  distance: Int
+}
+
+input UpsertCategoryCategoryTreeAncestorInput {
+  create: CreateCategoryCategoryTreeAncestorInput
+  update: UpdateCategoryCategoryTreeAncestorInputFields
+}
+
+input UpdateCategoryCategoryTreeAncestorInputFields {
+  id: Int
+  descendant: UpsertCategoryParentInput
+  distance: Int
+}
+
+input UpsertCategoryParentInput {
+  connect: FindCategoryInput
+  create: CreateCategoryInput
+  update: UpdateCategoryInput
+  upsert: UpsertCategoryInput
+}
+
+input UpdateCategoryInput {
+  id: Int
+  name: String
+  description: String
+  parent: UpsertCategoryParentInput
+  categories: UpdateManyCategoryCategoriesInput
+  ancestorCategoryTrees: UpdateManyCategoryCategoryTreeAncestorsInput
+  descendantCategoryTrees: UpdateManyCategoryCategoryTreeDescendantsInput
+  products: UpdateManyCategoryProductsInput
+}
+
+input UpdateManyCategoryCategoriesInput {
+  connect: [FindCategoryInput]
+  create: [CreateCategoryCategoryInput]
+  set: [CreateCategoryCategoryInput]
+  upsert: [UpsertCategoryCategoryInput]
+  update: [UpdateCategoryCategoryInput]
+  delete: [FilterCategoryCategoryInput]
+  disconnect: [FilterCategoryCategoryInput]
+}
+
+input UpsertCategoryCategoryInput {
+  create: CreateCategoryCategoryInput
+  update: UpdateCategoryCategoryInputFields
+}
+
+input UpdateCategoryCategoryInputFields {
+  id: Int
+  name: String
+  description: String
+  categories: UpdateManyCategoryCategoriesInput
+  ancestorCategoryTrees: UpdateManyCategoryCategoryTreeAncestorsInput
+  descendantCategoryTrees: UpdateManyCategoryCategoryTreeDescendantsInput
+  products: UpdateManyCategoryProductsInput
+}
+
+input UpdateManyCategoryCategoryTreeAncestorsInput {
+  connect: [FindCategoryTreeInput]
+  create: [CreateCategoryCategoryTreeAncestorInput]
+  set: [CreateCategoryCategoryTreeAncestorInput]
+  upsert: [UpsertCategoryCategoryTreeAncestorInput]
+  update: [UpdateCategoryCategoryTreeAncestorInput]
+  delete: [FilterCategoryCategoryTreeAncestorInput]
+  disconnect: [FilterCategoryCategoryTreeAncestorInput]
+}
+
+input UpdateCategoryCategoryTreeAncestorInput {
+  data: UpdateCategoryCategoryTreeAncestorInputFields
+  where: FilterCategoryCategoryTreeAncestorInput
+}
+
+input UpdateManyCategoryCategoryTreeDescendantsInput {
+  connect: [FindCategoryTreeInput]
+  create: [CreateCategoryCategoryTreeDescendantInput]
+  set: [CreateCategoryCategoryTreeDescendantInput]
+  upsert: [UpsertCategoryCategoryTreeDescendantInput]
+  update: [UpdateCategoryCategoryTreeDescendantInput]
+  delete: [FilterCategoryCategoryTreeDescendantInput]
+  disconnect: [FilterCategoryCategoryTreeDescendantInput]
+}
+
+input CreateCategoryCategoryTreeDescendantInput {
+  id: Int
+  ancestor: CreateCategoryParentInput
+  distance: Int
+}
+
+input UpsertCategoryCategoryTreeDescendantInput {
+  create: CreateCategoryCategoryTreeDescendantInput
+  update: UpdateCategoryCategoryTreeDescendantInputFields
+}
+
+input UpdateCategoryCategoryTreeDescendantInputFields {
+  id: Int
+  ancestor: UpsertCategoryParentInput
+  distance: Int
+}
+
+input UpdateCategoryCategoryTreeDescendantInput {
+  data: UpdateCategoryCategoryTreeDescendantInputFields
+  where: FilterCategoryCategoryTreeDescendantInput
+}
+
+input UpdateManyCategoryProductsInput {
+  connect: [FindProductInput]
+  create: [CreateCategoryProductsInput]
+  set: [CreateCategoryProductsInput]
+  upsert: [UpsertCategoryProductsInput]
+  update: [UpdateCategoryProductsInput]
+  delete: [FilterProductInput]
+  disconnect: [FilterProductInput]
+}
+
+input CreateCategoryProductsInput {
+  id: Int
+  sku: String
+  name: String
+  price: Float
+  stockQuantity: Float
+  status: Int
+  categories: CreateManyProductCategoriesInput
+  orderItems: CreateManyProductOrderItemsInput
+  storeProducts: CreateManyProductStoreProductsInput
+}
+
+input CreateManyProductOrderItemsInput {
+  connect: [FindOrderItemInput]
+  create: [CreateProductOrderItemInput]
+  upsert: [UpsertProductOrderItemInput]
+}
+
+input CreateProductOrderItemInput {
+  id: Int
+  order: CreateOrderParentInput
+  quantity: Float
+}
+
+input CreateOrderParentInput {
+  connect: FindOrderInput
+  create: CreateOrderInput
+  upsert: UpsertOrderInput
+}
+
+input CreateOrderInput {
+  id: Int
+  code: String
+  dateCreated: String
+  user: CreateUserParentInput
+  deliveryAddress: CreateDeliveryAddressParentInput
+  isDeleted: Int
+  status: Int
+  orderItems: CreateManyOrderOrderItemsInput
+  orderShipping: CreateOneOrderOrderShippingInput
+}
+
+input CreateOneOrderOrderShippingInput {
+  connect: FindOrderShippingInput
+  create: CreateOrderOrderShippingInput
+}
+
+input CreateOrderOrderShippingInput {
+  status: Int
+  orderShippingEvents: CreateManyOrderShippingOrderShippingEventsInput
+}
+
+input CreateManyOrderShippingOrderShippingEventsInput {
+  connect: [FindOrderShippingEventInput]
+  create: [CreateOrderShippingOrderShippingEventInput]
+  upsert: [UpsertOrderShippingOrderShippingEventInput]
+}
+
+input FindOrderShippingEventInput {
+  id: Int
+  eventTime: String
+  orderShipping: FindOrderShippingInput
+}
+
+input CreateOrderShippingOrderShippingEventInput {
+  id: Int
+  eventTime: String
+  eventDescription: String
+}
+
+input UpsertOrderShippingOrderShippingEventInput {
+  create: CreateOrderShippingOrderShippingEventInput
+  update: UpdateOrderShippingOrderShippingEventInputFields
+}
+
+input UpdateOrderShippingOrderShippingEventInputFields {
+  id: Int
+  eventTime: String
+  eventDescription: String
+}
+
+input UpsertOrderInput {
+  create: CreateOrderInput
+  update: UpdateOrderInput
+}
+
+input UpdateOrderInput {
+  id: Int
+  code: String
+  dateCreated: String
+  user: UpsertUserParentInput
+  deliveryAddress: UpsertDeliveryAddressParentInput
+  isDeleted: Int
+  status: Int
+  orderItems: UpdateManyOrderOrderItemsInput
+  orderShipping: UpdateOneOrderOrderShippingInput
+}
+
+input UpsertDeliveryAddressParentInput {
+  connect: FindDeliveryAddressInput
+  create: CreateDeliveryAddressInput
+  update: UpdateDeliveryAddressInput
+  upsert: UpsertDeliveryAddressInput
+}
+
+input UpdateDeliveryAddressInput {
+  id: Int
+  streetAddress: String
+  city: String
+  state: String
+  country: String
+  postalCode: String
+  orders: UpdateManyDeliveryAddressOrdersInput
+}
+
+input UpdateManyDeliveryAddressOrdersInput {
+  connect: [FindOrderInput]
+  create: [CreateDeliveryAddressOrderInput]
+  set: [CreateDeliveryAddressOrderInput]
+  upsert: [UpsertDeliveryAddressOrderInput]
+  update: [UpdateDeliveryAddressOrderInput]
+  delete: [FilterDeliveryAddressOrderInput]
+  disconnect: [FilterDeliveryAddressOrderInput]
+}
+
+input UpsertDeliveryAddressOrderInput {
+  create: CreateDeliveryAddressOrderInput
+  update: UpdateDeliveryAddressOrderInputFields
+}
+
+input UpdateDeliveryAddressOrderInputFields {
+  id: Int
+  code: String
+  dateCreated: String
+  user: UpsertUserParentInput
+  isDeleted: Int
+  status: Int
+  orderItems: UpdateManyOrderOrderItemsInput
+  orderShipping: UpdateOneOrderOrderShippingInput
+}
+
+input UpdateManyOrderOrderItemsInput {
+  connect: [FindOrderItemInput]
+  create: [CreateOrderOrderItemInput]
+  set: [CreateOrderOrderItemInput]
+  upsert: [UpsertOrderOrderItemInput]
+  update: [UpdateOrderOrderItemInput]
+  delete: [FilterOrderOrderItemInput]
+  disconnect: [FilterOrderOrderItemInput]
+}
+
+input UpsertOrderOrderItemInput {
+  create: CreateOrderOrderItemInput
+  update: UpdateOrderOrderItemInputFields
+}
+
+input UpdateOrderOrderItemInputFields {
+  id: Int
+  product: UpsertProductParentInput
+  quantity: Float
+}
+
+input UpsertProductParentInput {
+  connect: FindProductInput
+  create: CreateProductInput
+  update: UpdateProductInput
+  upsert: UpsertProductInput
+}
+
+input UpdateProductInput {
+  id: Int
+  sku: String
+  name: String
+  price: Float
+  stockQuantity: Float
+  status: Int
+  categories: UpdateManyProductCategoriesInput
+  orderItems: UpdateManyProductOrderItemsInput
+  storeProducts: UpdateManyProductStoreProductsInput
+}
+
+input UpdateManyProductCategoriesInput {
+  connect: [FindCategoryInput]
+  create: [CreateProductCategoriesInput]
+  set: [CreateProductCategoriesInput]
+  upsert: [UpsertProductCategoriesInput]
+  update: [UpdateProductCategoriesInput]
+  delete: [FilterCategoryInput]
+  disconnect: [FilterCategoryInput]
+}
+
+input UpsertProductCategoriesInput {
+  create: CreateProductCategoriesInput
+  update: UpdateProductCategoriesInputFields
+}
+
+input UpdateProductCategoriesInputFields {
+  id: Int
+  name: String
+  description: String
+  parent: UpsertCategoryParentInput
+  categories: UpdateManyCategoryCategoriesInput
+  ancestorCategoryTrees: UpdateManyCategoryCategoryTreeAncestorsInput
+  descendantCategoryTrees: UpdateManyCategoryCategoryTreeDescendantsInput
+  products: UpdateManyCategoryProductsInput
+}
+
+input UpdateProductCategoriesInput {
+  data: UpdateProductCategoriesInputFields
+  where: FilterCategoryInput
+}
+
+input UpdateManyProductOrderItemsInput {
+  connect: [FindOrderItemInput]
+  create: [CreateProductOrderItemInput]
+  set: [CreateProductOrderItemInput]
+  upsert: [UpsertProductOrderItemInput]
+  update: [UpdateProductOrderItemInput]
+  delete: [FilterProductOrderItemInput]
+  disconnect: [FilterProductOrderItemInput]
+}
+
+input UpsertProductOrderItemInput {
+  create: CreateProductOrderItemInput
+  update: UpdateProductOrderItemInputFields
+}
+
+input UpdateProductOrderItemInputFields {
+  id: Int
+  order: UpsertOrderParentInput
+  quantity: Float
+}
+
+input UpsertOrderParentInput {
+  connect: FindOrderInput
+  create: CreateOrderInput
+  update: UpdateOrderInput
+  upsert: UpsertOrderInput
+}
+
+input UpdateProductOrderItemInput {
+  data: UpdateProductOrderItemInputFields
+  where: FilterProductOrderItemInput
+}
+
+input UpdateManyProductStoreProductsInput {
+  connect: [FindStoreProductInput]
+  create: [CreateProductStoreProductInput]
+  set: [CreateProductStoreProductInput]
+  upsert: [UpsertProductStoreProductInput]
+  update: [UpdateProductStoreProductInput]
+  delete: [FilterProductStoreProductInput]
+  disconnect: [FilterProductStoreProductInput]
+}
+
+input FindStoreProductInput {
+  id: Int
+  store: FindStoreInput
+  product: FindProductInput
+}
+
+input CreateProductStoreProductInput {
+  id: Int
+  store: CreateStoreParentInput
+  price: Float
+}
+
+input CreateStoreParentInput {
+  connect: FindStoreInput
+  create: CreateStoreInput
+  upsert: UpsertStoreInput
+}
+
+input CreateStoreInput {
+  id: Int
+  name: String
+  storeProducts: CreateManyStoreStoreProductsInput
+}
+
+input CreateManyStoreStoreProductsInput {
+  connect: [FindStoreProductInput]
+  create: [CreateStoreStoreProductInput]
+  upsert: [UpsertStoreStoreProductInput]
+}
+
+input CreateStoreStoreProductInput {
+  id: Int
+  product: CreateProductParentInput
+  price: Float
+}
+
+input UpsertStoreStoreProductInput {
+  create: CreateStoreStoreProductInput
+  update: UpdateStoreStoreProductInputFields
+}
+
+input UpdateStoreStoreProductInputFields {
+  id: Int
+  product: UpsertProductParentInput
+  price: Float
+}
+
+input UpsertStoreInput {
+  create: CreateStoreInput
+  update: UpdateStoreInput
+}
+
+input UpdateStoreInput {
+  id: Int
+  name: String
+  storeProducts: UpdateManyStoreStoreProductsInput
+}
+
+input UpdateManyStoreStoreProductsInput {
+  connect: [FindStoreProductInput]
+  create: [CreateStoreStoreProductInput]
+  set: [CreateStoreStoreProductInput]
+  upsert: [UpsertStoreStoreProductInput]
+  update: [UpdateStoreStoreProductInput]
+  delete: [FilterStoreStoreProductInput]
+  disconnect: [FilterStoreStoreProductInput]
+}
+
+input UpdateStoreStoreProductInput {
+  data: UpdateStoreStoreProductInputFields
+  where: FilterStoreStoreProductInput
+}
+
+input UpsertProductStoreProductInput {
+  create: CreateProductStoreProductInput
+  update: UpdateProductStoreProductInputFields
+}
+
+input UpdateProductStoreProductInputFields {
+  id: Int
+  store: UpsertStoreParentInput
+  price: Float
+}
+
+input UpsertStoreParentInput {
+  connect: FindStoreInput
+  create: CreateStoreInput
+  update: UpdateStoreInput
+  upsert: UpsertStoreInput
+}
+
+input UpdateProductStoreProductInput {
+  data: UpdateProductStoreProductInputFields
+  where: FilterProductStoreProductInput
+}
+
+input UpsertProductInput {
+  create: CreateProductInput
+  update: UpdateProductInput
+}
+
+input UpdateOrderOrderItemInput {
+  data: UpdateOrderOrderItemInputFields
+  where: FilterOrderOrderItemInput
+}
+
+input UpdateOneOrderOrderShippingInput {
+  connect: FindOrderShippingInput
+  create: CreateOrderOrderShippingInput
+  upsert: UpsertOrderOrderShippingInput
+  update: UpdateOrderOrderShippingInput
+}
+
+input UpsertOrderOrderShippingInput {
+  create: CreateOrderOrderShippingInput
+  update: UpdateOrderOrderShippingInputFields
+}
+
+input UpdateOrderOrderShippingInputFields {
+  status: Int
+  orderShippingEvents: UpdateManyOrderShippingOrderShippingEventsInput
+}
+
+input UpdateManyOrderShippingOrderShippingEventsInput {
+  connect: [FindOrderShippingEventInput]
+  create: [CreateOrderShippingOrderShippingEventInput]
+  set: [CreateOrderShippingOrderShippingEventInput]
+  upsert: [UpsertOrderShippingOrderShippingEventInput]
+  update: [UpdateOrderShippingOrderShippingEventInput]
+  delete: [FilterOrderShippingOrderShippingEventInput]
+  disconnect: [FilterOrderShippingOrderShippingEventInput]
+}
+
+input UpdateOrderShippingOrderShippingEventInput {
+  data: UpdateOrderShippingOrderShippingEventInputFields
+  where: FilterOrderShippingOrderShippingEventInput
+}
+
+input UpdateOrderOrderShippingInput {
+  status: Int
+  orderShippingEvents: UpdateManyOrderShippingOrderShippingEventsInput
+}
+
+input UpdateDeliveryAddressOrderInput {
+  data: UpdateDeliveryAddressOrderInputFields
+  where: FilterDeliveryAddressOrderInput
+}
+
+input UpsertDeliveryAddressInput {
+  create: CreateDeliveryAddressInput
+  update: UpdateDeliveryAddressInput
+}
+
+input CreateManyProductStoreProductsInput {
+  connect: [FindStoreProductInput]
+  create: [CreateProductStoreProductInput]
+  upsert: [UpsertProductStoreProductInput]
+}
+
+input UpsertCategoryProductsInput {
+  create: CreateCategoryProductsInput
+  update: UpdateCategoryProductsInputFields
+}
+
+input UpdateCategoryProductsInputFields {
+  id: Int
+  sku: String
+  name: String
+  price: Float
+  stockQuantity: Float
+  status: Int
+  categories: UpdateManyProductCategoriesInput
+  orderItems: UpdateManyProductOrderItemsInput
+  storeProducts: UpdateManyProductStoreProductsInput
+}
+
+input UpdateCategoryProductsInput {
+  data: UpdateCategoryProductsInputFields
+  where: FilterProductInput
+}
+
+input UpdateCategoryCategoryInput {
+  data: UpdateCategoryCategoryInputFields
+  where: FilterCategoryCategoryInput
+}
+
+input UpsertCategoryInput {
+  create: CreateCategoryInput
+  update: UpdateCategoryInput
+}
+
+input CreateManyCategoryCategoryTreeDescendantsInput {
+  connect: [FindCategoryTreeInput]
+  create: [CreateCategoryCategoryTreeDescendantInput]
+  upsert: [UpsertCategoryCategoryTreeDescendantInput]
+}
+
+input CreateManyCategoryProductsInput {
+  connect: [FindProductInput]
+  create: [CreateCategoryProductsInput]
+  upsert: [UpsertCategoryProductsInput]
+}
+
+input UpsertUserOrderInput {
+  create: CreateUserOrderInput
+  update: UpdateUserOrderInputFields
+}
+
+input UpdateUserOrderInputFields {
+  id: Int
+  code: String
+  dateCreated: String
+  deliveryAddress: UpsertDeliveryAddressParentInput
+  isDeleted: Int
+  status: Int
+  orderItems: UpdateManyOrderOrderItemsInput
+  orderShipping: UpdateOneOrderOrderShippingInput
+}
+
+input UpdateUserOrderInput {
+  data: UpdateUserOrderInputFields
+  where: FilterUserOrderInput
+}
+
+input CreateManyUserUserGroupsInput {
+  connect: [FindUserGroupInput]
+  create: [CreateUserUserGroupInput]
+  upsert: [UpsertUserUserGroupInput]
+}
+
+input CreateManyUserOrdersInput {
+  connect: [FindOrderInput]
+  create: [CreateUserOrderInput]
+  upsert: [UpsertUserOrderInput]
+}
+
+input CreateUserProfileInput {
+  user: CreateUserParentInput
+}
+
+input CreateUserGroupInput {
+  id: Int
+  user: CreateUserParentInput
+  group: CreateGroupParentInput
+  dateAdded: String
+}
+
+input CreateCategoryTreeInput {
+  id: Int
+  ancestor: CreateCategoryParentInput
+  descendant: CreateCategoryParentInput
+  distance: Int
+}
+
+input CreateProductCategoryInput {
+  id: Int
+  product: CreateProductParentInput
+  category: CreateCategoryParentInput
+}
+
+input CreateOrderItemInput {
+  id: Int
+  order: CreateOrderParentInput
+  product: CreateProductParentInput
+  quantity: Float
+}
+
+input CreateOrderShippingInput {
+  order: CreateOrderParentInput
+  status: Int
+  orderShippingEvents: CreateManyOrderShippingOrderShippingEventsInput
+}
+
+input CreateOrderShippingEventInput {
+  id: Int
+  orderShipping: CreateOrderShippingParentInput
+  eventTime: String
+  eventDescription: String
+}
+
+input CreateOrderShippingParentInput {
+  connect: FindOrderShippingInput
+  create: CreateOrderShippingInput
+  upsert: UpsertOrderShippingInput
+}
+
+input UpsertOrderShippingInput {
+  create: CreateOrderShippingInput
+  update: UpdateOrderShippingInput
+}
+
+input UpdateOrderShippingInput {
+  order: UpsertOrderParentInput
+  status: Int
+  orderShippingEvents: UpdateManyOrderShippingOrderShippingEventsInput
+}
+
+input CreateStoreProductInput {
+  id: Int
+  store: CreateStoreParentInput
+  product: CreateProductParentInput
+  price: Float
+}
+
+input UpdateUserProfileInput {
+  user: UpsertUserParentInput
+}
+
+input UpdateUserGroupInput {
+  id: Int
+  user: UpsertUserParentInput
+  group: UpsertGroupParentInput
+  dateAdded: String
+}
+
+input UpdateCategoryTreeInput {
+  id: Int
+  ancestor: UpsertCategoryParentInput
+  descendant: UpsertCategoryParentInput
+  distance: Int
+}
+
+input FindProductCategoryInput {
+  id: Int
+  product: FindProductInput
+  category: FindCategoryInput
+}
+
+input UpdateProductCategoryInput {
+  id: Int
+  product: UpsertProductParentInput
+  category: UpsertCategoryParentInput
+}
+
+input UpdateOrderItemInput {
+  id: Int
+  order: UpsertOrderParentInput
+  product: UpsertProductParentInput
+  quantity: Float
+}
+
+input UpdateOrderShippingEventInput {
+  id: Int
+  orderShipping: UpsertOrderShippingParentInput
+  eventTime: String
+  eventDescription: String
+}
+
+input UpsertOrderShippingParentInput {
+  connect: FindOrderShippingInput
+  create: CreateOrderShippingInput
+  update: UpdateOrderShippingInput
+  upsert: UpsertOrderShippingInput
+}
+
+input UpdateStoreProductInput {
+  id: Int
+  store: UpsertStoreParentInput
+  product: UpsertProductParentInput
+  price: Float
+}
+
+type DatabaseQueryResultType {
+  affectedRows: Int
+  changedRows: Int
+}

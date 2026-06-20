@@ -16,25 +16,26 @@ const DB_HOST = process.env.DB_HOST || 'localhost';
 const DB_USER = process.env.DB_USER || 'root';
 const DB_PASS = process.env.DB_PASS || 'secret';
 const DB_NAME = process.env.DB_NAME || 'archen_test';
+const DB_PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined;
 
-const SCHEMA = fs.readFileSync('example/data/schema.sql').toString();
-const DATA = fs.readFileSync('example/data/data.sql').toString();
+const SCHEMA = fs.readFileSync('example/etc/schema.sql').toString();
+const DATA = fs.readFileSync('example/etc/data.sql').toString();
 
-function createSQLite3Database(name): Promise<void> {
+function createSQLite3Database(name: any): Promise<void> {
   const sqlite3 = require('sqlite3');
   const filename = `${DB_NAME}_${name}`;
   return new Promise(resolve => {
     function _create() {
       const db = new sqlite3.Database(filename);
       db.serialize(function() {
-        (SCHEMA + DATA).split(';').forEach(line => {
+        (SCHEMA + DATA).split(';').forEach((line: any) => {
           const stmt = line.replace(/auto_increment|--.*?(\n|$)/gi, '\n');
           if (stmt.trim() && !/^\s*alter/i.test(stmt)) {
             db.run(stmt);
           }
         });
       });
-      db.close(err => {
+      db.close((err: any) => {
         if (err) throw err;
         _resolve();
       });
@@ -44,9 +45,9 @@ function createSQLite3Database(name): Promise<void> {
       resolve();
     }
 
-    fs.exists(filename, exists => {
+    fs.exists(filename, (exists: any) => {
       if (exists) {
-        fs.unlink(filename, err => {
+        fs.unlink(filename, (err: any) => {
           if (err) throw err;
           _create();
         });
@@ -57,12 +58,12 @@ function createSQLite3Database(name): Promise<void> {
   });
 }
 
-function dropSQLite3Database(name): Promise<void> {
+function dropSQLite3Database(name: any): Promise<void> {
   const filename = `${DB_NAME}_${name}`;
   return new Promise(resolve => {
-    fs.access(filename, error => {
+    fs.access(filename, (error: any) => {
       if (!error) {
-        fs.unlink(filename, err => {
+        fs.unlink(filename, (err: any) => {
           if (err) throw err;
           resolve();
         });
@@ -82,6 +83,7 @@ async function createPostgresClient(db?: string) {
   const client = new Client({
     user: DB_USER,
     host: DB_HOST,
+    port: DB_PORT,
     database: db || 'postgres',
     password: DB_PASS
   });
@@ -95,6 +97,7 @@ function createPostgresConnection(name: string): Connection {
   return createConnection('postgres', {
     user: DB_USER,
     host: DB_HOST,
+    port: DB_PORT,
     database: getDatabaseName(name),
     password: DB_PASS
   });
@@ -116,8 +119,8 @@ export async function createPostgresDatabase(
   const sql = SCHEMA + (data ? DATA : '');
   const lines = sql
     .split(';')
-    .filter(line => line.trim())
-    .map(line =>
+    .filter((line: any) => line.trim())
+    .map((line: any) =>
       line
         .replace(/\bdatetime\b/g, 'timestamp(3)')
         .replace(/\buser\b/g, '"user"')
@@ -135,7 +138,7 @@ export async function createPostgresDatabase(
   for (const model of schema.models) {
     if (model.primaryKey.autoIncrement()) {
       const table = model.table.name;
-      const id = model.keyField().column.name;
+      const id = model.keyField()!.column.name;
       const seq = `${table}_${id}_seq`;
       await db.query(
         `SELECT setval('${seq}', COALESCE((SELECT MAX("${id}")+1 FROM "${table}"), 1), false)`
@@ -156,7 +159,7 @@ export async function dropPostgresDatabase(name: string): Promise<void> {
 }
 
 function createMySQLDatabase(name: string, data = true): Promise<any> {
-  const mysql = require('mysql');
+  const mysql = require('mysql2');
   const database = `${DB_NAME}_${name}`;
 
   const db = mysql.createConnection({
@@ -172,12 +175,12 @@ function createMySQLDatabase(name: string, data = true): Promise<any> {
     `create database ${database}`,
     `use ${database}`
   ].concat(sql.split(';')
-   .filter(line => line.trim())
-   .map(line => line.replace(/\b(\d+-\d+-\d+)T(\d+:\d+:\d+\.\d+)Z\b/g, '$1 $2'))
+   .filter((line: any) => line.trim())
+   .map((line: any) => line.replace(/\b(\d+-\d+-\d+)T(\d+:\d+:\d+\.\d+)Z\b/g, '$1 $2'))
   );
-  return serialise(line => {
+  return serialise((line: any) => {
     return new Promise((resolve, reject) => {
-      db.query(line, (error, results, fields) => {
+      db.query(line, (error: any, results: any, fields: any) => {
         if (error) reject(Error(error));
         resolve(results);
       });
@@ -186,7 +189,7 @@ function createMySQLDatabase(name: string, data = true): Promise<any> {
 }
 
 function dropMySQLDatabase(name: string): Promise<void> {
-  const mysql = require('mysql');
+  const mysql = require('mysql2');
   const database = `${DB_NAME}_${name}`;
 
   const db = mysql.createConnection({
@@ -196,7 +199,7 @@ function dropMySQLDatabase(name: string): Promise<void> {
   });
 
   return new Promise(resolve => {
-    db.query(`drop database if exists ${database}`, err => {
+    db.query(`drop database if exists ${database}`, (err: any) => {
       if (err) throw err;
       db.end();
       resolve();
@@ -206,7 +209,7 @@ function dropMySQLDatabase(name: string): Promise<void> {
 
 function createMySQLConnection(name: string): Connection {
   const database = `${DB_NAME}_${name}`;
-  return createConnection('mysql', {
+  return createConnection('mysql2', {
     host: DB_HOST,
     user: DB_USER,
     password: DB_PASS,
@@ -216,16 +219,16 @@ function createMySQLConnection(name: string): Connection {
   });
 }
 
-function serialise(func, argv: any[]) {
+function serialise(func: any, argv: any[]) {
   return new Promise(resolve => {
-    const results = [];
+    const results: any[] = [];
     let next = 0;
     function _resolve() {
       if (next >= argv.length) {
         resolve(results);
       } else {
         const args = argv[next++];
-        func(args).then(result => {
+        func(args).then((result: any) => {
           results.push(result);
           _resolve();
         });
@@ -240,7 +243,7 @@ export function getExampleData() {
     __dirname,
     '..',
     'example',
-    'data',
+    'etc',
     'schema.json'
   );
   return JSON.parse(fs.readFileSync(fileName).toString());
@@ -289,6 +292,7 @@ export function createTestConnectionPool(name: string): ConnectionPool {
   const database = `${DB_NAME}_${name}`;
   return createConnectionPool(DB_TYPE as Dialect, {
     host: DB_HOST,
+    port: DB_PORT,
     user: DB_USER,
     password: DB_PASS,
     database: database,

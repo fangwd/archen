@@ -1,6 +1,7 @@
 import {  Filter, Table } from 'sqlex';
 import { DialectEncoder } from 'sqlex/dist/engine';
 import { ForeignKeyField, Model, SimpleField } from 'sqlex/dist/schema';
+import { QueryBuilder } from 'sqlex/dist/filter';
 import { Value } from 'sqlex/dist/types';
 import { toCamelCase } from 'sqlex/dist/utils';
 
@@ -15,7 +16,7 @@ function buildFilter(
   dialect: DialectEncoder,
   fields: FieldInfo[],
   index: number
-): string {
+): string | undefined {
   const info = fields[index];
   const name = info.field.column.name;
 
@@ -66,12 +67,26 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
   if (options.orderBy)
     orderBy = [...options.orderBy, ...orderBy];
 
-  orderBy = matchUniqueKey(model, orderBy);
+  const matched = matchUniqueKey(model, orderBy);
+  if (!matched)
+    throw new Error(
+      `Cursor pagination on '${model.name}' requires an orderBy that resolves ` +
+        `to a unique key (got: ${orderBy.join(', ')})`
+    );
+  orderBy = matched;
 
-  const builder = function(builder) {
+  // Backward pagination ('before'/'last'): walk the other side of the cursor
+  // by flipping every sort direction, then reverse the rows back into the
+  // requested order once fetched. The column set is unchanged, so cursor
+  // encoding stays direction-independent.
+  const effectiveOrderBy = options.before
+    ? orderBy.map(entry => (entry[0] === '-' ? entry.slice(1) : '-' + entry))
+    : orderBy;
+
+  const builder = function(builder: QueryBuilder) {
     if (options.cursor) {
       const values = decodeCursor(options.cursor);
-      const fields = orderBy.map((entry, index) => {
+      const fields = effectiveOrderBy.map((entry, index) => {
         const [path, desc] =
           entry[0] === '-' ? [entry.substr(1), true] : [entry, false];
         const match = /^(.+)\.([^\.]+)$/.exec(path);
@@ -91,15 +106,16 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
           value: values[index],
         };
       });
-      return buildFilter(table.db.pool, fields, 0);
+      return buildFilter(table.db.pool, fields as FieldInfo[], 0) ?? '';
     }
-    return null;
+    return '';
   };
 
-  const selectOptions = { ...options, orderBy };
+  const selectOptions = { ...options, orderBy: effectiveOrderBy };
 
   const promises: Promise<any>[] = [
     table.select('*', selectOptions, builder).then(rows => {
+      if (options.before) rows.reverse();
       const keys = orderBy.map(s => {
         const name = s.replace(/^-/, '');
         return name.indexOf('.') === -1
@@ -135,15 +151,15 @@ export function cursorQuery(table: Table, options: CursorQueryOptions) {
   }));
 }
 
-export function encodeCursor(data) {
+export function encodeCursor(data: any) {
   return Buffer.from(JSON.stringify(data)).toString('base64');
 }
 
-export function decodeCursor(cursor) {
+export function decodeCursor(cursor: string) {
   return JSON.parse(Buffer.from(cursor, 'base64').toString());
 }
 
-export function matchUniqueKey(model: Model, spec: string[]): string[] {
+export function matchUniqueKey(model: Model, spec: string[]): string[] | null {
   const names = spec.map(name => name.replace(/^-/, '').split('.'));
   const fields = names.map(name => name[0]);
   for (const uniqueKey of model.uniqueKeys) {
@@ -159,7 +175,7 @@ export function matchUniqueKey(model: Model, spec: string[]): string[] {
         let key = field as ForeignKeyField;
         for (let i = 1; i < names[index].length; i++) {
           const model = (key ).referencedField.model;
-          const field = model.field(names[index][i]);
+          const field = model.field(names[index][i])!;
           if (!field.isUnique()) {
             success = false;
             break;
@@ -177,7 +193,7 @@ export function matchUniqueKey(model: Model, spec: string[]): string[] {
   return null;
 }
 
-function escapeFieldValue( dialect: DialectEncoder, field:SimpleField,  value: string | number | boolean | Date): string{
+function escapeFieldValue( dialect: DialectEncoder, field:SimpleField,  value: Value): string{
       if (/int|float|double|number/i.test(field.column.type))
           return +(value as number) + '';
 

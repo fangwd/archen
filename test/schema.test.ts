@@ -20,7 +20,69 @@ test('create schema', () => {
   expect(schema).not.toBe(undefined);
 });
 
-test('create simple object', done => {
+test('one-to-one reverse relation has no leaked dummy field', () => {
+  const { schema } = createSchema(data);
+  const types = schema.getTypeMap();
+  // The base type for a single-FK model carries no synthetic 'dummy' field.
+  const userProfile = types['UserProfile'] as any;
+  expect(Object.keys(userProfile.getFields())).not.toContain('dummy');
+  // The reverse-relation projection type is present and non-empty.
+  const projection = types['UserUserProfile'] as any;
+  expect(projection).toBeDefined();
+  expect(Object.keys(projection.getFields()).length).toBeGreaterThan(0);
+});
+
+describe('access control', () => {
+  function buildSchema(opts: any) {
+    const schema = new Schema(helper.getExampleData());
+    const builder = new GraphQLSchemaBuilder(schema, {
+      getAccessor: (c) => c,
+      ...opts,
+    });
+    return builder.getSchema();
+  }
+
+  test('hiding a model removes its root fields', () => {
+    const schema = buildSchema({ models: { User: false } });
+    const q = schema.getQueryType()!.getFields();
+    expect(q.users).toBeUndefined();
+    expect(q.user).toBeUndefined();
+    expect(q.usersConnection).toBeUndefined();
+    expect(q.products).toBeDefined();
+    const m = schema.getMutationType()!.getFields();
+    expect(m.createUser).toBeUndefined();
+    expect(m.deleteUser).toBeUndefined();
+    expect(m.createProduct).toBeDefined();
+  });
+
+  test('forbidding one operation leaves the others', () => {
+    const schema = buildSchema({ models: { User: { create: false } } });
+    expect(schema.getQueryType()!.getFields().users).toBeDefined();
+    const m = schema.getMutationType()!.getFields();
+    expect(m.createUser).toBeUndefined();
+    expect(m.updateUser).toBeDefined();
+    expect(m.deleteUser).toBeDefined();
+  });
+
+  test('allowAll:false exports only enabled models', () => {
+    const schema = buildSchema({ allowAll: false, models: { Product: true } });
+    const q = schema.getQueryType()!.getFields();
+    expect(q.products).toBeDefined();
+    expect(q.users).toBeUndefined();
+    expect(q.categories).toBeUndefined();
+  });
+
+  test('a read-only API drops the Mutation type', () => {
+    const schema = buildSchema({
+      allowAll: false,
+      models: { Product: { select: true } },
+    });
+    expect(schema.getQueryType()!.getFields().products).toBeDefined();
+    expect(schema.getMutationType()).toBeFalsy();
+  });
+});
+
+test('create simple object', (done) => {
   expect.assertions(6);
 
   const EMAIL = 'user@example.com';
@@ -39,17 +101,22 @@ mutation {
   const archen = createArchen();
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(row => {
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((row: any) => {
       const user = row.data.createUser;
       expect(user.email).toBe(EMAIL);
       expect(user.status).toBe(STATUS);
       archen.db
         .table('user')
         .select('*', { where: { email: EMAIL } })
-        .then(rows => {
+        .then((rows) => {
           expect(rows.length).toBe(1);
-          const row = rows[0];
+          const row: any = rows[0];
           expect(row.id).toBe(user.id);
           expect(row.email).toBe(EMAIL);
           expect(row.status).toBe(STATUS);
@@ -59,7 +126,7 @@ mutation {
     });
 });
 
-test('create object', done => {
+test('create object', (done) => {
   expect.assertions(5);
 
   const DATA = `
@@ -95,8 +162,13 @@ mutation {
   const archen = createArchen();
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(row => {
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((row: any) => {
       const order = row.data.createOrder;
       expect(order.code).toBe('test-001');
       expect(order.orderItems.length).toBe(2);
@@ -104,9 +176,9 @@ mutation {
         .table('OrderItem')
         .select('*', {
           where: { order: { id: order.id } },
-          orderBy: ['product_id']
+          orderBy: ['product_id'],
         })
-        .then(rows => {
+        .then((rows) => {
           expect(rows.length).toBe(2);
           expect((rows[0].product as any).id).toBe(1);
           expect((rows[1].product as any).id).toBe(3);
@@ -116,7 +188,7 @@ mutation {
     });
 });
 
-test('set foreign key null', done => {
+test('set foreign key null', (done) => {
   expect.assertions(2);
 
   const DATA = `
@@ -136,13 +208,18 @@ mutation {
     .table('order')
     .create({
       user: { connect: { id: 1 } }, // FIXME: { id: 1 } doesn't get anything
-      code: 'test-002'
+      code: 'test-002',
     })
-    .then(order => {
+    .then((order) => {
       expect((order.user as any).id).toBe(1);
       graphql
-        .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-        .then(row => {
+        .graphql({
+          schema: archen.schema,
+          source: DATA,
+          rootValue: archen.rootValue,
+          contextValue: archen.accessor,
+        })
+        .then((row: any) => {
           const order = row.data.updateOrder;
           expect(order.user).toBe(null);
           archen.shutdown();
@@ -151,7 +228,7 @@ mutation {
     });
 });
 
-test('one to one - create', done => {
+test('one to one - create', (done) => {
   const ID = 'T001';
 
   const DATA = `
@@ -175,8 +252,13 @@ mutation {
   const archen = createArchen();
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(row => {
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((row: any) => {
       const order = row.data.createOrder;
       expect(order.orderShipping.status).toBe(100);
       archen.shutdown();
@@ -184,12 +266,12 @@ mutation {
     });
 });
 
-test('one to one - create #2', done => {
+test('one to one - create #2', (done) => {
   const archen = createArchen();
 
   const CODE = 'T001A';
 
-  createOrderAndShipping(archen.db, CODE, 100).then(id => {
+  createOrderAndShipping(archen.db, CODE, 100).then((id) => {
     const DATA = `
 mutation {
   updateOrder(
@@ -206,8 +288,13 @@ mutation {
 }
 `;
     graphql
-      .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-      .then(row => {
+      .graphql({
+        schema: archen.schema,
+        source: DATA,
+        rootValue: archen.rootValue,
+        contextValue: archen.accessor,
+      })
+      .then((row: any) => {
         const order = row.data.updateOrder;
         expect(order.orderShipping.status).toBe(200);
         archen.shutdown();
@@ -216,7 +303,7 @@ mutation {
   });
 });
 
-test('one to one - connect', done => {
+test('one to one - connect', (done) => {
   const ID = '002';
 
   const DATA = `
@@ -240,8 +327,13 @@ mutation {
   const archen = createArchen();
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(row => {
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((row: any) => {
       const order = row.data.createOrder;
       expect(order.orderShipping.status).toBe(2);
       archen.shutdown();
@@ -249,7 +341,7 @@ mutation {
     });
 });
 
-test('one to one - connect #2', done => {
+test('one to one - connect #2', (done) => {
   const archen = createArchen();
 
   const CODE_A = 'T003A';
@@ -257,8 +349,8 @@ test('one to one - connect #2', done => {
   const STATUS_A = 300;
   const STATUS_B = 500;
 
-  createOrderAndShipping(archen.db, CODE_A, STATUS_A).then(a => {
-    createOrderAndShipping(archen.db, CODE_B, STATUS_B).then(b => {
+  createOrderAndShipping(archen.db, CODE_A, STATUS_A).then((a) => {
+    createOrderAndShipping(archen.db, CODE_B, STATUS_B).then((b) => {
       const DATA = `
 mutation {
   updateOrder(
@@ -275,8 +367,13 @@ mutation {
 }
 `;
       graphql
-        .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-        .then(row => {
+        .graphql({
+          schema: archen.schema,
+          source: DATA,
+          rootValue: archen.rootValue,
+          contextValue: archen.accessor,
+        })
+        .then((row: any) => {
           const order = row.data.updateOrder;
           expect(order.orderShipping.status).toBe(STATUS_B);
           archen.shutdown();
@@ -286,7 +383,7 @@ mutation {
   });
 });
 
-test('one to one - update', done => {
+test('one to one - update', (done) => {
   const CODE = 'T004';
   const STATUS = 3;
 
@@ -308,10 +405,15 @@ mutation {
 
   const archen = createArchen();
 
-  createOrderAndShipping(archen.db, CODE, STATUS).then(id => {
+  createOrderAndShipping(archen.db, CODE, STATUS).then((id) => {
     graphql
-      .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-      .then(row => {
+      .graphql({
+        schema: archen.schema,
+        source: DATA,
+        rootValue: archen.rootValue,
+        contextValue: archen.accessor,
+      })
+      .then((row: any) => {
         const order = row.data.updateOrder;
         expect(order.orderShipping.status).toBe(STATUS + 1);
         archen.shutdown();
@@ -320,7 +422,7 @@ mutation {
   });
 });
 
-test('one to one - upsert', done => {
+test('one to one - upsert', (done) => {
   const CODE = 'T005';
 
   const DATA = `
@@ -346,10 +448,15 @@ mutation {
 
   const archen = createArchen();
 
-  createOrderAndShipping(archen.db, CODE, 100).then(id => {
+  createOrderAndShipping(archen.db, CODE, 100).then((id) => {
     graphql
-      .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-      .then(row => {
+      .graphql({
+        schema: archen.schema,
+        source: DATA,
+        rootValue: archen.rootValue,
+        contextValue: archen.accessor,
+      })
+      .then((row: any) => {
         const order = row.data.updateOrder;
         expect(order.orderShipping.status).toBe(300);
         archen.shutdown();
@@ -358,7 +465,7 @@ mutation {
   });
 });
 
-test('one to one - delete', done => {
+test('one to one - delete', (done) => {
   expect.assertions(2);
 
   const ID = 'T006';
@@ -384,9 +491,14 @@ mutation {
   const archen = createArchen();
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(row => {
-      const order = row.data.createOrder;
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((row) => {
+      const order = (row.data as any).createOrder;
       expect(order.orderShipping.status).toBe(100);
       archen.shutdown();
       const DATA = `
@@ -407,9 +519,14 @@ mutation {
       // To clear data loader which happens in practice
       const archen2 = createArchen();
       graphql
-        .graphql(archen2.schema, DATA, archen2.rootValue, archen2.accessor)
-        .then(row => {
-          const order = row.data.updateOrder;
+        .graphql({
+          schema: archen2.schema,
+          source: DATA,
+          rootValue: archen2.rootValue,
+          contextValue: archen2.accessor,
+        })
+        .then((row) => {
+          const order = (row.data as any).updateOrder;
           expect(order.orderShipping).toBe(null);
           archen2.shutdown();
           done();
@@ -417,7 +534,7 @@ mutation {
     });
 });
 
-test('many to many #1', done => {
+test('many to many #1', (done) => {
   expect.assertions(1);
 
   const DATA = `
@@ -440,20 +557,25 @@ test('many to many #1', done => {
           {
             column: 'product_id',
             throughField: 'category_id',
-            relatedName: 'categorySet'
-          }
-        ]
-      }
-    ]
+            relatedName: 'categorySet',
+          },
+        ],
+      },
+    ],
   };
 
   const archen = createArchen(CONFIG);
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(result => {
-      const products = result.data.products.filter(
-        p => p.categorySet.length > 0
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((result) => {
+      const products = (result.data as any).products.filter(
+        (p: any) => p.categorySet.length > 0
       );
       expect(products.length).toBe(2);
       archen.shutdown();
@@ -461,7 +583,7 @@ test('many to many #1', done => {
     });
 });
 
-test('many to many #2', done => {
+test('many to many #2', (done) => {
   expect.assertions(1);
 
   const DATA = `
@@ -483,25 +605,30 @@ test('many to many #2', done => {
         fields: [
           {
             column: 'category_id',
-            throughField: 'product_id'
+            throughField: 'product_id',
           },
           {
             column: 'product_id',
             throughField: 'category_id',
-            relatedName: 'categorySet'
-          }
-        ]
-      }
-    ]
+            relatedName: 'categorySet',
+          },
+        ],
+      },
+    ],
   };
 
   const archen = createArchen(CONFIG);
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(result => {
-      const products = result.data.products.filter(
-        p => p.categorySet.length > 0
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((result) => {
+      const products = (result.data as any).products.filter(
+        (p: any) => p.categorySet.length > 0
       );
       expect(products.length).toBe(2);
       archen.shutdown();
@@ -509,7 +636,7 @@ test('many to many #2', done => {
     });
 });
 
-test('update child', done => {
+test('update child', (done) => {
   expect.assertions(2);
 
   const code = 'test-009';
@@ -546,7 +673,7 @@ mutation {
     return archen.db
       .table('order')
       .insert({ code })
-      .then((order :any) => {
+      .then((order: any) => {
         return archen.db
           .table('order_item')
           .insert({ order, product: 1, quantity: 10 })
@@ -558,14 +685,19 @@ mutation {
       });
   }
 
-  _createItems().then(result => {
+  _createItems().then((result) => {
     graphql
-      .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-      .then(result => {
-        const order = result.data.updateOrder;
-        const p1 = order.orderItems.find(x => x.product.id === 1);
+      .graphql({
+        schema: archen.schema,
+        source: DATA,
+        rootValue: archen.rootValue,
+        contextValue: archen.accessor,
+      })
+      .then((result) => {
+        const order: any = result.data!.updateOrder;
+        const p1 = order.orderItems.find((x: any) => x.product.id === 1);
         expect(p1.quantity).toBe(200);
-        const p2 = order.orderItems.find(x => x.product.id === 2);
+        const p2 = order.orderItems.find((x: any) => x.product.id === 2);
         expect(p2.quantity).toBe(20);
         archen.shutdown();
         done();
@@ -573,7 +705,7 @@ mutation {
   });
 });
 
-test('update date', done => {
+test('update date', (done) => {
   expect.assertions(1);
 
   const date = '2019-04-06T16:17:27.000Z';
@@ -590,16 +722,21 @@ mutation {
   const archen = createArchen();
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(row => {
-      const order = row.data.updateOrder;
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((row) => {
+      const order: any = row.data!.updateOrder;
       expect(order.dateCreated).toBe(date);
       archen.shutdown();
       done();
     });
 });
 
-test('order by', done => {
+test('order by', (done) => {
   expect.assertions(1);
 
   const archen = createArchen();
@@ -625,9 +762,14 @@ test('order by', done => {
 `;
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(result => {
-      const orderItems = result.data.orderItems;
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((result) => {
+      const orderItems: any = result.data!.orderItems;
       let ordered = true;
       for (let i = 1; i < orderItems.length; i++) {
         const code = orderItems[i].order.code;
@@ -643,7 +785,7 @@ test('order by', done => {
     });
 });
 
-test('update parent', done => {
+test('update parent', (done) => {
   expect.assertions(1);
 
   const DATA = `
@@ -667,16 +809,21 @@ mutation{
   const archen = createArchen();
 
   graphql
-    .graphql(archen.schema, DATA, archen.rootValue, archen.accessor)
-    .then(result => {
-      const order = result.data.updateOrder;
+    .graphql({
+      schema: archen.schema,
+      source: DATA,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((result) => {
+      const order: any = result.data!.updateOrder;
       expect(order.user.lastName).toBe('updated-last-name');
       archen.shutdown();
       done();
     });
 });
 
-test('user field type', done => {
+test('user field type', (done) => {
   expect.assertions(2);
 
   const data = `
@@ -695,25 +842,35 @@ mutation {
         fields: [
           {
             column: 'is_deleted',
-            userType: 'boolean'
-          }
-        ]
-      }
-    ]
+            userType: 'boolean',
+          },
+        ],
+      },
+    ],
   };
 
   const archen = createArchen(config);
 
   graphql
-    .graphql(archen.schema, data, archen.rootValue, archen.accessor)
-    .then(row => {
-      const order = row.data.updateOrder;
+    .graphql({
+      schema: archen.schema,
+      source: data,
+      rootValue: archen.rootValue,
+      contextValue: archen.accessor,
+    })
+    .then((row) => {
+      const order: any = row.data!.updateOrder;
       expect(order.isDeleted).toBe(true);
       const data2 = data.replace(/\btrue\b/, 'false');
       graphql
-        .graphql(archen.schema, data2, archen.rootValue, archen.accessor)
-        .then(row => {
-          const order = row.data.updateOrder;
+        .graphql({
+          schema: archen.schema,
+          source: data2,
+          rootValue: archen.rootValue,
+          contextValue: archen.accessor,
+        })
+        .then((row) => {
+          const order: any = row.data!.updateOrder;
           expect(order.isDeleted).toBe(false);
           archen.shutdown();
           done();
@@ -731,7 +888,12 @@ test('like', async () => {
 }
 `;
 
-  const result = await graphql.graphql(archen.schema, DATA, archen.rootValue, archen.accessor);
+  const result: any = await graphql.graphql({
+    schema: archen.schema,
+    source: DATA,
+    rootValue: archen.rootValue,
+    contextValue: archen.accessor,
+  });
   const group = result.data.groups[0];
   expect(group.name).toBe('ADMIN');
   archen.shutdown();
@@ -762,12 +924,12 @@ function createOrderAndShipping(
     });
 }
 
-function createSchema(data, config?: SchemaConfig) {
+function createSchema(data: any, config?: SchemaConfig) {
   const schema = data instanceof Schema ? data : new Schema(data, config);
   const builder = new GraphQLSchemaBuilder(schema, {
-    getAccessor: context => {
+    getAccessor: (context) => {
       return context;
-    }
+    },
   });
   return { schema: builder.getSchema(), rootValue: builder.getRootValue() };
 }

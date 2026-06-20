@@ -58,7 +58,7 @@ export function isModelAccessible(
 }
 
 function isModelAllowedWith(
-  config: boolean | string | ModelConfig,
+  config: undefined | boolean | string | ModelConfig,
   field: keyof ModelConfig,
   defaultValue: boolean
 ) {
@@ -71,7 +71,13 @@ function isModelAllowedWith(
   if (typeof config === 'string') {
     return !!config;
   }
-  return config[field];
+  const value = config[field];
+  // An unspecified operation falls back to the default rather than being
+  // treated as forbidden, so `{ create: false }` only disables create.
+  if (value === undefined) {
+    return defaultValue;
+  }
+  return !!value;
 }
 
 export function getModelTypeName(

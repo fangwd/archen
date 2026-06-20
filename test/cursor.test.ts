@@ -48,19 +48,19 @@ test('cursor query', async () => {
 test('matchUniqueKey', () => {
   const schema = new Schema(helper.getExampleData());
   const item = schema.model('OrderItem');
-  expect(matchUniqueKey(item, ['id']).length).toBe(1);
-  expect(matchUniqueKey(item, ['product'])).toBe(null);
-  expect(matchUniqueKey(item, ['product', 'order.code']).length).toBe(2);
-  expect(matchUniqueKey(item, ['product', 'order.user.email'])).toBe(null);
+  expect(matchUniqueKey(item!, ['id'])!.length).toBe(1);
+  expect(matchUniqueKey(item!, ['product'])).toBe(null);
+  expect(matchUniqueKey(item!, ['product', 'order.code'])!.length).toBe(2);
+  expect(matchUniqueKey(item!, ['product', 'order.user.email'])).toBe(null);
 
   const event = schema.model('OrderShippingEvent');
   {
     const spec = ['orderShipping.order.dateCreated', 'eventTime'];
-    expect(matchUniqueKey(event, spec)).toBe(null);
+    expect(matchUniqueKey(event!, spec)).toBe(null);
   }
   {
     const spec = ['eventTime', 'orderShipping.order.code', 'eventDescription'];
-    expect(matchUniqueKey(event, spec).length).toBe(2);
+    expect(matchUniqueKey(event!, spec)!.length).toBe(2);
   }
 });
 

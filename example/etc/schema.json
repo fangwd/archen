@@ -32,6 +32,11 @@
                     "name": "status",
                     "type": "int",
                     "nullable": true
+                },
+                {
+                    "name": "meta",
+                    "type": "json",
+                    "nullable": true
                 }
             ],
             "constraints": [
